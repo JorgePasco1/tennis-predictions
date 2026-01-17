@@ -9,7 +9,7 @@ import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "~/components/ui/sheet";
 
-function SidebarContent() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 	const pathname = usePathname();
 	const { user } = useUser();
 	const isAdmin = user?.publicMetadata?.role === "admin";
@@ -36,7 +36,11 @@ function SidebarContent() {
 		<div className="flex h-full flex-col">
 			{/* Logo */}
 			<div className="p-6">
-				<Link className="flex items-center gap-2" href="/tournaments">
+				<Link
+					className="flex items-center gap-2"
+					href="/tournaments"
+					onClick={onNavigate}
+				>
 					<Trophy className="h-6 w-6 text-primary" />
 					<h2 className="font-bold text-xl">Tennis Predictions</h2>
 				</Link>
@@ -57,7 +61,7 @@ function SidebarContent() {
 							key={item.href}
 							variant={isActive ? "secondary" : "ghost"}
 						>
-							<Link href={item.href}>
+							<Link href={item.href} onClick={onNavigate}>
 								<Icon className="mr-2 h-4 w-4" />
 								{item.label}
 							</Link>
@@ -73,7 +77,7 @@ function SidebarContent() {
 							className="w-full justify-start"
 							variant={pathname.startsWith("/admin") ? "secondary" : "ghost"}
 						>
-							<Link href="/admin">
+							<Link href="/admin" onClick={onNavigate}>
 								<Settings className="mr-2 h-4 w-4" />
 								Admin
 							</Link>
@@ -139,16 +143,7 @@ export function Sidebar() {
 							</Button>
 						</SheetTrigger>
 						<SheetContent className="w-60 p-0" side="left">
-							{/* Wrap UserButton click handler to close sheet */}
-							<div
-								onClick={() => {
-									// Close sheet when user interacts with UserButton area
-									// This allows Clerk's modal to open properly
-									setSheetOpen(false);
-								}}
-							>
-								<SidebarContent />
-							</div>
+							<SidebarContent onNavigate={() => setSheetOpen(false)} />
 						</SheetContent>
 					</Sheet>
 				</div>
