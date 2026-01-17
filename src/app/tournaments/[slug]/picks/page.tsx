@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -26,13 +26,15 @@ export default function PicksPage({
 
 	const { data: tournament } = api.tournaments.getBySlug.useQuery({ slug });
 	const submitPicksMutation = api.picks.submitRoundPicks.useMutation();
+	const saveDraftMutation = api.picks.saveRoundPicksDraft.useMutation();
 
 	const activeRound = tournament?.rounds.find((r) => r.isActive);
+	const hasLoadedDraft = useRef(false);
 
 	// Query for existing user picks for the active round
 	const { data: existingPicks } = api.picks.getUserRoundPicks.useQuery(
 		{ roundId: activeRound?.id ?? 0 },
-		{ enabled: !!activeRound?.id }
+		{ enabled: !!activeRound?.id },
 	);
 
 	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -47,6 +49,61 @@ export default function PicksPage({
 			}
 		>
 	>({});
+
+	// Load draft picks when available
+	useEffect(() => {
+		if (existingPicks?.isDraft && !hasLoadedDraft.current) {
+			hasLoadedDraft.current = true;
+			const loadedPicks: typeof picks = {};
+			for (const pick of existingPicks.matchPicks) {
+				loadedPicks[pick.matchId] = {
+					predictedWinner: pick.predictedWinner,
+					predictedSetsWon: pick.predictedSetsWon,
+					predictedSetsLost: pick.predictedSetsLost,
+				};
+			}
+			setPicks(loadedPicks);
+		}
+	}, [existingPicks]);
+
+	// Auto-save draft (debounced - 30 seconds after last change)
+	useEffect(() => {
+		// Only auto-save if we have picks and no final submission
+		if (Object.keys(picks).length === 0) return;
+		if (existingPicks && !existingPicks.isDraft) return;
+		if (!activeRound) return;
+
+		const timer = setTimeout(() => {
+			handleSaveDraft(true);
+		}, 30000);
+
+		return () => clearTimeout(timer);
+	}, [picks, activeRound?.id]);
+
+	const handleSaveDraft = async (isAutoSave = false) => {
+		if (!activeRound || Object.keys(picks).length === 0) return;
+
+		const picksArray = Object.entries(picks).map(([matchId, pick]) => ({
+			matchId: Number(matchId),
+			...pick,
+		}));
+
+		try {
+			await saveDraftMutation.mutateAsync({
+				roundId: activeRound.id,
+				picks: picksArray,
+			});
+			if (!isAutoSave) {
+				toast.success("Draft saved");
+			}
+		} catch (error) {
+			if (!isAutoSave) {
+				toast.error(
+					error instanceof Error ? error.message : "Failed to save draft",
+				);
+			}
+		}
+	};
 
 	if (!tournament) {
 		return (
@@ -113,12 +170,14 @@ export default function PicksPage({
 			toast.success("Picks submitted successfully!");
 			router.push(`/tournaments/${slug}`);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to submit picks");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to submit picks",
+			);
 		}
 	};
 
-	// If user has already submitted picks for this round, show readonly view
-	if (existingPicks) {
+	// If user has already submitted final picks for this round, show readonly view
+	if (existingPicks && !existingPicks.isDraft) {
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<nav className="border-b bg-white">
@@ -160,7 +219,9 @@ export default function PicksPage({
 					{/* ATP URL Reference */}
 					{tournament.atpUrl && (
 						<div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
-							<div className="mb-2 font-semibold text-blue-900">📊 Tournament Information</div>
+							<div className="mb-2 font-semibold text-blue-900">
+								📊 Tournament Information
+							</div>
 							<p className="text-blue-800">
 								View the official tournament draw and details:{" "}
 								<a
@@ -209,7 +270,8 @@ export default function PicksPage({
 														: "border-gray-200 bg-gray-50 text-gray-500"
 												}`}
 											>
-												{pick.match.player1Seed && `(${pick.match.player1Seed}) `}
+												{pick.match.player1Seed &&
+													`(${pick.match.player1Seed}) `}
 												{pick.match.player1Name}
 											</div>
 											<div
@@ -219,7 +281,8 @@ export default function PicksPage({
 														: "border-gray-200 bg-gray-50 text-gray-500"
 												}`}
 											>
-												{pick.match.player2Seed && `(${pick.match.player2Seed}) `}
+												{pick.match.player2Seed &&
+													`(${pick.match.player2Seed}) `}
 												{pick.match.player2Name}
 											</div>
 										</div>
@@ -230,7 +293,7 @@ export default function PicksPage({
 										<label className="mb-2 block font-medium text-gray-700 text-sm">
 											Your Predicted Score
 										</label>
-										<div className="rounded-lg border-2 border-blue-600 bg-blue-50 px-4 py-2 font-semibold text-blue-900 text-center">
+										<div className="rounded-lg border-2 border-blue-600 bg-blue-50 px-4 py-2 text-center font-semibold text-blue-900">
 											{pick.predictedSetsWon}-{pick.predictedSetsLost}
 										</div>
 									</div>
@@ -266,6 +329,26 @@ export default function PicksPage({
 					</p>
 				</div>
 
+				{/* Draft Status Banner */}
+				{existingPicks?.isDraft && (
+					<div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
+						<div className="mb-2 font-semibold text-blue-900">
+							📝 Draft Saved
+						</div>
+						<p className="text-blue-800">
+							Your picks are saved as a draft. Complete all picks and submit to
+							finalize. Last saved:{" "}
+							{new Date(existingPicks.submittedAt).toLocaleDateString("en-US", {
+								month: "long",
+								day: "numeric",
+								year: "numeric",
+								hour: "numeric",
+								minute: "2-digit",
+							})}
+						</p>
+					</div>
+				)}
+
 				{/* Warning */}
 				<div className="mb-8 rounded-lg border border-yellow-200 bg-yellow-50 p-6">
 					<div className="mb-2 font-semibold text-yellow-900">⚠️ Important</div>
@@ -278,7 +361,9 @@ export default function PicksPage({
 				{/* ATP URL Reference */}
 				{tournament.atpUrl && (
 					<div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
-						<div className="mb-2 font-semibold text-blue-900">📊 Tournament Information</div>
+						<div className="mb-2 font-semibold text-blue-900">
+							📊 Tournament Information
+						</div>
 						<p className="text-blue-800">
 							View the official tournament draw and details:{" "}
 							<a
@@ -332,7 +417,8 @@ export default function PicksPage({
 													[match.id]: {
 														predictedWinner: match.player1Name,
 														predictedSetsWon:
-															prev[match.id]?.predictedSetsWon ?? (tournament.format === "bo5" ? 3 : 2),
+															prev[match.id]?.predictedSetsWon ??
+															(tournament.format === "bo5" ? 3 : 2),
 														predictedSetsLost:
 															prev[match.id]?.predictedSetsLost ?? 0,
 													},
@@ -354,7 +440,8 @@ export default function PicksPage({
 													[match.id]: {
 														predictedWinner: match.player2Name,
 														predictedSetsWon:
-															prev[match.id]?.predictedSetsWon ?? (tournament.format === "bo5" ? 3 : 2),
+															prev[match.id]?.predictedSetsWon ??
+															(tournament.format === "bo5" ? 3 : 2),
 														predictedSetsLost:
 															prev[match.id]?.predictedSetsLost ?? 0,
 													},
@@ -373,7 +460,9 @@ export default function PicksPage({
 										<label className="mb-2 block font-medium text-gray-700 text-sm">
 											Predicted Score
 										</label>
-										<div className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}>
+										<div
+											className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
+										>
 											{tournament.format === "bo3" ? (
 												<>
 													<button
@@ -502,25 +591,42 @@ export default function PicksPage({
 									`${activeRound.scoringRule.pointsPerWinner} points per correct winner, +${activeRound.scoringRule.pointsExactScore} for exact score`}
 							</div>
 						</div>
-						<button
-							className="rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-							disabled={!allPicksComplete || submitPicksMutation.isPending}
-							onClick={handleSubmitClick}
-						>
-							{submitPicksMutation.isPending
-								? "Submitting..."
-								: "Submit All Picks"}
-						</button>
+						<div className="flex gap-4">
+							<button
+								className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={
+									saveDraftMutation.isPending || Object.keys(picks).length === 0
+								}
+								onClick={() => handleSaveDraft(false)}
+							>
+								{saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
+							</button>
+							<button
+								className="rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={!allPicksComplete || submitPicksMutation.isPending}
+								onClick={handleSubmitClick}
+							>
+								{submitPicksMutation.isPending
+									? "Submitting..."
+									: existingPicks?.isDraft
+										? "Submit Final Picks"
+										: "Submit All Picks"}
+							</button>
+						</div>
 					</div>
 				</div>
 
 				{/* Confirmation Dialog */}
-				<AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+				<AlertDialog
+					onOpenChange={setShowConfirmDialog}
+					open={showConfirmDialog}
+				>
 					<AlertDialogContent>
 						<AlertDialogHeader>
 							<AlertDialogTitle>Confirm Submission</AlertDialogTitle>
 							<AlertDialogDescription>
-								Once submitted, your picks cannot be changed. Are you sure you want to submit?
+								Once submitted, your picks cannot be changed. Are you sure you
+								want to submit?
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>

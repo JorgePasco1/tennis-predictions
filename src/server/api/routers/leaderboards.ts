@@ -2,7 +2,13 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { rounds, tournaments, userRoundPicks, users } from "~/server/db/schema";
+import {
+	matchPicks,
+	rounds,
+	tournaments,
+	userRoundPicks,
+	users,
+} from "~/server/db/schema";
 
 export const leaderboardsRouter = createTRPCRouter({
 	/**
@@ -186,4 +192,131 @@ export const leaderboardsRouter = createTRPCRouter({
 				...leaderboard[userIndex],
 			};
 		}),
+
+	/**
+	 * Get comprehensive stats for the current user
+	 */
+	getUserStats: protectedProcedure.query(async ({ ctx }) => {
+		// Get all user's round picks with tournament context (only final submissions)
+		const userPicks = await ctx.db.query.userRoundPicks.findMany({
+			where: and(
+				eq(userRoundPicks.userId, ctx.user.id),
+				eq(userRoundPicks.isDraft, false),
+			),
+			with: {
+				round: {
+					with: {
+						tournament: true,
+					},
+				},
+				matchPicks: true,
+			},
+			orderBy: [desc(userRoundPicks.submittedAt)],
+		});
+
+		// Calculate overall stats
+		const totalPoints = userPicks.reduce((sum, p) => sum + p.totalPoints, 0);
+		const totalCorrectWinners = userPicks.reduce(
+			(sum, p) => sum + p.correctWinners,
+			0,
+		);
+		const totalExactScores = userPicks.reduce(
+			(sum, p) => sum + p.exactScores,
+			0,
+		);
+		const totalPredictions = userPicks.reduce(
+			(sum, p) => sum + p.matchPicks.length,
+			0,
+		);
+
+		const accuracy =
+			totalPredictions > 0 ? (totalCorrectWinners / totalPredictions) * 100 : 0;
+		const exactScoreRate =
+			totalPredictions > 0 ? (totalExactScores / totalPredictions) * 100 : 0;
+
+		// Get rank from all-time leaderboard
+		const allTimeLeaderboard = await ctx.db
+			.select({
+				odUserId: userRoundPicks.userId,
+				odTotalPoints: sql<number>`SUM(${userRoundPicks.totalPoints})`,
+			})
+			.from(userRoundPicks)
+			.where(eq(userRoundPicks.isDraft, false))
+			.groupBy(userRoundPicks.userId)
+			.orderBy(desc(sql`SUM(${userRoundPicks.totalPoints})`));
+
+		const userRank =
+			allTimeLeaderboard.findIndex((u) => u.odUserId === ctx.user.id) + 1;
+
+		// Group by tournament
+		const tournamentMap = new Map<
+			number,
+			{
+				tournamentId: number;
+				tournamentName: string;
+				tournamentYear: number;
+				points: number;
+				correctWinners: number;
+				exactScores: number;
+				roundsPlayed: number;
+				predictions: number;
+			}
+		>();
+
+		for (const pick of userPicks) {
+			const tid = pick.round.tournament.id;
+			if (!tournamentMap.has(tid)) {
+				tournamentMap.set(tid, {
+					tournamentId: tid,
+					tournamentName: pick.round.tournament.name,
+					tournamentYear: pick.round.tournament.year,
+					points: 0,
+					correctWinners: 0,
+					exactScores: 0,
+					roundsPlayed: 0,
+					predictions: 0,
+				});
+			}
+			const t = tournamentMap.get(tid)!;
+			t.points += pick.totalPoints;
+			t.correctWinners += pick.correctWinners;
+			t.exactScores += pick.exactScores;
+			t.roundsPlayed += 1;
+			t.predictions += pick.matchPicks.length;
+		}
+
+		const tournamentsList = Array.from(tournamentMap.values())
+			.map((t) => ({
+				...t,
+				accuracy:
+					t.predictions > 0 ? (t.correctWinners / t.predictions) * 100 : 0,
+			}))
+			.sort((a, b) => b.points - a.points);
+
+		return {
+			overall: {
+				totalPoints,
+				totalCorrectWinners,
+				totalExactScores,
+				totalPredictions,
+				accuracy,
+				exactScoreRate,
+				rank: userRank || null,
+				totalPlayers: allTimeLeaderboard.length,
+				tournamentsPlayed: tournamentsList.length,
+				roundsPlayed: userPicks.length,
+			},
+			tournaments: tournamentsList,
+			bestTournament: tournamentsList[0] ?? null,
+			recentActivity: userPicks.slice(0, 5).map((p) => ({
+				roundName: p.round.name,
+				tournamentName: p.round.tournament.name,
+				tournamentYear: p.round.tournament.year,
+				totalPoints: p.totalPoints,
+				correctWinners: p.correctWinners,
+				exactScores: p.exactScores,
+				submittedAt: p.submittedAt,
+			})),
+		};
+	}),
 });

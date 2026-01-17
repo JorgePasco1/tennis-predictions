@@ -1,7 +1,7 @@
 "use client";
 
 import { UserButton, useUser } from "@clerk/nextjs";
-import { BarChart3, Menu, Settings, Trophy } from "lucide-react";
+import { BarChart3, Menu, Settings, TrendingUp, Trophy } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -24,6 +24,11 @@ function SidebarContent() {
 			href: "/leaderboards",
 			label: "Leaderboards",
 			icon: BarChart3,
+		},
+		{
+			href: "/stats",
+			label: "My Stats",
+			icon: TrendingUp,
 		},
 	];
 
@@ -88,7 +93,16 @@ function SidebarContent() {
 							avatarBox: "h-10 w-10",
 						},
 					}}
-				/>
+				>
+					<UserButton.MenuItems>
+						<UserButton.Link
+							href="/stats"
+							label="My Stats"
+							labelIcon={<TrendingUp className="h-4 w-4" />}
+						/>
+						<UserButton.Action label="manageAccount" />
+					</UserButton.MenuItems>
+				</UserButton>
 			</div>
 		</div>
 	);
@@ -97,6 +111,7 @@ function SidebarContent() {
 export function Sidebar() {
 	// Delay rendering the mobile sheet until after hydration to avoid ID mismatch
 	const [mounted, setMounted] = useState(false);
+	const [sheetOpen, setSheetOpen] = useState(false);
 
 	useEffect(() => {
 		setMounted(true);
@@ -112,10 +127,10 @@ export function Sidebar() {
 			{/* Mobile Sidebar - only render after hydration to avoid Radix ID mismatch */}
 			{mounted && (
 				<div className="md:hidden">
-					<Sheet>
+					<Sheet onOpenChange={setSheetOpen} open={sheetOpen}>
 						<SheetTrigger asChild>
 							<Button
-								className="fixed left-4 top-4 z-40"
+								className="fixed top-4 left-4 z-40"
 								size="icon"
 								variant="outline"
 							>
@@ -124,7 +139,16 @@ export function Sidebar() {
 							</Button>
 						</SheetTrigger>
 						<SheetContent className="w-60 p-0" side="left">
-							<SidebarContent />
+							{/* Wrap UserButton click handler to close sheet */}
+							<div
+								onClick={() => {
+									// Close sheet when user interacts with UserButton area
+									// This allows Clerk's modal to open properly
+									setSheetOpen(false);
+								}}
+							>
+								<SidebarContent />
+							</div>
 						</SheetContent>
 					</Sheet>
 				</div>
