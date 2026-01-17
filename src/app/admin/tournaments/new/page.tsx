@@ -45,11 +45,19 @@ export default function NewTournamentPage() {
 		const reader = new FileReader();
 
 		reader.onload = async (e) => {
-			const htmlContent = e.target?.result as string;
+			const arrayBuffer = e.target?.result as ArrayBuffer;
+
+			// Convert to base64 for safe transmission via tRPC
+			const bytes = new Uint8Array(arrayBuffer);
+			let binary = '';
+			for (let i = 0; i < bytes.byteLength; i++) {
+				binary += String.fromCharCode(bytes[i]!);
+			}
+			const htmlContentBase64 = btoa(binary);
 
 			try {
 				const result = await uploadMutation.mutateAsync({
-					htmlContent,
+					htmlContentBase64,
 					year,
 				});
 
@@ -61,7 +69,7 @@ export default function NewTournamentPage() {
 			}
 		};
 
-		reader.readAsText(file);
+		reader.readAsArrayBuffer(file);
 	};
 
 	const handleCommit = async () => {

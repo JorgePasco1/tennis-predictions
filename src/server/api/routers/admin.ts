@@ -19,17 +19,21 @@ import { calculateMatchPickScores } from "~/server/services/scoring";
 export const adminRouter = createTRPCRouter({
 	/**
 	 * Parse and preview ATP draw from HTML content
+	 * The htmlContent should be base64-encoded to safely transmit large files
 	 */
 	uploadDraw: adminProcedure
 		.input(
 			z.object({
-				htmlContent: z.string(),
+				htmlContentBase64: z.string(),
 				year: z.number().int().min(2000).max(2100),
 			}),
 		)
 		.mutation(async ({ input }) => {
+			// Decode base64 to get the HTML/MHTML content
+			const htmlContent = Buffer.from(input.htmlContentBase64, "base64").toString("utf-8");
+
 			// Parse the draw
-			const parsedDraw = parseAtpDraw(input.htmlContent);
+			const parsedDraw = parseAtpDraw(htmlContent);
 
 			// Validate the parsed draw
 			const validation = validateParsedDraw(parsedDraw);

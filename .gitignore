@@ -48,3 +48,6 @@ yarn-error.log*
 # html files
 *.html
 *.mhtml
+
+# Agents
+.claude/settings.local.json

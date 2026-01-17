@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { decodeMhtml } from "./mhtmlDecoder";
 
 export interface ParsedMatch {
 	matchNumber: number;
@@ -21,148 +22,138 @@ export interface ParsedDraw {
 
 /**
  * Parse ATP draw HTML/MHTML content
- * This parser needs to be tested with actual ATP files and adjusted accordingly
+ * Supports the official ATP Tour website draw format
  */
-export function parseAtpDraw(htmlContent: string): ParsedDraw {
+export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
+	// Decode MHTML if needed
+	const htmlContent = decodeMhtml(htmlOrMhtmlContent);
+
 	const $ = cheerio.load(htmlContent);
 
-	// Try to extract tournament name from title or h1
+	// Extract tournament name from title
 	let tournamentName = $("title").text().trim();
-	if (!tournamentName) {
-		tournamentName = $("h1").first().text().trim();
-	}
-	if (!tournamentName) {
+
+	// Clean up tournament name (remove "| Draws | ATP Tour | Tennis" suffix)
+	tournamentName = tournamentName
+		.replace(/\s*\|.*$/i, "")
+		.trim();
+
+	if (!tournamentName || tournamentName === "") {
 		tournamentName = "Unknown Tournament";
 	}
 
-	// Clean up tournament name (remove "- Singles Draw" or similar suffixes)
-	tournamentName = tournamentName
-		.replace(/\s*-\s*(Men's\s+)?Singles(\s+Draw)?.*$/i, "")
-		.trim();
-
 	const rounds: ParsedRound[] = [];
 
-	// Standard ATP tournament rounds for a 128-player draw (Grand Slam)
-	// Adjust based on actual tournament size
-	const roundNames = [
-		"First Round",
-		"Second Round",
-		"Third Round",
-		"Fourth Round",
-		"Quarterfinals",
-		"Semifinals",
-		"Final",
-	];
+	// ATP website uses class="draw draw-round-1", "draw draw-round-2", etc.
+	// Find all round containers by looking for elements with classes starting with "draw-round-"
+	// We need to select by multiple class names as cheerio's [class*=] doesn't work as expected
+	const allDivs = $("div[class]");
+	const roundElements: cheerio.Element[] = [];
 
-	// This is a placeholder parser structure
-	// The actual selectors will need to be adjusted based on real ATP HTML structure
-	// Common patterns to look for:
-	// - Tables with match data
-	// - Divs with player names
-	// - Sections organized by round
+	allDivs.each((_, el) => {
+		const className = $(el).attr("class") || "";
+		// Only match divs that start with "draw draw-round-" to avoid nested elements
+		if (/^draw draw-round-\d+/.test(className)) {
+			roundElements.push(el);
+		}
+	});
 
-	// Try to find draw sections
-	const drawSections = $(".draw-section, .round, [class*='round']");
+	if (roundElements.length === 0) {
+		// No rounds found
+		return {
+			tournamentName,
+			rounds: [],
+		};
+	}
 
-	if (drawSections.length > 0) {
-		// Parse each round section
-		drawSections.each((roundIndex, roundElement) => {
-			const matches: ParsedMatch[] = [];
-			const $round = $(roundElement);
+	for (let roundIndex = 0; roundIndex < roundElements.length; roundIndex++) {
+		const roundElement = roundElements[roundIndex];
+		if (!roundElement) continue;
 
-			// Try to find matches within this round
-			const matchElements = $round.find(
-				".match, [class*='match'], tr:has(td:contains)",
-			);
+		const $round = $(roundElement);
 
-			let matchNumber = 1;
-			matchElements.each((_, matchElement) => {
-				const $match = $(matchElement);
+		// Get round name from draw-header
+		const roundName = $round.find(".draw-header").text().trim() || `Round ${roundIndex + 1}`;
 
-				// Try to extract player names and seeds
-				// This is a generic approach - adjust based on actual HTML structure
-				const playerElements = $match.find(
-					".player, [class*='player'], td",
-				);
+		// Find all matches in this round (each draw-item is a match)
+		const matchItems = $round.find(".draw-item");
+		const matches: ParsedMatch[] = [];
 
-				if (playerElements.length >= 2) {
-					const player1Text = $(playerElements[0]).text().trim();
-					const player2Text = $(playerElements[1]).text().trim();
+		matchItems.each((matchIndex, matchElement) => {
+			const $match = $(matchElement);
 
-					// Extract seed numbers (usually in parentheses or brackets)
-					const { name: player1Name, seed: player1Seed } =
-						extractPlayerInfo(player1Text);
-					const { name: player2Name, seed: player2Seed } =
-						extractPlayerInfo(player2Text);
+			// Each match has two stats-item elements (one for each player)
+			const playerElements = $match.find(".stats-item");
 
-					if (player1Name && player2Name) {
-						matches.push({
-							matchNumber: matchNumber++,
-							player1Name,
-							player2Name,
-							player1Seed,
-							player2Seed,
-						});
-					}
+			if (playerElements.length >= 2) {
+				// Parse player 1
+				const $player1 = $(playerElements[0]);
+				const player1Info = parsePlayerFromStatsItem($player1, $);
+
+				// Parse player 2
+				const $player2 = $(playerElements[1]);
+				const player2Info = parsePlayerFromStatsItem($player2, $);
+
+				// Only add if both players have names
+				if (player1Info.name && player2Info.name) {
+					matches.push({
+						matchNumber: matchIndex + 1,
+						player1Name: player1Info.name,
+						player2Name: player2Info.name,
+						player1Seed: player1Info.seed,
+						player2Seed: player2Info.seed,
+					});
 				}
-			});
-
-			if (matches.length > 0) {
-				rounds.push({
-					roundNumber: roundIndex + 1,
-					name: roundNames[roundIndex] ?? `Round ${roundIndex + 1}`,
-					matches,
-				});
 			}
 		});
-	} else {
-		// Fallback: try to parse a simple table structure
-		const tables = $("table");
 
-		tables.each((tableIndex, table) => {
-			const $table = $(table);
-			const matches: ParsedMatch[] = [];
-			let matchNumber = 1;
-
-			$table.find("tr").each((_, row) => {
-				const $row = $(row);
-				const cells = $row.find("td");
-
-				if (cells.length >= 2) {
-					const player1Text = $(cells[0]).text().trim();
-					const player2Text = $(cells[1]).text().trim();
-
-					const { name: player1Name, seed: player1Seed } =
-						extractPlayerInfo(player1Text);
-					const { name: player2Name, seed: player2Seed } =
-						extractPlayerInfo(player2Text);
-
-					if (player1Name && player2Name) {
-						matches.push({
-							matchNumber: matchNumber++,
-							player1Name,
-							player2Name,
-							player1Seed,
-							player2Seed,
-						});
-					}
-				}
+		if (matches.length > 0) {
+			rounds.push({
+				roundNumber: roundIndex + 1,
+				name: roundName,
+				matches,
 			});
-
-			if (matches.length > 0) {
-				rounds.push({
-					roundNumber: tableIndex + 1,
-					name: roundNames[tableIndex] ?? `Round ${tableIndex + 1}`,
-					matches,
-				});
-			}
-		});
+		}
 	}
 
 	return {
 		tournamentName,
 		rounds,
 	};
+}
+
+/**
+ * Parse player information from a stats-item element
+ */
+function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio, $: cheerio.CheerioAPI): {
+	name: string;
+	seed: number | null;
+} {
+	// Find the player name element
+	const $nameDiv = $statsItem.find(".player-info .name");
+
+	if ($nameDiv.length === 0) {
+		return { name: "", seed: null };
+	}
+
+	// Get the player name from the link text
+	const $link = $nameDiv.find("a");
+	let name = $link.text().trim();
+
+	// Get the seed from the span (if exists)
+	const $seedSpan = $nameDiv.find("span");
+	let seed: number | null = null;
+
+	if ($seedSpan.length > 0) {
+		const seedText = $seedSpan.text().trim();
+		// Seed is in format "(1)" or "(32)"
+		const seedMatch = seedText.match(/\((\d+)\)/);
+		if (seedMatch && seedMatch[1]) {
+			seed = Number.parseInt(seedMatch[1], 10);
+		}
+	}
+
+	return { name, seed };
 }
 
 /**
