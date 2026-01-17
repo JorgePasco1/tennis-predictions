@@ -42,8 +42,8 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 								? user.firstName
 								: user.username
 									? user.username
-									: user.emailAddresses[0]?.emailAddress?.split("@")[0] ??
-										"User",
+									: (user.emailAddresses[0]?.emailAddress?.split("@")[0] ??
+										"User"),
 					role:
 						(user.publicMetadata.role as "user" | "admin" | undefined) ??
 						"user",

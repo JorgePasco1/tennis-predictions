@@ -248,7 +248,8 @@ export default function NewTournamentPage() {
 							</h3>
 							<p className="text-blue-800">Year: {parsedDraw.year}</p>
 							<p className="text-blue-800">
-								Format: {format === "bo3" ? "Best of 3" : "Best of 5 (Grand Slam)"}
+								Format:{" "}
+								{format === "bo3" ? "Best of 3" : "Best of 5 (Grand Slam)"}
 							</p>
 							{atpUrl && (
 								<p className="text-blue-800">
@@ -299,7 +300,9 @@ export default function NewTournamentPage() {
 													onClick={() => toggleRoundExpanded(round.roundNumber)}
 													type="button"
 												>
-													{isExpanded ? "Show less" : `Show all ${round.matches.length}`}
+													{isExpanded
+														? "Show less"
+														: `Show all ${round.matches.length}`}
 												</button>
 											)}
 										</div>

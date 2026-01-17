@@ -1,4 +1,5 @@
-- [ ] Fix floating menu button overlapping with content on mobile version
+- [x] Fix floating menu button overlapping with content on mobile version
 - [ ] Add a profile settings page (Implement Manage Account button)
-- [ ] Add a personal stats page
-- [ ] Draft mode for picks
+- [x] Add a personal stats page
+- [x] Draft mode for picks
+- [ ] In picks page, When clicking on save with unpicked matches, tapping or clicking on the button should take you to that missing item.

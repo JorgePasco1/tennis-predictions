@@ -203,7 +203,9 @@ export default function AdminTournamentManagePage({
 						<div className="space-y-2 text-gray-700">
 							<p>
 								<span className="font-medium">Format:</span>{" "}
-								{tournament.format === "bo5" ? "Best of 5 (Grand Slam)" : "Best of 3"}
+								{tournament.format === "bo5"
+									? "Best of 5 (Grand Slam)"
+									: "Best of 3"}
 							</p>
 							<p>
 								<span className="font-medium">ATP URL:</span>{" "}
@@ -254,7 +256,9 @@ export default function AdminTournamentManagePage({
 											type="radio"
 											value="bo5"
 										/>
-										<span className="text-gray-700">Best of 5 (Grand Slams)</span>
+										<span className="text-gray-700">
+											Best of 5 (Grand Slams)
+										</span>
 									</label>
 								</div>
 							</div>
@@ -285,7 +289,9 @@ export default function AdminTournamentManagePage({
 									onClick={handleSaveProperties}
 									type="button"
 								>
-									{updateTournamentMutation.isPending ? "Saving..." : "Save Changes"}
+									{updateTournamentMutation.isPending
+										? "Saving..."
+										: "Save Changes"}
 								</button>
 								<button
 									className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition hover:bg-gray-50"

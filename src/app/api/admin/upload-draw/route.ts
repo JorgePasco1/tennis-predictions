@@ -1,9 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { NextResponse, type NextRequest } from "next/server";
-import {
-	parseAtpDraw,
-	validateParsedDraw,
-} from "~/server/services/drawParser";
+import { type NextRequest, NextResponse } from "next/server";
+import { parseAtpDraw, validateParsedDraw } from "~/server/services/drawParser";
 
 /**
  * REST endpoint for uploading and parsing ATP draw files
@@ -16,10 +13,7 @@ export async function POST(request: NextRequest) {
 		// Check authentication
 		const user = await currentUser();
 		if (!user) {
-			return NextResponse.json(
-				{ error: "Unauthorized" },
-				{ status: 401 }
-			);
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		// Check admin role
@@ -27,7 +21,7 @@ export async function POST(request: NextRequest) {
 		if (role !== "admin") {
 			return NextResponse.json(
 				{ error: "Forbidden - Admin access required" },
-				{ status: 403 }
+				{ status: 403 },
 			);
 		}
 
@@ -39,7 +33,7 @@ export async function POST(request: NextRequest) {
 		if (!file) {
 			return NextResponse.json(
 				{ error: "Missing file in form data" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -47,7 +41,7 @@ export async function POST(request: NextRequest) {
 		if (!year || year < 2000 || year > 2100) {
 			return NextResponse.json(
 				{ error: "Missing or invalid year (must be between 2000 and 2100)" },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -57,8 +51,10 @@ export async function POST(request: NextRequest) {
 			htmlContent = await file.text();
 		} catch (readError) {
 			return NextResponse.json(
-				{ error: `Failed to read file: ${readError instanceof Error ? readError.message : String(readError)}` },
-				{ status: 400 }
+				{
+					error: `Failed to read file: ${readError instanceof Error ? readError.message : String(readError)}`,
+				},
+				{ status: 400 },
 			);
 		}
 
@@ -71,7 +67,7 @@ export async function POST(request: NextRequest) {
 		if (!validation.valid) {
 			return NextResponse.json(
 				{ error: `Failed to parse draw: ${validation.errors.join(", ")}` },
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
@@ -83,18 +79,21 @@ export async function POST(request: NextRequest) {
 		// Log success
 		const totalMatches = result.rounds.reduce(
 			(sum, round) => sum + round.matches.length,
-			0
+			0,
 		);
 		console.log(
-			`✅ Upload parsed successfully. Tournament: ${result.tournamentName}, Rounds: ${result.rounds.length}, Matches: ${totalMatches}`
+			`✅ Upload parsed successfully. Tournament: ${result.tournamentName}, Rounds: ${result.rounds.length}, Matches: ${totalMatches}`,
 		);
 
 		return NextResponse.json(result);
 	} catch (error) {
 		console.error("Error parsing draw:", error);
 		return NextResponse.json(
-			{ error: error instanceof Error ? error.message : "Unknown error occurred" },
-			{ status: 500 }
+			{
+				error:
+					error instanceof Error ? error.message : "Unknown error occurred",
+			},
+			{ status: 500 },
 		);
 	}
 }

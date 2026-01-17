@@ -64,7 +64,10 @@ export default async function TournamentDetailPage({
 							<AlertDescription className="text-green-800">
 								Submit your predictions for this round before it closes
 							</AlertDescription>
-							<Button asChild className="col-start-2 mt-4 bg-green-600 hover:bg-green-700">
+							<Button
+								asChild
+								className="col-start-2 mt-4 bg-green-600 hover:bg-green-700"
+							>
 								<Link href={`/tournaments/${slug}/picks`}>Submit Picks</Link>
 							</Button>
 						</Alert>
