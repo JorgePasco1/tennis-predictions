@@ -170,7 +170,7 @@ export default function PicksPage({
 													[match.id]: {
 														predictedWinner: match.player1Name,
 														predictedSetsWon:
-															prev[match.id]?.predictedSetsWon ?? 2,
+															prev[match.id]?.predictedSetsWon ?? (tournament.format === "bo5" ? 3 : 2),
 														predictedSetsLost:
 															prev[match.id]?.predictedSetsLost ?? 0,
 													},
@@ -192,7 +192,7 @@ export default function PicksPage({
 													[match.id]: {
 														predictedWinner: match.player2Name,
 														predictedSetsWon:
-															prev[match.id]?.predictedSetsWon ?? 2,
+															prev[match.id]?.predictedSetsWon ?? (tournament.format === "bo5" ? 3 : 2),
 														predictedSetsLost:
 															prev[match.id]?.predictedSetsLost ?? 0,
 													},
@@ -211,67 +211,114 @@ export default function PicksPage({
 										<label className="mb-2 block font-medium text-gray-700 text-sm">
 											Predicted Score
 										</label>
-										<div className="grid grid-cols-3 gap-4">
-											<button
-												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-													picks[match.id]?.predictedSetsWon === 2 &&
-													picks[match.id]?.predictedSetsLost === 0
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
-												}`}
-												onClick={() =>
-													setPicks((prev) => ({
-														...prev,
-														[match.id]: {
-															...prev[match.id]!,
-															predictedSetsWon: 2,
-															predictedSetsLost: 0,
-														},
-													}))
-												}
-											>
-												2-0
-											</button>
-											<button
-												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-													picks[match.id]?.predictedSetsWon === 2 &&
-													picks[match.id]?.predictedSetsLost === 1
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
-												}`}
-												onClick={() =>
-													setPicks((prev) => ({
-														...prev,
-														[match.id]: {
-															...prev[match.id]!,
-															predictedSetsWon: 2,
-															predictedSetsLost: 1,
-														},
-													}))
-												}
-											>
-												2-1
-											</button>
-											<button
-												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-													picks[match.id]?.predictedSetsWon === 3 &&
-													picks[match.id]?.predictedSetsLost === 2
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
-												}`}
-												onClick={() =>
-													setPicks((prev) => ({
-														...prev,
-														[match.id]: {
-															...prev[match.id]!,
-															predictedSetsWon: 3,
-															predictedSetsLost: 2,
-														},
-													}))
-												}
-											>
-												3-2
-											</button>
+										<div className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}>
+											{tournament.format === "bo3" ? (
+												<>
+													<button
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+															picks[match.id]?.predictedSetsWon === 2 &&
+															picks[match.id]?.predictedSetsLost === 0
+																? "border-blue-600 bg-blue-50 text-blue-900"
+																: "border-gray-300 text-gray-700 hover:border-gray-400"
+														}`}
+														onClick={() =>
+															setPicks((prev) => ({
+																...prev,
+																[match.id]: {
+																	...prev[match.id]!,
+																	predictedSetsWon: 2,
+																	predictedSetsLost: 0,
+																},
+															}))
+														}
+													>
+														2-0
+													</button>
+													<button
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+															picks[match.id]?.predictedSetsWon === 2 &&
+															picks[match.id]?.predictedSetsLost === 1
+																? "border-blue-600 bg-blue-50 text-blue-900"
+																: "border-gray-300 text-gray-700 hover:border-gray-400"
+														}`}
+														onClick={() =>
+															setPicks((prev) => ({
+																...prev,
+																[match.id]: {
+																	...prev[match.id]!,
+																	predictedSetsWon: 2,
+																	predictedSetsLost: 1,
+																},
+															}))
+														}
+													>
+														2-1
+													</button>
+												</>
+											) : (
+												<>
+													<button
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+															picks[match.id]?.predictedSetsWon === 3 &&
+															picks[match.id]?.predictedSetsLost === 0
+																? "border-blue-600 bg-blue-50 text-blue-900"
+																: "border-gray-300 text-gray-700 hover:border-gray-400"
+														}`}
+														onClick={() =>
+															setPicks((prev) => ({
+																...prev,
+																[match.id]: {
+																	...prev[match.id]!,
+																	predictedSetsWon: 3,
+																	predictedSetsLost: 0,
+																},
+															}))
+														}
+													>
+														3-0
+													</button>
+													<button
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+															picks[match.id]?.predictedSetsWon === 3 &&
+															picks[match.id]?.predictedSetsLost === 1
+																? "border-blue-600 bg-blue-50 text-blue-900"
+																: "border-gray-300 text-gray-700 hover:border-gray-400"
+														}`}
+														onClick={() =>
+															setPicks((prev) => ({
+																...prev,
+																[match.id]: {
+																	...prev[match.id]!,
+																	predictedSetsWon: 3,
+																	predictedSetsLost: 1,
+																},
+															}))
+														}
+													>
+														3-1
+													</button>
+													<button
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+															picks[match.id]?.predictedSetsWon === 3 &&
+															picks[match.id]?.predictedSetsLost === 2
+																? "border-blue-600 bg-blue-50 text-blue-900"
+																: "border-gray-300 text-gray-700 hover:border-gray-400"
+														}`}
+														onClick={() =>
+															setPicks((prev) => ({
+																...prev,
+																[match.id]: {
+																	...prev[match.id]!,
+																	predictedSetsWon: 3,
+																	predictedSetsLost: 2,
+																},
+															}))
+														}
+													>
+														3-2
+													</button>
+												</>
+											)}
 										</div>
 									</div>
 								)}

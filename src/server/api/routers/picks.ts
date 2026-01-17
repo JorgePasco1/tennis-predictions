@@ -41,6 +41,7 @@ export const picksRouter = createTRPCRouter({
 							id: true,
 							name: true,
 							status: true,
+							format: true,
 						},
 					},
 				},
@@ -86,6 +87,10 @@ export const picksRouter = createTRPCRouter({
 				}
 			}
 
+			// Get tournament format for score validation
+			const tournamentFormat = round.tournament.format;
+			const requiredSetsToWin = tournamentFormat === "bo5" ? 3 : 2;
+
 			// Validate that each pick has a valid winner
 			for (const pick of input.picks) {
 				const match = round.matches.find((m) => m.id === pick.matchId);
@@ -101,30 +106,19 @@ export const picksRouter = createTRPCRouter({
 					});
 				}
 
-				// Validate sets
-				if (pick.predictedSetsWon < 2) {
+				// Validate sets based on tournament format
+				if (pick.predictedSetsWon !== requiredSetsToWin) {
 					throw new TRPCError({
 						code: "BAD_REQUEST",
-						message: "Winner must have won at least 2 sets",
+						message: `Invalid score: winner must have won exactly ${requiredSetsToWin} sets for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
 					});
 				}
-				if (pick.predictedSetsLost >= pick.predictedSetsWon) {
+
+				const maxSetsLost = requiredSetsToWin - 1;
+				if (pick.predictedSetsLost < 0 || pick.predictedSetsLost > maxSetsLost) {
 					throw new TRPCError({
 						code: "BAD_REQUEST",
-						message: "Winner must have won more sets than they lost",
-					});
-				}
-				if (pick.predictedSetsWon === 2 && pick.predictedSetsLost > 1) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message:
-							"Invalid score: if sets won is 2, sets lost must be 0 or 1",
-					});
-				}
-				if (pick.predictedSetsWon === 3 && pick.predictedSetsLost !== 2) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message: "Invalid score: if sets won is 3, sets lost must be 2",
+						message: `Invalid score: sets lost must be between 0 and ${maxSetsLost} for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
 					});
 				}
 			}

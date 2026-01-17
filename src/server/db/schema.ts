@@ -23,6 +23,7 @@ export const tournamentStatusEnum = pgEnum("tournament_status", [
 	"active",
 	"archived",
 ]);
+export const tournamentFormatEnum = pgEnum("tournament_format", ["bo3", "bo5"]);
 export const matchStatusEnum = pgEnum("match_status", ["pending", "finalized"]);
 
 // Users table
@@ -52,6 +53,7 @@ export const tournaments = createTable(
 		name: varchar({ length: 255 }).notNull(),
 		slug: varchar({ length: 255 }).notNull().unique(),
 		year: integer().notNull(),
+		format: tournamentFormatEnum().notNull().default("bo3"),
 		status: tournamentStatusEnum().notNull().default("draft"),
 		currentRoundNumber: integer("current_round_number"),
 		startDate: timestamp("start_date", { withTimezone: true }),

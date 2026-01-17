@@ -25,6 +25,7 @@ export default function NewTournamentPage() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
 	const [year, setYear] = useState(new Date().getFullYear());
+	const [format, setFormat] = useState<"bo3" | "bo5">("bo3");
 	const [parsedDraw, setParsedDraw] = useState<ParsedDraw | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isUploading, setIsUploading] = useState(false);
@@ -92,6 +93,7 @@ export default function NewTournamentPage() {
 		try {
 			const tournament = await commitMutation.mutateAsync({
 				parsedDraw,
+				format,
 				overwriteExisting: false,
 			});
 
@@ -145,6 +147,38 @@ export default function NewTournamentPage() {
 						</div>
 
 						<div>
+							<label className="mb-2 block font-medium text-gray-700 text-sm">
+								Tournament Format
+							</label>
+							<div className="flex gap-4">
+								<label className="flex cursor-pointer items-center gap-2">
+									<input
+										checked={format === "bo3"}
+										className="h-4 w-4 text-blue-600"
+										name="format"
+										onChange={() => setFormat("bo3")}
+										type="radio"
+										value="bo3"
+									/>
+									<span className="text-gray-700">
+										Best of 3 (Regular tournaments)
+									</span>
+								</label>
+								<label className="flex cursor-pointer items-center gap-2">
+									<input
+										checked={format === "bo5"}
+										className="h-4 w-4 text-blue-600"
+										name="format"
+										onChange={() => setFormat("bo5")}
+										type="radio"
+										value="bo5"
+									/>
+									<span className="text-gray-700">Best of 5 (Grand Slams)</span>
+								</label>
+							</div>
+						</div>
+
+						<div>
 							<label
 								className="mb-2 block font-medium text-gray-700 text-sm"
 								htmlFor="file"
@@ -191,6 +225,9 @@ export default function NewTournamentPage() {
 								{parsedDraw.tournamentName}
 							</h3>
 							<p className="text-blue-800">Year: {parsedDraw.year}</p>
+							<p className="text-blue-800">
+								Format: {format === "bo3" ? "Best of 3" : "Best of 5 (Grand Slam)"}
+							</p>
 							<p className="text-blue-800">
 								Rounds: {parsedDraw.rounds.length}
 							</p>
