@@ -178,7 +178,7 @@ export const matchPicks = createTable(
 		id: serial().primaryKey(),
 		userRoundPickId: integer("user_round_pick_id")
 			.notNull()
-			.references(() => userRoundPicks.id),
+			.references(() => userRoundPicks.id, { onDelete: "cascade" }),
 		matchId: integer("match_id")
 			.notNull()
 			.references(() => matches.id),

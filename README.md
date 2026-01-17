@@ -347,6 +347,19 @@ Required:
 2. Copy `DATABASE_URL` to environment variables
 3. Run migrations: `pnpm db:migrate`
 
+### Clerk Webhook Setup
+
+**Important**: Configure webhooks for user data sync:
+
+1. Go to [Clerk Dashboard](https://dashboard.clerk.com) → Your App → Webhooks
+2. Click "Add Endpoint"
+3. Enter your production URL: `https://your-app.vercel.app/api/webhooks/clerk`
+4. Subscribe to events: `user.created` and `user.updated`
+5. Copy the signing secret (starts with `whsec_...`)
+6. Add to Vercel environment variables as `CLERK_WEBHOOK_SECRET`
+
+**Note**: While the app includes automatic user upsert as a fallback, webhooks ensure immediate user sync and better reliability.
+
 ## 👥 User Roles
 
 ### Making a User Admin

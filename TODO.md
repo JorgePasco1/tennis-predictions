@@ -1,0 +1,4 @@
+- [ ] Fix floating menu button overlapping with content on mobile version
+- [ ] Add a profile settings page (Implement Manage Account button)
+- [ ] Add a personal stats page
+- [ ] Draft mode for picks
