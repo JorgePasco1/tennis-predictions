@@ -8,6 +8,7 @@ import {
 	matchPicks,
 	rounds,
 	userRoundPicks,
+	users,
 } from "~/server/db/schema";
 
 export const picksRouter = createTRPCRouter({
@@ -29,6 +30,25 @@ export const picksRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
+			// Ensure user exists in database (webhook might not have fired yet)
+			await ctx.db
+				.insert(users)
+				.values({
+					id: ctx.user.id,
+					clerkId: ctx.user.id,
+					email: ctx.user.email,
+					displayName: ctx.user.displayName,
+					role: ctx.user.role,
+				})
+				.onConflictDoUpdate({
+					target: users.clerkId,
+					set: {
+						email: ctx.user.email,
+						displayName: ctx.user.displayName,
+						role: ctx.user.role,
+					},
+				});
+
 			// Get the round and verify it's active
 			const round = await ctx.db.query.rounds.findFirst({
 				where: eq(rounds.id, input.roundId),
