@@ -4,7 +4,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { BarChart3, Menu, Settings, TrendingUp, Trophy } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "~/components/ui/sheet";
@@ -19,6 +19,27 @@ function SidebarContent({
 	const pathname = usePathname();
 	const { user } = useUser();
 	const isAdmin = user?.publicMetadata?.role === "admin";
+	const userButtonRef = useRef<HTMLDivElement>(null);
+
+	// Listen for clicks on UserButton menu items
+	useEffect(() => {
+		if (!onUserButtonClick) return;
+
+		const handleClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			// Check if click is on a Clerk menu item
+			if (
+				target.closest('[role="menuitem"]') &&
+				userButtonRef.current?.contains(target)
+			) {
+				// Close the sheet before the action executes
+				onUserButtonClick();
+			}
+		};
+
+		document.addEventListener("click", handleClick, true);
+		return () => document.removeEventListener("click", handleClick, true);
+	}, [onUserButtonClick]);
 
 	const navItems = [
 		{
@@ -95,7 +116,7 @@ function SidebarContent({
 			<Separator />
 
 			{/* User profile */}
-			<div className="p-4" onClick={onUserButtonClick}>
+			<div className="p-4" ref={userButtonRef}>
 				<UserButton
 					afterSignOutUrl="/"
 					appearance={{
