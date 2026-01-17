@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
+import { toast } from "sonner";
 import { api } from "~/trpc/react";
 
 export default function AdminTournamentManagePage({
@@ -20,6 +21,16 @@ export default function AdminTournamentManagePage({
 		onSuccess: () => refetch(),
 	});
 
+	const updateTournamentMutation = api.admin.updateTournament.useMutation({
+		onSuccess: () => {
+			refetch();
+			toast.success("Tournament updated successfully");
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to update tournament");
+		},
+	});
+
 	const setActiveRoundMutation = api.admin.setActiveRound.useMutation({
 		onSuccess: () => refetch(),
 	});
@@ -29,6 +40,11 @@ export default function AdminTournamentManagePage({
 	});
 
 	const [selectedRound, setSelectedRound] = useState<number | null>(null);
+	const [isEditingProperties, setIsEditingProperties] = useState(false);
+	const [editForm, setEditForm] = useState({
+		format: "",
+		atpUrl: "",
+	});
 	const [matchResults, setMatchResults] = useState<
 		Record<
 			number,
@@ -53,6 +69,27 @@ export default function AdminTournamentManagePage({
 		status: "draft" | "active" | "archived",
 	) => {
 		await updateStatusMutation.mutateAsync({ id: tournamentId, status });
+	};
+
+	const handleEditProperties = () => {
+		setEditForm({
+			format: tournament?.format || "bo3",
+			atpUrl: tournament?.atpUrl || "",
+		});
+		setIsEditingProperties(true);
+	};
+
+	const handleSaveProperties = async () => {
+		await updateTournamentMutation.mutateAsync({
+			id: tournamentId,
+			format: editForm.format as "bo3" | "bo5",
+			atpUrl: editForm.atpUrl || undefined,
+		});
+		setIsEditingProperties(false);
+	};
+
+	const handleCancelEdit = () => {
+		setIsEditingProperties(false);
 	};
 
 	const handleSetActiveRound = async (roundNumber: number) => {
@@ -143,6 +180,124 @@ export default function AdminTournamentManagePage({
 							Archive
 						</button>
 					</div>
+				</div>
+
+				{/* Tournament Properties */}
+				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+					<div className="mb-4 flex items-center justify-between">
+						<h2 className="font-semibold text-gray-900 text-xl">
+							Tournament Properties
+						</h2>
+						{!isEditingProperties && (
+							<button
+								className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"
+								onClick={handleEditProperties}
+								type="button"
+							>
+								Edit
+							</button>
+						)}
+					</div>
+
+					{!isEditingProperties ? (
+						<div className="space-y-2 text-gray-700">
+							<p>
+								<span className="font-medium">Format:</span>{" "}
+								{tournament.format === "bo5" ? "Best of 5 (Grand Slam)" : "Best of 3"}
+							</p>
+							<p>
+								<span className="font-medium">ATP URL:</span>{" "}
+								{tournament.atpUrl ? (
+									<a
+										className="text-blue-600 underline hover:text-blue-800"
+										href={tournament.atpUrl}
+										rel="noopener noreferrer"
+										target="_blank"
+									>
+										{tournament.atpUrl}
+									</a>
+								) : (
+									<span className="text-gray-500">Not set</span>
+								)}
+							</p>
+						</div>
+					) : (
+						<div className="space-y-4">
+							<div>
+								<label className="mb-2 block font-medium text-gray-700 text-sm">
+									Tournament Format
+								</label>
+								<div className="flex gap-4">
+									<label className="flex cursor-pointer items-center gap-2">
+										<input
+											checked={editForm.format === "bo3"}
+											className="h-4 w-4 text-blue-600"
+											name="format"
+											onChange={() =>
+												setEditForm((prev) => ({ ...prev, format: "bo3" }))
+											}
+											type="radio"
+											value="bo3"
+										/>
+										<span className="text-gray-700">
+											Best of 3 (Regular tournaments)
+										</span>
+									</label>
+									<label className="flex cursor-pointer items-center gap-2">
+										<input
+											checked={editForm.format === "bo5"}
+											className="h-4 w-4 text-blue-600"
+											name="format"
+											onChange={() =>
+												setEditForm((prev) => ({ ...prev, format: "bo5" }))
+											}
+											type="radio"
+											value="bo5"
+										/>
+										<span className="text-gray-700">Best of 5 (Grand Slams)</span>
+									</label>
+								</div>
+							</div>
+
+							<div>
+								<label
+									className="mb-2 block font-medium text-gray-700 text-sm"
+									htmlFor="atpUrl"
+								>
+									ATP Tournament URL
+								</label>
+								<input
+									className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+									id="atpUrl"
+									onChange={(e) =>
+										setEditForm((prev) => ({ ...prev, atpUrl: e.target.value }))
+									}
+									placeholder="https://www.atptour.com/..."
+									type="url"
+									value={editForm.atpUrl}
+								/>
+							</div>
+
+							<div className="flex gap-4">
+								<button
+									className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+									disabled={updateTournamentMutation.isPending}
+									onClick={handleSaveProperties}
+									type="button"
+								>
+									{updateTournamentMutation.isPending ? "Saving..." : "Save Changes"}
+								</button>
+								<button
+									className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition hover:bg-gray-50"
+									disabled={updateTournamentMutation.isPending}
+									onClick={handleCancelEdit}
+									type="button"
+								>
+									Cancel
+								</button>
+							</div>
+						</div>
+					)}
 				</div>
 
 				{/* Round Management */}

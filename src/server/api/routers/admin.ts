@@ -368,6 +368,48 @@ export const adminRouter = createTRPCRouter({
 
 			return updatedMatch;
 		}),
+
+	/**
+	 * Update tournament properties
+	 */
+	updateTournament: adminProcedure
+		.input(
+			z.object({
+				id: z.number().int(),
+				format: z.enum(tournamentFormatEnum.enumValues).optional(),
+				atpUrl: z.string().url().optional().or(z.literal("")),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(eq(tournaments.id, input.id), isNull(tournaments.deletedAt)),
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			const updateData: {
+				format?: "bo3" | "bo5";
+				atpUrl?: string | null;
+			} = {};
+
+			if (input.format) {
+				updateData.format = input.format;
+			}
+
+			if (input.atpUrl !== undefined) {
+				updateData.atpUrl = input.atpUrl || null;
+			}
+
+			const [updatedTournament] = await ctx.db
+				.update(tournaments)
+				.set(updateData)
+				.where(eq(tournaments.id, input.id))
+				.returning();
+
+			return updatedTournament;
+		}),
 });
 
 /**
