@@ -35,6 +35,18 @@ export default async function TournamentDetailPage({
 							<p className="text-blue-100">
 								{tournament.year} • {tournament.status}
 							</p>
+							{tournament.atpUrl && (
+								<p className="mt-2">
+									<a
+										className="inline-flex items-center gap-1 text-blue-100 underline hover:text-white"
+										href={tournament.atpUrl}
+										rel="noopener noreferrer"
+										target="_blank"
+									>
+										View on ATP Tour ↗
+									</a>
+								</p>
+							)}
 							{tournament.currentRoundNumber && (
 								<p className="mt-2 text-lg">
 									Current Round: {tournament.currentRoundNumber}

@@ -102,11 +102,12 @@ export const adminRouter = createTRPCRouter({
 					),
 				}),
 				format: z.enum(tournamentFormatEnum.enumValues).default("bo3"),
+				atpUrl: z.string().url().optional(),
 				overwriteExisting: z.boolean().default(false),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { parsedDraw, format, overwriteExisting } = input;
+			const { parsedDraw, format, atpUrl, overwriteExisting } = input;
 
 			// Ensure the current user exists in the database (upsert)
 			// This handles cases where the Clerk webhook hasn't synced the user yet
@@ -190,6 +191,7 @@ export const adminRouter = createTRPCRouter({
 						slug,
 						year: parsedDraw.year,
 						format,
+						atpUrl,
 						status: "draft",
 						uploadedBy: ctx.user.id,
 					})

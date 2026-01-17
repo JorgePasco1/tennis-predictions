@@ -1,0 +1,1 @@
+ALTER TABLE "tournament" ADD COLUMN "atp_url" varchar(500);

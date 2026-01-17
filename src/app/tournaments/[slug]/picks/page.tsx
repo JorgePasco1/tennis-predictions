@@ -157,6 +157,24 @@ export default function PicksPage({
 						</p>
 					</div>
 
+					{/* ATP URL Reference */}
+					{tournament.atpUrl && (
+						<div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
+							<div className="mb-2 font-semibold text-blue-900">📊 Tournament Information</div>
+							<p className="text-blue-800">
+								View the official tournament draw and details:{" "}
+								<a
+									className="font-semibold underline hover:text-blue-600"
+									href={tournament.atpUrl}
+									rel="noopener noreferrer"
+									target="_blank"
+								>
+									ATP Tournament Page
+								</a>
+							</p>
+						</div>
+					)}
+
 					{/* Matches - Readonly */}
 					<div className="mb-8 space-y-4">
 						{existingPicks.matchPicks.map((pick) => (
@@ -256,6 +274,24 @@ export default function PicksPage({
 						your predictions are correct before submitting!
 					</p>
 				</div>
+
+				{/* ATP URL Reference */}
+				{tournament.atpUrl && (
+					<div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
+						<div className="mb-2 font-semibold text-blue-900">📊 Tournament Information</div>
+						<p className="text-blue-800">
+							View the official tournament draw and details:{" "}
+							<a
+								className="font-semibold underline hover:text-blue-600"
+								href={tournament.atpUrl}
+								rel="noopener noreferrer"
+								target="_blank"
+							>
+								ATP Tournament Page
+							</a>
+						</p>
+					</div>
+				)}
 
 				{/* Matches */}
 				<div className="mb-8 space-y-4">

@@ -26,6 +26,7 @@ export default function NewTournamentPage() {
 	const [file, setFile] = useState<File | null>(null);
 	const [year, setYear] = useState(new Date().getFullYear());
 	const [format, setFormat] = useState<"bo3" | "bo5">("bo3");
+	const [atpUrl, setAtpUrl] = useState("");
 	const [parsedDraw, setParsedDraw] = useState<ParsedDraw | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isUploading, setIsUploading] = useState(false);
@@ -94,6 +95,7 @@ export default function NewTournamentPage() {
 			const tournament = await commitMutation.mutateAsync({
 				parsedDraw,
 				format,
+				atpUrl: atpUrl || undefined,
 				overwriteExisting: false,
 			});
 
@@ -181,6 +183,26 @@ export default function NewTournamentPage() {
 						<div>
 							<label
 								className="mb-2 block font-medium text-gray-700 text-sm"
+								htmlFor="atpUrl"
+							>
+								ATP Tournament URL (Optional)
+							</label>
+							<input
+								className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+								id="atpUrl"
+								onChange={(e) => setAtpUrl(e.target.value)}
+								placeholder="https://www.atptour.com/..."
+								type="url"
+								value={atpUrl}
+							/>
+							<p className="mt-1 text-gray-500 text-sm">
+								Add a link to the ATP tournament page for user reference
+							</p>
+						</div>
+
+						<div>
+							<label
+								className="mb-2 block font-medium text-gray-700 text-sm"
 								htmlFor="file"
 							>
 								ATP Draw File (HTML or MHTML)
@@ -228,6 +250,19 @@ export default function NewTournamentPage() {
 							<p className="text-blue-800">
 								Format: {format === "bo3" ? "Best of 3" : "Best of 5 (Grand Slam)"}
 							</p>
+							{atpUrl && (
+								<p className="text-blue-800">
+									ATP URL:{" "}
+									<a
+										className="underline hover:text-blue-600"
+										href={atpUrl}
+										rel="noopener noreferrer"
+										target="_blank"
+									>
+										{atpUrl}
+									</a>
+								</p>
+							)}
 							<p className="text-blue-800">
 								Rounds: {parsedDraw.rounds.length}
 							</p>

@@ -54,6 +54,7 @@ export const tournaments = createTable(
 		slug: varchar({ length: 255 }).notNull().unique(),
 		year: integer().notNull(),
 		format: tournamentFormatEnum().notNull().default("bo3"),
+		atpUrl: varchar("atp_url", { length: 500 }),
 		status: tournamentStatusEnum().notNull().default("draft"),
 		currentRoundNumber: integer("current_round_number"),
 		startDate: timestamp("start_date", { withTimezone: true }),
