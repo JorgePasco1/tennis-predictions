@@ -30,6 +30,7 @@ export default function PicksPage({
 
 	const activeRound = tournament?.rounds.find((r) => r.isActive);
 	const hasLoadedDraft = useRef(false);
+	const matchRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
 	// Query for existing user picks for the active round
 	const { data: existingPicks } = api.picks.getUserRoundPicks.useQuery(
@@ -117,7 +118,7 @@ export default function PicksPage({
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<nav className="border-b bg-white">
-					<div className="container mx-auto px-4 py-4">
+					<div className="container mx-auto px-4 py-4 pl-16 md:pl-4">
 						<Link
 							className="text-blue-600 transition hover:text-blue-700"
 							href={`/tournaments/${slug}`}
@@ -145,9 +146,28 @@ export default function PicksPage({
 		activeRound.matches.length > 0 &&
 		activeRound.matches.every((match) => picks[match.id]?.predictedWinner);
 
+	const scrollToFirstIncomplete = () => {
+		if (!activeRound) return;
+		const firstIncompleteMatch = activeRound.matches.find(
+			(match) => !picks[match.id]?.predictedWinner,
+		);
+		if (firstIncompleteMatch) {
+			const element = matchRefs.current[firstIncompleteMatch.id];
+			if (element) {
+				element.scrollIntoView({ behavior: "smooth", block: "center" });
+				// Add a brief highlight effect
+				element.classList.add("ring-2", "ring-yellow-400");
+				setTimeout(() => {
+					element.classList.remove("ring-2", "ring-yellow-400");
+				}, 2000);
+			}
+		}
+	};
+
 	const handleSubmitClick = () => {
 		if (!allPicksComplete) {
 			toast.error("Please complete all picks before submitting");
+			scrollToFirstIncomplete();
 			return;
 		}
 		setShowConfirmDialog(true);
@@ -181,7 +201,7 @@ export default function PicksPage({
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<nav className="border-b bg-white">
-					<div className="container mx-auto px-4 py-4">
+					<div className="container mx-auto px-4 py-4 pl-16 md:pl-4">
 						<Link
 							className="text-blue-600 transition hover:text-blue-700"
 							href={`/tournaments/${slug}`}
@@ -225,7 +245,7 @@ export default function PicksPage({
 							<p className="text-blue-800">
 								View the official tournament draw and details:{" "}
 								<a
-									className="font-semibold underline hover:text-blue-600"
+									className="break-all font-semibold underline hover:text-blue-600"
 									href={tournament.atpUrl}
 									rel="noopener noreferrer"
 									target="_blank"
@@ -309,7 +329,7 @@ export default function PicksPage({
 	return (
 		<div className="min-h-screen bg-gray-50">
 			<nav className="border-b bg-white">
-				<div className="container mx-auto px-4 py-4">
+				<div className="container mx-auto px-4 py-4 pl-16 md:pl-4">
 					<Link
 						className="text-blue-600 transition hover:text-blue-700"
 						href={`/tournaments/${slug}`}
@@ -367,7 +387,7 @@ export default function PicksPage({
 						<p className="text-blue-800">
 							View the official tournament draw and details:{" "}
 							<a
-								className="font-semibold underline hover:text-blue-600"
+								className="break-all font-semibold underline hover:text-blue-600"
 								href={tournament.atpUrl}
 								rel="noopener noreferrer"
 								target="_blank"
@@ -382,8 +402,11 @@ export default function PicksPage({
 				<div className="mb-8 space-y-4">
 					{activeRound.matches.map((match) => (
 						<div
-							className="rounded-lg border border-gray-200 bg-white p-6"
+							className="rounded-lg border border-gray-200 bg-white p-6 transition-all"
 							key={match.id}
+							ref={(el) => {
+								matchRefs.current[match.id] = el;
+							}}
 						>
 							<div className="mb-4">
 								<div className="mb-2 font-semibold text-gray-900">
