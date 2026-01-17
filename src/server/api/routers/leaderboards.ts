@@ -1,13 +1,8 @@
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { eq, and, isNull, sql, desc, asc } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-	tournaments,
-	rounds,
-	userRoundPicks,
-	users,
-} from "~/server/db/schema";
+import { rounds, tournaments, userRoundPicks, users } from "~/server/db/schema";
 
 export const leaderboardsRouter = createTRPCRouter({
 	/**
@@ -126,7 +121,12 @@ export const leaderboardsRouter = createTRPCRouter({
 			.where(
 				sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
 			)
-			.groupBy(userRoundPicks.userId, users.displayName, users.email, users.createdAt)
+			.groupBy(
+				userRoundPicks.userId,
+				users.displayName,
+				users.email,
+				users.createdAt,
+			)
 			.orderBy(
 				desc(sql`SUM(${userRoundPicks.totalPoints})`),
 				asc(users.createdAt),

@@ -1,13 +1,13 @@
-import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { and, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
-	rounds,
 	matches,
-	userRoundPicks,
 	matchPicks,
+	rounds,
+	userRoundPicks,
 } from "~/server/db/schema";
 
 export const picksRouter = createTRPCRouter({
@@ -124,8 +124,7 @@ export const picksRouter = createTRPCRouter({
 				if (pick.predictedSetsWon === 3 && pick.predictedSetsLost !== 2) {
 					throw new TRPCError({
 						code: "BAD_REQUEST",
-						message:
-							"Invalid score: if sets won is 3, sets lost must be 2",
+						message: "Invalid score: if sets won is 3, sets lost must be 2",
 					});
 				}
 			}

@@ -9,6 +9,34 @@ export interface ParsedMatch {
 	player2Seed: number | null;
 }
 
+/**
+ * Sanitize text extracted from HTML to ensure it's safe for JSON serialization
+ * Removes control characters, normalizes whitespace, and handles special characters
+ */
+function sanitizeText(text: string): string {
+	if (!text) return "";
+
+	return (
+		text
+			// Remove null bytes and other problematic control characters
+			.replace(/\x00/g, "")
+			// Remove other control characters except newlines and tabs (which we'll handle next)
+			.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, "")
+			// Replace newlines and tabs with spaces
+			.replace(/[\n\r\t]/g, " ")
+			// Replace multiple spaces with a single space
+			.replace(/\s+/g, " ")
+			// Remove any remaining invisible or zero-width characters
+			.replace(/[\u200B-\u200D\uFEFF]/g, "")
+			// Remove backslashes that could cause JSON issues
+			.replace(/\\/g, "")
+			// Replace any other potentially problematic characters
+			.replace(/[\uFFFD\uFFFE\uFFFF]/g, "") // Replacement character and non-characters
+			// Trim whitespace
+			.trim()
+	);
+}
+
 export interface ParsedRound {
 	roundNumber: number;
 	name: string;
@@ -31,12 +59,10 @@ export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
 	const $ = cheerio.load(htmlContent);
 
 	// Extract tournament name from title
-	let tournamentName = $("title").text().trim();
+	let tournamentName = sanitizeText($("title").text());
 
 	// Clean up tournament name (remove "| Draws | ATP Tour | Tennis" suffix)
-	tournamentName = tournamentName
-		.replace(/\s*\|.*$/i, "")
-		.trim();
+	tournamentName = tournamentName.replace(/\s*\|.*$/i, "").trim();
 
 	if (!tournamentName || tournamentName === "") {
 		tournamentName = "Unknown Tournament";
@@ -48,14 +74,10 @@ export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
 	// Find all round containers by looking for elements with classes starting with "draw-round-"
 	// We need to select by multiple class names as cheerio's [class*=] doesn't work as expected
 	const allDivs = $("div[class]");
-	const roundElements: cheerio.Element[] = [];
-
-	allDivs.each((_, el) => {
+	const roundElements = allDivs.toArray().filter((el) => {
 		const className = $(el).attr("class") || "";
 		// Only match divs that start with "draw draw-round-" to avoid nested elements
-		if (/^draw draw-round-\d+/.test(className)) {
-			roundElements.push(el);
-		}
+		return /^draw draw-round-\d+/.test(className);
 	});
 
 	if (roundElements.length === 0) {
@@ -73,7 +95,9 @@ export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
 		const $round = $(roundElement);
 
 		// Get round name from draw-header
-		const roundName = $round.find(".draw-header").text().trim() || `Round ${roundIndex + 1}`;
+		const roundName =
+			sanitizeText($round.find(".draw-header").text()) ||
+			`Round ${roundIndex + 1}`;
 
 		// Find all matches in this round (each draw-item is a match)
 		const matchItems = $round.find(".draw-item");
@@ -88,11 +112,11 @@ export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
 			if (playerElements.length >= 2) {
 				// Parse player 1
 				const $player1 = $(playerElements[0]);
-				const player1Info = parsePlayerFromStatsItem($player1, $);
+				const player1Info = parsePlayerFromStatsItem($player1);
 
 				// Parse player 2
 				const $player2 = $(playerElements[1]);
-				const player2Info = parsePlayerFromStatsItem($player2, $);
+				const player2Info = parsePlayerFromStatsItem($player2);
 
 				// Only add if both players have names
 				if (player1Info.name && player2Info.name) {
@@ -125,7 +149,7 @@ export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
 /**
  * Parse player information from a stats-item element
  */
-function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio, $: cheerio.CheerioAPI): {
+function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio<any>): {
 	name: string;
 	seed: number | null;
 } {
@@ -138,14 +162,14 @@ function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio, $: cheerio.Cheeri
 
 	// Get the player name from the link text
 	const $link = $nameDiv.find("a");
-	let name = $link.text().trim();
+	const name = sanitizeText($link.text());
 
 	// Get the seed from the span (if exists)
 	const $seedSpan = $nameDiv.find("span");
 	let seed: number | null = null;
 
 	if ($seedSpan.length > 0) {
-		const seedText = $seedSpan.text().trim();
+		const seedText = sanitizeText($seedSpan.text());
 		// Seed is in format "(1)" or "(32)"
 		const seedMatch = seedText.match(/\((\d+)\)/);
 		if (seedMatch && seedMatch[1]) {
@@ -154,50 +178,6 @@ function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio, $: cheerio.Cheeri
 	}
 
 	return { name, seed };
-}
-
-/**
- * Extract player name and seed from text like "Novak Djokovic (1)" or "[1] Novak Djokovic"
- */
-function extractPlayerInfo(text: string): {
-	name: string;
-	seed: number | null;
-} {
-	if (!text) {
-		return { name: "", seed: null };
-	}
-
-	let name = text;
-	let seed: number | null = null;
-
-	// Pattern 1: "Name (Seed)" - e.g., "Novak Djokovic (1)"
-	const pattern1 = /^(.+?)\s*\((\d+)\)\s*$/;
-	const match1 = text.match(pattern1);
-	if (match1) {
-		name = match1[1]?.trim() ?? text;
-		seed = Number.parseInt(match1[2] ?? "", 10) || null;
-		return { name, seed };
-	}
-
-	// Pattern 2: "[Seed] Name" - e.g., "[1] Novak Djokovic"
-	const pattern2 = /^\[(\d+)\]\s*(.+)$/;
-	const match2 = text.match(pattern2);
-	if (match2) {
-		name = match2[2]?.trim() ?? text;
-		seed = Number.parseInt(match2[1] ?? "", 10) || null;
-		return { name, seed };
-	}
-
-	// Pattern 3: "(Seed) Name" - e.g., "(1) Novak Djokovic"
-	const pattern3 = /^\((\d+)\)\s*(.+)$/;
-	const match3 = text.match(pattern3);
-	if (match3) {
-		name = match3[2]?.trim() ?? text;
-		seed = Number.parseInt(match3[1] ?? "", 10) || null;
-		return { name, seed };
-	}
-
-	return { name: name.trim(), seed: null };
 }
 
 /**

@@ -1,11 +1,11 @@
+import { currentUser } from "@clerk/nextjs/server";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
-import { api, HydrateClient } from "~/trpc/server";
-import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Plus } from "lucide-react";
+import { Card, CardContent } from "~/components/ui/card";
+import { api, HydrateClient } from "~/trpc/server";
 
 export default async function AdminDashboard() {
 	const user = await currentUser();
@@ -113,8 +113,8 @@ export default async function AdminDashboard() {
 							<div className="space-y-4">
 								{draftTournaments.map((tournament) => (
 									<Card
-										key={tournament.id}
 										className="border-yellow-200 bg-yellow-50"
+										key={tournament.id}
 									>
 										<CardContent className="p-6">
 											<div className="flex items-start justify-between">
@@ -126,8 +126,8 @@ export default async function AdminDashboard() {
 														Year: {tournament.year}
 													</p>
 													<Badge
-														variant="outline"
 														className="border-yellow-600 bg-yellow-200 text-yellow-800"
+														variant="outline"
 													>
 														Draft
 													</Badge>
@@ -148,23 +148,21 @@ export default async function AdminDashboard() {
 					{/* Archived Tournaments */}
 					{archivedTournaments.length > 0 && (
 						<div>
-							<h2 className="mb-4 font-bold text-2xl">
-								Archived Tournaments
-							</h2>
+							<h2 className="mb-4 font-bold text-2xl">Archived Tournaments</h2>
 							<div className="space-y-4">
 								{archivedTournaments.map((tournament) => (
-									<Card key={tournament.id} className="bg-muted">
+									<Card className="bg-muted" key={tournament.id}>
 										<CardContent className="p-6">
 											<div className="flex items-start justify-between">
 												<div>
-													<h3 className="mb-2 font-semibold text-xl text-muted-foreground">
+													<h3 className="mb-2 font-semibold text-muted-foreground text-xl">
 														{tournament.name}
 													</h3>
 													<p className="text-muted-foreground">
 														Year: {tournament.year}
 													</p>
 												</div>
-												<Button variant="link" asChild>
+												<Button asChild variant="link">
 													<Link href={`/admin/tournaments/${tournament.id}`}>
 														View
 													</Link>

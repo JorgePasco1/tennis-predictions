@@ -1,8 +1,12 @@
-import { eq, and, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-
-import { matches, matchPicks, userRoundPicks, rounds } from "~/server/db/schema";
 import type * as schema from "~/server/db/schema";
+import {
+	matches,
+	matchPicks,
+	rounds,
+	userRoundPicks,
+} from "~/server/db/schema";
 
 /**
  * Calculate scores for all picks related to a specific match

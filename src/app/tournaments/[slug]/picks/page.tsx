@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { use, useState } from "react";
 import { api } from "~/trpc/react";
 
 export default function PicksPage({
@@ -32,7 +32,7 @@ export default function PicksPage({
 	if (!tournament) {
 		return (
 			<div className="flex min-h-screen items-center justify-center">
-				<div className="text-lg text-gray-600">Loading...</div>
+				<div className="text-gray-600 text-lg">Loading...</div>
 			</div>
 		);
 	}
@@ -43,8 +43,8 @@ export default function PicksPage({
 				<nav className="border-b bg-white">
 					<div className="container mx-auto px-4 py-4">
 						<Link
-							href={`/tournaments/${slug}`}
 							className="text-blue-600 transition hover:text-blue-700"
+							href={`/tournaments/${slug}`}
 						>
 							← Back to Tournament
 						</Link>
@@ -95,9 +95,7 @@ export default function PicksPage({
 			alert("Picks submitted successfully!");
 			router.push(`/tournaments/${slug}`);
 		} catch (error) {
-			alert(
-				error instanceof Error ? error.message : "Failed to submit picks",
-			);
+			alert(error instanceof Error ? error.message : "Failed to submit picks");
 		}
 	};
 
@@ -106,8 +104,8 @@ export default function PicksPage({
 			<nav className="border-b bg-white">
 				<div className="container mx-auto px-4 py-4">
 					<Link
-						href={`/tournaments/${slug}`}
 						className="text-blue-600 transition hover:text-blue-700"
+						href={`/tournaments/${slug}`}
 					>
 						← Back to Tournament
 					</Link>
@@ -126,9 +124,7 @@ export default function PicksPage({
 
 				{/* Warning */}
 				<div className="mb-8 rounded-lg border border-yellow-200 bg-yellow-50 p-6">
-					<div className="mb-2 font-semibold text-yellow-900">
-						⚠️ Important
-					</div>
+					<div className="mb-2 font-semibold text-yellow-900">⚠️ Important</div>
 					<p className="text-yellow-800">
 						Once you submit your picks, they cannot be changed. Make sure all
 						your predictions are correct before submitting!
@@ -139,14 +135,14 @@ export default function PicksPage({
 				<div className="mb-8 space-y-4">
 					{activeRound.matches.map((match) => (
 						<div
-							key={match.id}
 							className="rounded-lg border border-gray-200 bg-white p-6"
+							key={match.id}
 						>
 							<div className="mb-4">
 								<div className="mb-2 font-semibold text-gray-900">
 									Match {match.matchNumber}
 								</div>
-								<div className="text-lg text-gray-700">
+								<div className="text-gray-700 text-lg">
 									{match.player1Seed && `(${match.player1Seed}) `}
 									{match.player1Name}
 									<span className="mx-2 text-gray-400">vs</span>
@@ -163,43 +159,45 @@ export default function PicksPage({
 									</label>
 									<div className="flex gap-4">
 										<button
-											onClick={() =>
-												setPicks((prev) => ({
-													...prev,
-													[match.id]: {
-														predictedWinner: match.player1Name,
-														predictedSetsWon: prev[match.id]?.predictedSetsWon ?? 2,
-														predictedSetsLost:
-															prev[match.id]?.predictedSetsLost ?? 0,
-													},
-												}))
-											}
 											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
 												picks[match.id]?.predictedWinner === match.player1Name
 													? "border-blue-600 bg-blue-50 text-blue-900"
 													: "border-gray-300 text-gray-700 hover:border-gray-400"
 											}`}
-										>
-											{match.player1Seed && `(${match.player1Seed}) `}
-											{match.player1Name}
-										</button>
-										<button
 											onClick={() =>
 												setPicks((prev) => ({
 													...prev,
 													[match.id]: {
-														predictedWinner: match.player2Name,
-														predictedSetsWon: prev[match.id]?.predictedSetsWon ?? 2,
+														predictedWinner: match.player1Name,
+														predictedSetsWon:
+															prev[match.id]?.predictedSetsWon ?? 2,
 														predictedSetsLost:
 															prev[match.id]?.predictedSetsLost ?? 0,
 													},
 												}))
 											}
+										>
+											{match.player1Seed && `(${match.player1Seed}) `}
+											{match.player1Name}
+										</button>
+										<button
 											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
 												picks[match.id]?.predictedWinner === match.player2Name
 													? "border-blue-600 bg-blue-50 text-blue-900"
 													: "border-gray-300 text-gray-700 hover:border-gray-400"
 											}`}
+											onClick={() =>
+												setPicks((prev) => ({
+													...prev,
+													[match.id]: {
+														predictedWinner: match.player2Name,
+														predictedSetsWon:
+															prev[match.id]?.predictedSetsWon ?? 2,
+														predictedSetsLost:
+															prev[match.id]?.predictedSetsLost ?? 0,
+													},
+												}))
+											}
 										>
 											{match.player2Seed && `(${match.player2Seed}) `}
 											{match.player2Name}
@@ -215,6 +213,12 @@ export default function PicksPage({
 										</label>
 										<div className="grid grid-cols-3 gap-4">
 											<button
+												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+													picks[match.id]?.predictedSetsWon === 2 &&
+													picks[match.id]?.predictedSetsLost === 0
+														? "border-blue-600 bg-blue-50 text-blue-900"
+														: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -225,16 +229,16 @@ export default function PicksPage({
 														},
 													}))
 												}
-												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-													picks[match.id]?.predictedSetsWon === 2 &&
-													picks[match.id]?.predictedSetsLost === 0
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
-												}`}
 											>
 												2-0
 											</button>
 											<button
+												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+													picks[match.id]?.predictedSetsWon === 2 &&
+													picks[match.id]?.predictedSetsLost === 1
+														? "border-blue-600 bg-blue-50 text-blue-900"
+														: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -245,16 +249,16 @@ export default function PicksPage({
 														},
 													}))
 												}
-												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-													picks[match.id]?.predictedSetsWon === 2 &&
-													picks[match.id]?.predictedSetsLost === 1
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
-												}`}
 											>
 												2-1
 											</button>
 											<button
+												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+													picks[match.id]?.predictedSetsWon === 3 &&
+													picks[match.id]?.predictedSetsLost === 2
+														? "border-blue-600 bg-blue-50 text-blue-900"
+														: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -265,12 +269,6 @@ export default function PicksPage({
 														},
 													}))
 												}
-												className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-													picks[match.id]?.predictedSetsWon === 3 &&
-													picks[match.id]?.predictedSetsLost === 2
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
-												}`}
 											>
 												3-2
 											</button>
@@ -296,9 +294,9 @@ export default function PicksPage({
 							</div>
 						</div>
 						<button
-							onClick={handleSubmit}
-							disabled={!allPicksComplete || submitPicksMutation.isPending}
 							className="rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={!allPicksComplete || submitPicksMutation.isPending}
+							onClick={handleSubmit}
 						>
 							{submitPicksMutation.isPending
 								? "Submitting..."

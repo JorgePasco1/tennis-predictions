@@ -1,8 +1,8 @@
-import { tournamentsRouter } from "~/server/api/routers/tournaments";
 import { adminRouter } from "~/server/api/routers/admin";
-import { picksRouter } from "~/server/api/routers/picks";
 import { leaderboardsRouter } from "~/server/api/routers/leaderboards";
+import { picksRouter } from "~/server/api/routers/picks";
 import { resultsRouter } from "~/server/api/routers/results";
+import { tournamentsRouter } from "~/server/api/routers/tournaments";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**

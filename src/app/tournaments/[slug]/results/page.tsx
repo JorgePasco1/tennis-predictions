@@ -1,10 +1,10 @@
+import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
-import { api, HydrateClient } from "~/trpc/server";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { api, HydrateClient } from "~/trpc/server";
 
 export default async function ResultsPage({
 	params,
@@ -14,17 +14,16 @@ export default async function ResultsPage({
 	const { slug } = await params;
 
 	const tournament = await api.tournaments.getBySlug({ slug });
-	const roundsData =
-		await api.results.getTournamentResultsWithUserPicks({
-			tournamentId: tournament.id,
-		});
+	const roundsData = await api.results.getTournamentResultsWithUserPicks({
+		tournamentId: tournament.id,
+	});
 
 	return (
 		<HydrateClient>
 			<div className="min-h-screen bg-muted/30">
 				<main className="container mx-auto px-4 py-8">
 					<div className="mb-8">
-						<Button variant="link" className="mb-4 -ml-4" asChild>
+						<Button asChild className="mb-4 -ml-4" variant="link">
 							<Link href={`/tournaments/${slug}`}>
 								<ArrowLeft className="mr-2 h-4 w-4" />
 								Back to Tournament
@@ -77,7 +76,9 @@ export default async function ResultsPage({
 													)}
 												</div>
 												{hasPicks ? (
-													<Badge className="bg-green-600">Picks Submitted</Badge>
+													<Badge className="bg-green-600">
+														Picks Submitted
+													</Badge>
 												) : (
 													<Badge variant="secondary">No Picks</Badge>
 												)}
@@ -90,7 +91,6 @@ export default async function ResultsPage({
 
 												return (
 													<Card
-														key={match.id}
 														className={cn(
 															isFinalized
 																? userPick?.isWinnerCorrect
@@ -100,6 +100,7 @@ export default async function ResultsPage({
 																		: "bg-muted"
 																: "",
 														)}
+														key={match.id}
 													>
 														<CardContent className="p-4">
 															<div className="mb-3 flex items-start justify-between">
@@ -108,12 +109,14 @@ export default async function ResultsPage({
 																		Match {match.matchNumber}
 																	</div>
 																	<div>
-																		{match.player1Seed && `(${match.player1Seed}) `}
+																		{match.player1Seed &&
+																			`(${match.player1Seed}) `}
 																		{match.player1Name}
 																		<span className="mx-2 text-muted-foreground">
 																			vs
 																		</span>
-																		{match.player2Seed && `(${match.player2Seed}) `}
+																		{match.player2Seed &&
+																			`(${match.player2Seed}) `}
 																		{match.player2Name}
 																	</div>
 																</div>

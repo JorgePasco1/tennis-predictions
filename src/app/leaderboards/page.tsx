@@ -1,7 +1,7 @@
-import { api, HydrateClient } from "~/trpc/server";
-import { Card } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
+import { Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
+import { Card } from "~/components/ui/card";
 import {
 	Table,
 	TableBody,
@@ -10,8 +10,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "~/components/ui/table";
-import { Info } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { api, HydrateClient } from "~/trpc/server";
 
 export default async function AllTimeLeaderboardPage() {
 	const leaderboard = await api.leaderboards.getAllTimeLeaderboard();

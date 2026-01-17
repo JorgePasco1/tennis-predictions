@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 
@@ -20,7 +20,7 @@ export default async function Home() {
 					<h1 className="font-extrabold text-5xl text-white tracking-tight sm:text-6xl">
 						Tennis Predictions
 					</h1>
-					<p className="max-w-2xl text-xl text-blue-200">
+					<p className="max-w-2xl text-blue-200 text-xl">
 						Compete with friends by predicting ATP Tour tournament results.
 						Submit your picks, earn points, and climb the leaderboard.
 					</p>
@@ -28,17 +28,17 @@ export default async function Home() {
 
 				<div className="flex flex-col gap-4 sm:flex-row">
 					<Button
-						size="lg"
-						className="bg-white px-8 text-blue-900 hover:bg-blue-50"
 						asChild
+						className="bg-white px-8 text-blue-900 hover:bg-blue-50"
+						size="lg"
 					>
 						<Link href="/sign-up">Get Started</Link>
 					</Button>
 					<Button
+						asChild
+						className="border-2 border-white bg-transparent px-8 text-white hover:bg-white/10 hover:text-white"
 						size="lg"
 						variant="outline"
-						className="border-2 border-white bg-transparent px-8 text-white hover:bg-white/10 hover:text-white"
-						asChild
 					>
 						<Link href="/sign-in">Sign In</Link>
 					</Button>

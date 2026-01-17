@@ -6,8 +6,9 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC, TRPCError } from "@trpc/server";
+
 import { currentUser } from "@clerk/nextjs/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -35,7 +36,8 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 					id: user.id,
 					email: user.emailAddresses[0]?.emailAddress ?? "",
 					role:
-						(user.publicMetadata.role as "user" | "admin" | undefined) ?? "user",
+						(user.publicMetadata.role as "user" | "admin" | undefined) ??
+						"user",
 				}
 			: null,
 		...opts,
@@ -169,6 +171,4 @@ export const protectedProcedure = t.procedure
 /**
  * Admin procedure - requires admin role
  */
-export const adminProcedure = t.procedure
-	.use(timingMiddleware)
-	.use(isAdmin);
+export const adminProcedure = t.procedure.use(timingMiddleware).use(isAdmin);

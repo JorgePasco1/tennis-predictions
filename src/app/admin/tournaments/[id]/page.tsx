@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useState } from "react";
 import Link from "next/link";
+import { use, useState } from "react";
 import { api } from "~/trpc/react";
 
 export default function AdminTournamentManagePage({
@@ -44,12 +44,14 @@ export default function AdminTournamentManagePage({
 	if (!tournament) {
 		return (
 			<div className="flex min-h-screen items-center justify-center">
-				<div className="text-lg text-gray-600">Loading...</div>
+				<div className="text-gray-600 text-lg">Loading...</div>
 			</div>
 		);
 	}
 
-	const handleStatusChange = async (status: "draft" | "active" | "archived") => {
+	const handleStatusChange = async (
+		status: "draft" | "active" | "archived",
+	) => {
 		await updateStatusMutation.mutateAsync({ id: tournamentId, status });
 	};
 
@@ -76,9 +78,7 @@ export default function AdminTournamentManagePage({
 			});
 		} catch (error) {
 			alert(
-				error instanceof Error
-					? error.message
-					: "Failed to finalize match",
+				error instanceof Error ? error.message : "Failed to finalize match",
 			);
 		}
 	};
@@ -90,8 +90,8 @@ export default function AdminTournamentManagePage({
 			<nav className="border-b bg-white">
 				<div className="container mx-auto px-4 py-4">
 					<Link
-						href="/admin"
 						className="text-blue-600 transition hover:text-blue-700"
+						href="/admin"
 					>
 						← Back to Admin Dashboard
 					</Link>
@@ -110,35 +110,35 @@ export default function AdminTournamentManagePage({
 
 				{/* Status Management */}
 				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-					<h2 className="mb-4 font-semibold text-xl text-gray-900">
+					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
 						Tournament Status
 					</h2>
 					<div className="flex gap-4">
 						<button
-							onClick={() => handleStatusChange("draft")}
+							className="rounded-lg bg-yellow-600 px-4 py-2 font-semibold text-white transition hover:bg-yellow-700 disabled:cursor-not-allowed disabled:opacity-50"
 							disabled={
 								tournament.status === "draft" || updateStatusMutation.isPending
 							}
-							className="rounded-lg bg-yellow-600 px-4 py-2 font-semibold text-white transition hover:bg-yellow-700 disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => handleStatusChange("draft")}
 						>
 							Set to Draft
 						</button>
 						<button
-							onClick={() => handleStatusChange("active")}
+							className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
 							disabled={
 								tournament.status === "active" || updateStatusMutation.isPending
 							}
-							className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => handleStatusChange("active")}
 						>
 							Activate
 						</button>
 						<button
-							onClick={() => handleStatusChange("archived")}
+							className="rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
 							disabled={
 								tournament.status === "archived" ||
 								updateStatusMutation.isPending
 							}
-							className="rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => handleStatusChange("archived")}
 						>
 							Archive
 						</button>
@@ -147,7 +147,7 @@ export default function AdminTournamentManagePage({
 
 				{/* Round Management */}
 				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-					<h2 className="mb-4 font-semibold text-xl text-gray-900">
+					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
 						Active Round
 					</h2>
 					<p className="mb-4 text-gray-600">
@@ -156,14 +156,14 @@ export default function AdminTournamentManagePage({
 					<div className="flex flex-wrap gap-2">
 						{tournament.rounds.map((round) => (
 							<button
-								key={round.id}
-								onClick={() => handleSetActiveRound(round.roundNumber)}
-								disabled={round.isActive || setActiveRoundMutation.isPending}
 								className={`rounded-lg px-4 py-2 font-semibold transition disabled:cursor-not-allowed ${
 									round.isActive
 										? "bg-green-600 text-white"
 										: "bg-gray-200 text-gray-700 hover:bg-gray-300"
 								}`}
+								disabled={round.isActive || setActiveRoundMutation.isPending}
+								key={round.id}
+								onClick={() => handleSetActiveRound(round.roundNumber)}
 							>
 								{round.name}
 							</button>
@@ -173,7 +173,7 @@ export default function AdminTournamentManagePage({
 
 				{/* Round Selection */}
 				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-					<h2 className="mb-4 font-semibold text-xl text-gray-900">
+					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
 						Manage Results
 					</h2>
 					<div className="mb-4">
@@ -181,13 +181,13 @@ export default function AdminTournamentManagePage({
 							Select Round
 						</label>
 						<select
-							value={selectedRound ?? ""}
+							className="w-full rounded-lg border border-gray-300 px-4 py-2"
 							onChange={(e) =>
 								setSelectedRound(
 									e.target.value ? Number.parseInt(e.target.value) : null,
 								)
 							}
-							className="w-full rounded-lg border border-gray-300 px-4 py-2"
+							value={selectedRound ?? ""}
 						>
 							<option value="">Choose a round...</option>
 							{tournament.rounds.map((round) => (
@@ -205,12 +205,12 @@ export default function AdminTournamentManagePage({
 								.find((r) => r.id === selectedRound)
 								?.matches.map((match) => (
 									<div
-										key={match.id}
 										className={`rounded-lg border p-4 ${
 											match.status === "finalized"
 												? "border-green-300 bg-green-50"
 												: "border-gray-200 bg-white"
 										}`}
+										key={match.id}
 									>
 										<div className="mb-4">
 											<div className="mb-2 flex items-start justify-between">
@@ -233,8 +233,7 @@ export default function AdminTournamentManagePage({
 											</div>
 											{match.status === "finalized" && (
 												<div className="mt-2 text-green-800 text-sm">
-													Winner: {match.winnerName} • Score:{" "}
-													{match.finalScore}
+													Winner: {match.winnerName} • Score: {match.finalScore}
 												</div>
 											)}
 										</div>
@@ -246,7 +245,7 @@ export default function AdminTournamentManagePage({
 														Winner
 													</label>
 													<select
-														value={matchResults[match.id]?.winnerName ?? ""}
+														className="w-full rounded border px-3 py-2 text-sm"
 														onChange={(e) =>
 															setMatchResults((prev) => ({
 																...prev,
@@ -259,7 +258,7 @@ export default function AdminTournamentManagePage({
 																},
 															}))
 														}
-														className="w-full rounded border px-3 py-2 text-sm"
+														value={matchResults[match.id]?.winnerName ?? ""}
 													>
 														<option value="">Select winner...</option>
 														<option value={match.player1Name}>
@@ -277,7 +276,7 @@ export default function AdminTournamentManagePage({
 															Sets Won
 														</label>
 														<select
-															value={matchResults[match.id]?.setsWon ?? 2}
+															className="w-full rounded border px-3 py-2 text-sm"
 															onChange={(e) =>
 																setMatchResults((prev) => ({
 																	...prev,
@@ -292,7 +291,7 @@ export default function AdminTournamentManagePage({
 																	},
 																}))
 															}
-															className="w-full rounded border px-3 py-2 text-sm"
+															value={matchResults[match.id]?.setsWon ?? 2}
 														>
 															<option value={2}>2</option>
 															<option value={3}>3</option>
@@ -303,7 +302,7 @@ export default function AdminTournamentManagePage({
 															Sets Lost
 														</label>
 														<select
-															value={matchResults[match.id]?.setsLost ?? 0}
+															className="w-full rounded border px-3 py-2 text-sm"
 															onChange={(e) =>
 																setMatchResults((prev) => ({
 																	...prev,
@@ -318,7 +317,7 @@ export default function AdminTournamentManagePage({
 																	},
 																}))
 															}
-															className="w-full rounded border px-3 py-2 text-sm"
+															value={matchResults[match.id]?.setsLost ?? 0}
 														>
 															<option value={0}>0</option>
 															<option value={1}>1</option>
@@ -330,9 +329,7 @@ export default function AdminTournamentManagePage({
 															Final Score
 														</label>
 														<input
-															type="text"
-															placeholder="6-4, 7-6(3)"
-															value={matchResults[match.id]?.finalScore ?? ""}
+															className="w-full rounded border px-3 py-2 text-sm"
 															onChange={(e) =>
 																setMatchResults((prev) => ({
 																	...prev,
@@ -346,19 +343,21 @@ export default function AdminTournamentManagePage({
 																	},
 																}))
 															}
-															className="w-full rounded border px-3 py-2 text-sm"
+															placeholder="6-4, 7-6(3)"
+															type="text"
+															value={matchResults[match.id]?.finalScore ?? ""}
 														/>
 													</div>
 												</div>
 
 												<button
-													onClick={() => handleFinalizeMatch(match.id)}
+													className="rounded bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
 													disabled={
 														!matchResults[match.id]?.winnerName ||
 														!matchResults[match.id]?.finalScore ||
 														finalizeMatchMutation.isPending
 													}
-													className="rounded bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+													onClick={() => handleFinalizeMatch(match.id)}
 												>
 													Finalize Result
 												</button>

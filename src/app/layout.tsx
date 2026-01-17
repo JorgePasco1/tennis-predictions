@@ -1,12 +1,11 @@
 import "~/styles/globals.css";
 
-import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-
+import { Toaster } from "~/components/ui/sonner";
 import { TRPCReactProvider } from "~/trpc/react";
 import { LayoutContent } from "./_components/LayoutContent";
-import { Toaster } from "~/components/ui/sonner";
 
 export const metadata: Metadata = {
 	title: "Tennis Predictions",

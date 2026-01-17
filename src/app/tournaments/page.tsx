@@ -1,9 +1,9 @@
-import Link from "next/link";
-import { api, HydrateClient } from "~/trpc/server";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Info } from "lucide-react";
+import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { api, HydrateClient } from "~/trpc/server";
 
 export default async function TournamentsPage() {
 	const activeTournaments = await api.tournaments.list({ status: "active" });
@@ -33,9 +33,9 @@ export default async function TournamentsPage() {
 						<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 							{activeTournaments.map((tournament) => (
 								<Link
-									key={tournament.id}
-									href={`/tournaments/${tournament.slug}`}
 									className="group"
+									href={`/tournaments/${tournament.slug}`}
+									key={tournament.id}
 								>
 									<Card className="overflow-hidden transition-shadow hover:shadow-lg">
 										<CardHeader className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white">
@@ -47,8 +47,8 @@ export default async function TournamentsPage() {
 										<CardContent className="p-6">
 											<div className="mb-4 flex items-center gap-2">
 												<Badge
-													variant="default"
 													className="bg-green-600 hover:bg-green-700"
+													variant="default"
 												>
 													Active
 												</Badge>
@@ -80,7 +80,9 @@ export default async function TournamentsPage() {
 								<li>
 									• Submit your predictions for each match before the deadline
 								</li>
-								<li>• Earn 10 points for correct winners, +5 for exact scores</li>
+								<li>
+									• Earn 10 points for correct winners, +5 for exact scores
+								</li>
 								<li>• Check the leaderboard to see your ranking</li>
 							</ul>
 						</AlertDescription>

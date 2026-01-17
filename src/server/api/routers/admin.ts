@@ -1,18 +1,19 @@
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { eq, and, isNull, sql } from "drizzle-orm";
 
-import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
+import { adminProcedure, createTRPCRouter } from "~/server/api/trpc";
 import {
-	tournaments,
-	rounds,
 	matches,
-	userRoundPicks,
 	roundScoringRules,
+	rounds,
+	tournaments,
+	userRoundPicks,
+	users,
 } from "~/server/db/schema";
 import {
+	type ParsedDraw,
 	parseAtpDraw,
 	validateParsedDraw,
-	type ParsedDraw,
 } from "~/server/services/drawParser";
 import { calculateMatchPickScores } from "~/server/services/scoring";
 
@@ -30,7 +31,16 @@ export const adminRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			// Decode base64 to get the HTML/MHTML content
-			const htmlContent = Buffer.from(input.htmlContentBase64, "base64").toString("utf-8");
+			let htmlContent: string;
+			try {
+				htmlContent = Buffer.from(input.htmlContentBase64, "base64").toString(
+					"utf-8",
+				);
+			} catch (decodeError) {
+				throw new Error(
+					`Failed to decode base64 content: ${decodeError instanceof Error ? decodeError.message : String(decodeError)}`,
+				);
+			}
 
 			// Parse the draw
 			const parsedDraw = parseAtpDraw(htmlContent);
@@ -44,10 +54,25 @@ export const adminRouter = createTRPCRouter({
 				);
 			}
 
-			return {
+			const result = {
 				...parsedDraw,
 				year: input.year,
 			};
+
+			// Validate JSON serialization before returning
+			try {
+				const jsonString = JSON.stringify(result);
+				const sizeInMB = (jsonString.length / (1024 * 1024)).toFixed(2);
+				console.log(
+					`✅ Upload parsed successfully. Response size: ${sizeInMB}MB`,
+				);
+			} catch (jsonError) {
+				throw new Error(
+					`Parsed draw contains invalid characters that cannot be serialized: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`,
+				);
+			}
+
+			return result;
 		}),
 
 	/**
@@ -80,6 +105,19 @@ export const adminRouter = createTRPCRouter({
 		)
 		.mutation(async ({ ctx, input }) => {
 			const { parsedDraw, overwriteExisting } = input;
+
+			// Ensure the current user exists in the database (upsert)
+			// This handles cases where the Clerk webhook hasn't synced the user yet
+			await ctx.db
+				.insert(users)
+				.values({
+					id: ctx.user.id,
+					clerkId: ctx.user.id,
+					email: ctx.user.email,
+					displayName: ctx.user.email.split("@")[0] ?? "Admin",
+					role: "admin",
+				})
+				.onConflictDoNothing({ target: users.id });
 
 			// Generate slug from tournament name
 			const slug = generateSlug(parsedDraw.tournamentName, parsedDraw.year);
@@ -286,9 +324,7 @@ export const adminRouter = createTRPCRouter({
 				input.winnerName !== match.player1Name &&
 				input.winnerName !== match.player2Name
 			) {
-				throw new Error(
-					"Winner must be one of the match players",
-				);
+				throw new Error("Winner must be one of the match players");
 			}
 
 			// Validate sets

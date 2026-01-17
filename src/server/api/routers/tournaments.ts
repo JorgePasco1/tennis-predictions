@@ -1,16 +1,16 @@
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { eq, isNull, and, desc } from "drizzle-orm";
 
 import {
+	adminProcedure,
 	createTRPCRouter,
 	protectedProcedure,
-	adminProcedure,
 } from "~/server/api/trpc";
 import {
-	tournaments,
-	rounds,
 	matches,
+	rounds,
 	tournamentStatusEnum,
+	tournaments,
 } from "~/server/db/schema";
 
 export const tournamentsRouter = createTRPCRouter({
@@ -57,10 +57,7 @@ export const tournamentsRouter = createTRPCRouter({
 		)
 		.query(async ({ ctx, input }) => {
 			const tournament = await ctx.db.query.tournaments.findFirst({
-				where: and(
-					eq(tournaments.id, input.id),
-					isNull(tournaments.deletedAt),
-				),
+				where: and(eq(tournaments.id, input.id), isNull(tournaments.deletedAt)),
 				with: {
 					uploadedByUser: {
 						columns: {
@@ -146,9 +143,7 @@ export const tournamentsRouter = createTRPCRouter({
 				.set({
 					status: input.status,
 				})
-				.where(
-					and(eq(tournaments.id, input.id), isNull(tournaments.deletedAt)),
-				)
+				.where(and(eq(tournaments.id, input.id), isNull(tournaments.deletedAt)))
 				.returning();
 
 			if (!result[0]) {

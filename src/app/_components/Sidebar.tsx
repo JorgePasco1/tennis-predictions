@@ -1,17 +1,13 @@
 "use client";
 
+import { UserButton, useUser } from "@clerk/nextjs";
+import { BarChart3, Menu, Settings, Trophy } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, useUser } from "@clerk/nextjs";
-import { Trophy, BarChart3, Settings, Menu } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
-import {
-	Sheet,
-	SheetContent,
-	SheetTrigger,
-} from "~/components/ui/sheet";
-import { cn } from "~/lib/utils";
+import { Sheet, SheetContent, SheetTrigger } from "~/components/ui/sheet";
 
 function SidebarContent() {
 	const pathname = usePathname();
@@ -35,9 +31,9 @@ function SidebarContent() {
 		<div className="flex h-full flex-col">
 			{/* Logo */}
 			<div className="p-6">
-				<Link href="/tournaments" className="flex items-center gap-2">
+				<Link className="flex items-center gap-2" href="/tournaments">
 					<Trophy className="h-6 w-6 text-primary" />
-					<h2 className="text-xl font-bold">Tennis Predictions</h2>
+					<h2 className="font-bold text-xl">Tennis Predictions</h2>
 				</Link>
 			</div>
 
@@ -51,10 +47,10 @@ function SidebarContent() {
 
 					return (
 						<Button
+							asChild
+							className="w-full justify-start"
 							key={item.href}
 							variant={isActive ? "secondary" : "ghost"}
-							className="w-full justify-start"
-							asChild
 						>
 							<Link href={item.href}>
 								<Icon className="mr-2 h-4 w-4" />
@@ -68,9 +64,9 @@ function SidebarContent() {
 					<>
 						<Separator className="my-4" />
 						<Button
-							variant={pathname.startsWith("/admin") ? "secondary" : "ghost"}
-							className="w-full justify-start"
 							asChild
+							className="w-full justify-start"
+							variant={pathname.startsWith("/admin") ? "secondary" : "ghost"}
 						>
 							<Link href="/admin">
 								<Settings className="mr-2 h-4 w-4" />
@@ -99,6 +95,13 @@ function SidebarContent() {
 }
 
 export function Sidebar() {
+	// Delay rendering the mobile sheet until after hydration to avoid ID mismatch
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
 	return (
 		<>
 			{/* Desktop Sidebar */}
@@ -106,24 +109,26 @@ export function Sidebar() {
 				<SidebarContent />
 			</aside>
 
-			{/* Mobile Sidebar */}
-			<div className="md:hidden">
-				<Sheet>
-					<SheetTrigger asChild>
-						<Button
-							variant="outline"
-							size="icon"
-							className="fixed left-4 top-4 z-40"
-						>
-							<Menu className="h-5 w-5" />
-							<span className="sr-only">Toggle navigation menu</span>
-						</Button>
-					</SheetTrigger>
-					<SheetContent side="left" className="w-60 p-0">
-						<SidebarContent />
-					</SheetContent>
-				</Sheet>
-			</div>
+			{/* Mobile Sidebar - only render after hydration to avoid Radix ID mismatch */}
+			{mounted && (
+				<div className="md:hidden">
+					<Sheet>
+						<SheetTrigger asChild>
+							<Button
+								className="fixed left-4 top-4 z-40"
+								size="icon"
+								variant="outline"
+							>
+								<Menu className="h-5 w-5" />
+								<span className="sr-only">Toggle navigation menu</span>
+							</Button>
+						</SheetTrigger>
+						<SheetContent className="w-60 p-0" side="left">
+							<SidebarContent />
+						</SheetContent>
+					</Sheet>
+				</div>
+			)}
 		</>
 	);
 }

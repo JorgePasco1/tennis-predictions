@@ -1,12 +1,12 @@
+import { BarChart3, FileText, Trophy } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { api, HydrateClient } from "~/trpc/server";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { FileText, BarChart3, Trophy } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { api, HydrateClient } from "~/trpc/server";
 
 export default async function TournamentDetailPage({
 	params,
@@ -52,10 +52,7 @@ export default async function TournamentDetailPage({
 							<AlertDescription className="text-green-800">
 								Submit your predictions for this round before it closes
 							</AlertDescription>
-							<Button
-								className="mt-4 bg-green-600 hover:bg-green-700"
-								asChild
-							>
+							<Button asChild className="mt-4 bg-green-600 hover:bg-green-700">
 								<Link href={`/tournaments/${slug}/picks`}>Submit Picks</Link>
 							</Button>
 						</Alert>
@@ -67,7 +64,6 @@ export default async function TournamentDetailPage({
 						<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 							{tournament.rounds.map((round) => (
 								<Card
-									key={round.id}
 									className={cn(
 										round.isActive
 											? "border-green-500 bg-green-50"
@@ -75,6 +71,7 @@ export default async function TournamentDetailPage({
 												? "bg-muted"
 												: "",
 									)}
+									key={round.id}
 								>
 									<CardContent className="p-6">
 										<div className="mb-2 flex items-center justify-between">
@@ -105,7 +102,7 @@ export default async function TournamentDetailPage({
 
 					{/* Quick Links */}
 					<div className="grid gap-4 md:grid-cols-3">
-						<Link href={`/tournaments/${slug}/picks`} className="group">
+						<Link className="group" href={`/tournaments/${slug}/picks`}>
 							<Card className="transition-shadow hover:shadow-md">
 								<CardContent className="p-6">
 									<FileText className="mb-2 h-8 w-8 text-primary" />
@@ -116,7 +113,7 @@ export default async function TournamentDetailPage({
 								</CardContent>
 							</Card>
 						</Link>
-						<Link href={`/tournaments/${slug}/results`} className="group">
+						<Link className="group" href={`/tournaments/${slug}/results`}>
 							<Card className="transition-shadow hover:shadow-md">
 								<CardContent className="p-6">
 									<BarChart3 className="mb-2 h-8 w-8 text-primary" />
@@ -127,7 +124,7 @@ export default async function TournamentDetailPage({
 								</CardContent>
 							</Card>
 						</Link>
-						<Link href={`/leaderboards/${tournament.id}`} className="group">
+						<Link className="group" href={`/leaderboards/${tournament.id}`}>
 							<Card className="transition-shadow hover:shadow-md">
 								<CardContent className="p-6">
 									<Trophy className="mb-2 h-8 w-8 text-primary" />

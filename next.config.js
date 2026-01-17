@@ -5,6 +5,11 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+	// Increase the maximum allowed body size for API routes (for MHTML uploads)
+	experimental: {
+		proxyClientMaxBodySize: "50mb",
+	},
+};
 
 export default config;

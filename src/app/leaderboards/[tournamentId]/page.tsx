@@ -1,9 +1,9 @@
+import { ArrowLeft, Info } from "lucide-react";
 import Link from "next/link";
-import { api, HydrateClient } from "~/trpc/server";
-import { Card } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import {
 	Table,
 	TableBody,
@@ -12,8 +12,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "~/components/ui/table";
-import { ArrowLeft, Info } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { api, HydrateClient } from "~/trpc/server";
 
 export default async function TournamentLeaderboardPage({
 	params,
@@ -33,15 +33,13 @@ export default async function TournamentLeaderboardPage({
 			<div className="min-h-screen bg-muted/30">
 				<main className="container mx-auto px-4 py-8">
 					<div className="mb-8">
-						<Button variant="link" className="mb-4 -ml-4" asChild>
+						<Button asChild className="mb-4 -ml-4" variant="link">
 							<Link href={`/tournaments/${tournament.slug}`}>
 								<ArrowLeft className="mr-2 h-4 w-4" />
 								Back to Tournament
 							</Link>
 						</Button>
-						<h1 className="mb-2 font-bold text-4xl">
-							Tournament Leaderboard
-						</h1>
+						<h1 className="mb-2 font-bold text-4xl">Tournament Leaderboard</h1>
 						<p className="text-muted-foreground">{tournament.name}</p>
 					</div>
 
@@ -65,9 +63,7 @@ export default async function TournamentLeaderboardPage({
 											<TableHead className="text-right">
 												Correct Winners
 											</TableHead>
-											<TableHead className="text-right">
-												Exact Scores
-											</TableHead>
+											<TableHead className="text-right">Exact Scores</TableHead>
 											<TableHead className="text-right">
 												Rounds Played
 											</TableHead>

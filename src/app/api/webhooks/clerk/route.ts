@@ -1,11 +1,10 @@
-import { Webhook } from "svix";
-import { headers } from "next/headers";
 import type { WebhookEvent } from "@clerk/nextjs/server";
-
+import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
+import { Webhook } from "svix";
+import { env } from "~/env";
 import { db } from "~/server/db";
 import { users } from "~/server/db/schema";
-import { env } from "~/env";
-import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
 	// Verify the webhook signature
@@ -75,7 +74,8 @@ export async function POST(req: Request) {
 		}
 
 		// Get role from public metadata
-		const role = (public_metadata?.role as "user" | "admin" | undefined) ?? "user";
+		const role =
+			(public_metadata?.role as "user" | "admin" | undefined) ?? "user";
 
 		// Upsert user to database
 		try {
@@ -97,7 +97,9 @@ export async function POST(req: Request) {
 					},
 				});
 
-			console.log(`User ${eventType === "user.created" ? "created" : "updated"}: ${id}`);
+			console.log(
+				`User ${eventType === "user.created" ? "created" : "updated"}: ${id}`,
+			);
 		} catch (error) {
 			console.error("Error syncing user to database:", error);
 			return new Response("Error syncing user", {

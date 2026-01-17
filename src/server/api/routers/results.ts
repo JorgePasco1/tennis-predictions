@@ -1,8 +1,13 @@
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { rounds, matches, matchPicks, userRoundPicks } from "~/server/db/schema";
+import {
+	matches,
+	matchPicks,
+	rounds,
+	userRoundPicks,
+} from "~/server/db/schema";
 
 export const resultsRouter = createTRPCRouter({
 	/**
