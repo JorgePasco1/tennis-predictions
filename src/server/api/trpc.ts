@@ -6,7 +6,8 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
+import { currentUser } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -25,8 +26,18 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+	const user = await currentUser();
+
 	return {
 		db,
+		user: user
+			? {
+					id: user.id,
+					email: user.emailAddresses[0]?.emailAddress ?? "",
+					role:
+						(user.publicMetadata.role as "user" | "admin" | undefined) ?? "user",
+				}
+			: null,
 		...opts,
 	};
 };
@@ -104,3 +115,60 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Middleware to check if user is authenticated
+ */
+const isAuthenticated = t.middleware(async ({ ctx, next }) => {
+	if (!ctx.user) {
+		throw new TRPCError({
+			code: "UNAUTHORIZED",
+			message: "You must be logged in to perform this action",
+		});
+	}
+
+	return next({
+		ctx: {
+			user: ctx.user,
+		},
+	});
+});
+
+/**
+ * Middleware to check if user is an admin
+ */
+const isAdmin = t.middleware(async ({ ctx, next }) => {
+	if (!ctx.user) {
+		throw new TRPCError({
+			code: "UNAUTHORIZED",
+			message: "You must be logged in to perform this action",
+		});
+	}
+
+	if (ctx.user.role !== "admin") {
+		throw new TRPCError({
+			code: "FORBIDDEN",
+			message: "You must be an admin to perform this action",
+		});
+	}
+
+	return next({
+		ctx: {
+			user: ctx.user,
+		},
+	});
+});
+
+/**
+ * Protected procedure - requires authentication
+ */
+export const protectedProcedure = t.procedure
+	.use(timingMiddleware)
+	.use(isAuthenticated);
+
+/**
+ * Admin procedure - requires admin role
+ */
+export const adminProcedure = t.procedure
+	.use(timingMiddleware)
+	.use(isAdmin);

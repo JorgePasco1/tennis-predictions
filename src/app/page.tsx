@@ -1,53 +1,88 @@
+import { redirect } from "next/navigation";
+import { currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
-
-import { LatestPost } from "~/app/_components/post";
-import { api, HydrateClient } from "~/trpc/server";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 
 export default async function Home() {
-	const hello = await api.post.hello({ text: "from tRPC" });
+	const user = await currentUser();
 
-	void api.post.getLatest.prefetch();
+	// If logged in, redirect to tournaments page
+	if (user) {
+		redirect("/tournaments");
+	}
 
+	// Landing page for non-authenticated users
 	return (
-		<HydrateClient>
-			<main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-				<div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-					<h1 className="font-extrabold text-5xl tracking-tight sm:text-[5rem]">
-						Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
+		<main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-900 to-blue-950">
+			<div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
+				<div className="flex flex-col items-center gap-4 text-center">
+					<h1 className="font-extrabold text-5xl text-white tracking-tight sm:text-6xl">
+						Tennis Predictions
 					</h1>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-						<Link
-							className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-							href="https://create.t3.gg/en/usage/first-steps"
-							target="_blank"
-						>
-							<h3 className="font-bold text-2xl">First Steps →</h3>
-							<div className="text-lg">
-								Just the basics - Everything you need to know to set up your
-								database and authentication.
-							</div>
-						</Link>
-						<Link
-							className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-							href="https://create.t3.gg/en/introduction"
-							target="_blank"
-						>
-							<h3 className="font-bold text-2xl">Documentation →</h3>
-							<div className="text-lg">
-								Learn more about Create T3 App, the libraries it uses, and how
-								to deploy it.
-							</div>
-						</Link>
-					</div>
-					<div className="flex flex-col items-center gap-2">
-						<p className="text-2xl text-white">
-							{hello ? hello.greeting : "Loading tRPC query..."}
-						</p>
-					</div>
-
-					<LatestPost />
+					<p className="max-w-2xl text-xl text-blue-200">
+						Compete with friends by predicting ATP Tour tournament results.
+						Submit your picks, earn points, and climb the leaderboard.
+					</p>
 				</div>
-			</main>
-		</HydrateClient>
+
+				<div className="flex flex-col gap-4 sm:flex-row">
+					<Button
+						size="lg"
+						className="bg-white px-8 text-blue-900 hover:bg-blue-50"
+						asChild
+					>
+						<Link href="/sign-up">Get Started</Link>
+					</Button>
+					<Button
+						size="lg"
+						variant="outline"
+						className="border-2 border-white bg-transparent px-8 text-white hover:bg-white/10 hover:text-white"
+						asChild
+					>
+						<Link href="/sign-in">Sign In</Link>
+					</Button>
+				</div>
+
+				<div className="mt-12 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-3">
+					<Card className="border-white/20 bg-white/10 backdrop-blur-sm">
+						<CardHeader>
+							<div className="mb-2 text-3xl">🎾</div>
+							<CardTitle className="text-white">Predict Matches</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<p className="text-blue-200">
+								Pick winners and predict exact scores for every match in ATP
+								tournaments
+							</p>
+						</CardContent>
+					</Card>
+					<Card className="border-white/20 bg-white/10 backdrop-blur-sm">
+						<CardHeader>
+							<div className="mb-2 text-3xl">📊</div>
+							<CardTitle className="text-white">Earn Points</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<p className="text-blue-200">
+								Score points for correct predictions with bonus points for exact
+								scores
+							</p>
+						</CardContent>
+					</Card>
+					<Card className="border-white/20 bg-white/10 backdrop-blur-sm">
+						<CardHeader>
+							<div className="mb-2 text-3xl">🏆</div>
+							<CardTitle className="text-white">Climb Rankings</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<p className="text-blue-200">
+								Compete on tournament leaderboards and track your all-time
+								performance
+							</p>
+						</CardContent>
+					</Card>
+				</div>
+			</div>
+		</main>
 	);
 }
