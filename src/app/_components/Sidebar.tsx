@@ -9,7 +9,13 @@ import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "~/components/ui/sheet";
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+	onNavigate,
+	onUserButtonClick,
+}: {
+	onNavigate?: () => void;
+	onUserButtonClick?: () => void;
+}) {
 	const pathname = usePathname();
 	const { user } = useUser();
 	const isAdmin = user?.publicMetadata?.role === "admin";
@@ -89,7 +95,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 			<Separator />
 
 			{/* User profile */}
-			<div className="p-4">
+			<div className="p-4" onClick={onUserButtonClick}>
 				<UserButton
 					afterSignOutUrl="/"
 					appearance={{
@@ -143,7 +149,10 @@ export function Sidebar() {
 							</Button>
 						</SheetTrigger>
 						<SheetContent className="w-60 p-0" side="left">
-							<SidebarContent onNavigate={() => setSheetOpen(false)} />
+							<SidebarContent
+								onNavigate={() => setSheetOpen(false)}
+								onUserButtonClick={() => setSheetOpen(false)}
+							/>
 						</SheetContent>
 					</Sheet>
 				</div>
