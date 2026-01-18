@@ -1,5 +1,6 @@
 "use client";
 
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
@@ -14,6 +15,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { Input } from "~/components/ui/input";
 import { api } from "~/trpc/react";
 
 export default function PicksPage({
@@ -39,6 +41,7 @@ export default function PicksPage({
 	);
 
 	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
 
 	const [picks, setPicks] = useState<
 		Record<
@@ -196,8 +199,39 @@ export default function PicksPage({
 		}
 	};
 
+	// Filter matches based on search query
+	const filterMatches = <
+		T extends { match: { player1Name: string; player2Name: string } },
+	>(
+		matches: T[],
+	) => {
+		if (!searchQuery.trim()) return matches;
+		const query = searchQuery.toLowerCase();
+		return matches.filter((item) => {
+			const match = item.match;
+			return (
+				match.player1Name.toLowerCase().includes(query) ||
+				match.player2Name.toLowerCase().includes(query)
+			);
+		});
+	};
+
+	// Filter function for active round matches (editable view)
+	const filterActiveMatches = (matches: typeof activeRound.matches) => {
+		if (!searchQuery.trim()) return matches;
+		const query = searchQuery.toLowerCase();
+		return matches.filter(
+			(match) =>
+				match.player1Name.toLowerCase().includes(query) ||
+				match.player2Name.toLowerCase().includes(query),
+		);
+	};
+
 	// If user has already submitted final picks for this round, show readonly view
 	if (existingPicks && !existingPicks.isDraft) {
+		const filteredPicks = filterMatches(existingPicks.matchPicks);
+		const totalMatches = existingPicks.matchPicks.length;
+		const filteredCount = filteredPicks.length;
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<nav className="border-b bg-white">
@@ -256,75 +290,110 @@ export default function PicksPage({
 						</div>
 					)}
 
-					{/* Matches - Readonly */}
-					<div className="mb-8 space-y-4">
-						{existingPicks.matchPicks.map((pick) => (
-							<div
-								className="rounded-lg border border-gray-200 bg-white p-6"
-								key={pick.matchId}
-							>
-								<div className="mb-4">
-									<div className="mb-2 font-semibold text-gray-900">
-										Match {pick.match.matchNumber}
-									</div>
-									<div className="text-gray-700 text-lg">
-										{pick.match.player1Seed && `(${pick.match.player1Seed}) `}
-										{pick.match.player1Name}
-										<span className="mx-2 text-gray-400">vs</span>
-										{pick.match.player2Seed && `(${pick.match.player2Seed}) `}
-										{pick.match.player2Name}
-									</div>
-								</div>
-
-								<div className="space-y-4">
-									{/* Winner Display */}
-									<div>
-										<label className="mb-2 block font-medium text-gray-700 text-sm">
-											Your Predicted Winner
-										</label>
-										<div className="flex gap-4">
-											<div
-												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
-													pick.predictedWinner === pick.match.player1Name
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-200 bg-gray-50 text-gray-500"
-												}`}
-											>
-												{pick.match.player1Seed &&
-													`(${pick.match.player1Seed}) `}
-												{pick.match.player1Name}
-											</div>
-											<div
-												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
-													pick.predictedWinner === pick.match.player2Name
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-200 bg-gray-50 text-gray-500"
-												}`}
-											>
-												{pick.match.player2Seed &&
-													`(${pick.match.player2Seed}) `}
-												{pick.match.player2Name}
-											</div>
-										</div>
-									</div>
-
-									{/* Score Display */}
-									<div>
-										<label className="mb-2 block font-medium text-gray-700 text-sm">
-											Your Predicted Score
-										</label>
-										<div className="rounded-lg border-2 border-blue-600 bg-blue-50 px-4 py-2 text-center font-semibold text-blue-900">
-											{pick.predictedSetsWon}-{pick.predictedSetsLost}
-										</div>
-									</div>
-								</div>
+					{/* Search Input */}
+					<div className="mb-6">
+						<div className="relative">
+							<Search className="absolute top-3 left-3 h-5 w-5 text-gray-400" />
+							<Input
+								className="pl-10 text-base"
+								onChange={(e) => setSearchQuery(e.target.value)}
+								placeholder="Search by player name..."
+								type="text"
+								value={searchQuery}
+							/>
+						</div>
+						{searchQuery.trim() && (
+							<div className="mt-2 text-gray-600 text-sm">
+								Showing {filteredCount} of {totalMatches} matches
+								{filteredCount === 0 && " - No matches found"}
 							</div>
-						))}
+						)}
 					</div>
+
+					{/* Matches - Readonly */}
+					{filteredCount === 0 && searchQuery.trim() ? (
+						<div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+							<div className="mb-4 text-6xl">🔍</div>
+							<h2 className="mb-2 font-semibold text-2xl">No Matches Found</h2>
+							<p className="text-gray-600">
+								No matches found with player name "{searchQuery}"
+							</p>
+						</div>
+					) : (
+						<div className="mb-8 space-y-4">
+							{filteredPicks.map((pick) => (
+								<div
+									className="rounded-lg border border-gray-200 bg-white p-6"
+									key={pick.matchId}
+								>
+									<div className="mb-4">
+										<div className="mb-2 font-semibold text-gray-900">
+											Match {pick.match.matchNumber}
+										</div>
+										<div className="text-gray-700 text-lg">
+											{pick.match.player1Seed && `(${pick.match.player1Seed}) `}
+											{pick.match.player1Name}
+											<span className="mx-2 text-gray-400">vs</span>
+											{pick.match.player2Seed && `(${pick.match.player2Seed}) `}
+											{pick.match.player2Name}
+										</div>
+									</div>
+
+									<div className="space-y-4">
+										{/* Winner Display */}
+										<div>
+											<label className="mb-2 block font-medium text-gray-700 text-sm">
+												Your Predicted Winner
+											</label>
+											<div className="flex gap-4">
+												<div
+													className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
+														pick.predictedWinner === pick.match.player1Name
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-200 bg-gray-50 text-gray-500"
+													}`}
+												>
+													{pick.match.player1Seed &&
+														`(${pick.match.player1Seed}) `}
+													{pick.match.player1Name}
+												</div>
+												<div
+													className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
+														pick.predictedWinner === pick.match.player2Name
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-200 bg-gray-50 text-gray-500"
+													}`}
+												>
+													{pick.match.player2Seed &&
+														`(${pick.match.player2Seed}) `}
+													{pick.match.player2Name}
+												</div>
+											</div>
+										</div>
+
+										{/* Score Display */}
+										<div>
+											<label className="mb-2 block font-medium text-gray-700 text-sm">
+												Your Predicted Score
+											</label>
+											<div className="rounded-lg border-2 border-blue-600 bg-blue-50 px-4 py-2 text-center font-semibold text-blue-900">
+												{pick.predictedSetsWon}-{pick.predictedSetsLost}
+											</div>
+										</div>
+									</div>
+								</div>
+							))}
+						</div>
+					)}
 				</main>
 			</div>
 		);
 	}
+
+	// Editable picks view - filter matches
+	const filteredMatches = filterActiveMatches(activeRound.matches);
+	const totalMatchesCount = activeRound.matches.length;
+	const filteredMatchesCount = filteredMatches.length;
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -404,208 +473,238 @@ export default function PicksPage({
 					</div>
 				)}
 
-				{/* Matches */}
-				<div className="mb-8 space-y-4">
-					{activeRound.matches.map((match) => (
-						<div
-							className="rounded-lg border border-gray-200 bg-white p-6 transition-all"
-							key={match.id}
-							ref={(el) => {
-								matchRefs.current[match.id] = el;
-							}}
-						>
-							<div className="mb-4">
-								<div className="mb-2 font-semibold text-gray-900">
-									Match {match.matchNumber}
-								</div>
-								<div className="text-gray-700 text-lg">
-									{match.player1Seed && `(${match.player1Seed}) `}
-									{match.player1Name}
-									<span className="mx-2 text-gray-400">vs</span>
-									{match.player2Seed && `(${match.player2Seed}) `}
-									{match.player2Name}
-								</div>
-							</div>
+				{/* Search Input */}
+				<div className="mb-6">
+					<div className="relative">
+						<Search className="absolute top-3 left-3 h-5 w-5 text-gray-400" />
+						<Input
+							className="pl-10 text-base"
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="Search by player name..."
+							type="text"
+							value={searchQuery}
+						/>
+					</div>
+					{searchQuery.trim() && (
+						<div className="mt-2 text-gray-600 text-sm">
+							Showing {filteredMatchesCount} of {totalMatchesCount} matches
+							{filteredMatchesCount === 0 && " - No matches found"}
+						</div>
+					)}
+				</div>
 
-							<div className="space-y-4">
-								{/* Winner Selection */}
-								<div>
-									<label className="mb-2 block font-medium text-gray-700 text-sm">
-										Predicted Winner
-									</label>
-									<div className="flex gap-4">
-										<button
-											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
-												picks[match.id]?.predictedWinner === match.player1Name
-													? "border-blue-600 bg-blue-50 text-blue-900"
-													: "border-gray-300 text-gray-700 hover:border-gray-400"
-											}`}
-											onClick={() =>
-												setPicks((prev) => ({
-													...prev,
-													[match.id]: {
-														predictedWinner: match.player1Name,
-														predictedSetsWon:
-															prev[match.id]?.predictedSetsWon ??
-															(tournament.format === "bo5" ? 3 : 2),
-														predictedSetsLost:
-															prev[match.id]?.predictedSetsLost ?? 0,
-													},
-												}))
-											}
-										>
-											{match.player1Seed && `(${match.player1Seed}) `}
-											{match.player1Name}
-										</button>
-										<button
-											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
-												picks[match.id]?.predictedWinner === match.player2Name
-													? "border-blue-600 bg-blue-50 text-blue-900"
-													: "border-gray-300 text-gray-700 hover:border-gray-400"
-											}`}
-											onClick={() =>
-												setPicks((prev) => ({
-													...prev,
-													[match.id]: {
-														predictedWinner: match.player2Name,
-														predictedSetsWon:
-															prev[match.id]?.predictedSetsWon ??
-															(tournament.format === "bo5" ? 3 : 2),
-														predictedSetsLost:
-															prev[match.id]?.predictedSetsLost ?? 0,
-													},
-												}))
-											}
-										>
-											{match.player2Seed && `(${match.player2Seed}) `}
-											{match.player2Name}
-										</button>
+				{/* Matches */}
+				{filteredMatchesCount === 0 && searchQuery.trim() ? (
+					<div className="mb-8 rounded-lg border border-gray-200 bg-white p-12 text-center">
+						<div className="mb-4 text-6xl">🔍</div>
+						<h2 className="mb-2 font-semibold text-2xl">No Matches Found</h2>
+						<p className="text-gray-600">
+							No matches found with player name "{searchQuery}"
+						</p>
+					</div>
+				) : (
+					<div className="mb-8 space-y-4">
+						{filteredMatches.map((match) => (
+							<div
+								className="rounded-lg border border-gray-200 bg-white p-6 transition-all"
+								key={match.id}
+								ref={(el) => {
+									matchRefs.current[match.id] = el;
+								}}
+							>
+								<div className="mb-4">
+									<div className="mb-2 font-semibold text-gray-900">
+										Match {match.matchNumber}
+									</div>
+									<div className="text-gray-700 text-lg">
+										{match.player1Seed && `(${match.player1Seed}) `}
+										{match.player1Name}
+										<span className="mx-2 text-gray-400">vs</span>
+										{match.player2Seed && `(${match.player2Seed}) `}
+										{match.player2Name}
 									</div>
 								</div>
 
-								{/* Score Prediction */}
-								{picks[match.id]?.predictedWinner && (
+								<div className="space-y-4">
+									{/* Winner Selection */}
 									<div>
 										<label className="mb-2 block font-medium text-gray-700 text-sm">
-											Predicted Score
+											Predicted Winner
 										</label>
-										<div
-											className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
-										>
-											{tournament.format === "bo3" ? (
-												<>
-													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 2 &&
-															picks[match.id]?.predictedSetsLost === 0
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
-														onClick={() =>
-															setPicks((prev) => ({
-																...prev,
-																[match.id]: {
-																	...prev[match.id]!,
-																	predictedSetsWon: 2,
-																	predictedSetsLost: 0,
-																},
-															}))
-														}
-													>
-														2-0
-													</button>
-													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 2 &&
-															picks[match.id]?.predictedSetsLost === 1
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
-														onClick={() =>
-															setPicks((prev) => ({
-																...prev,
-																[match.id]: {
-																	...prev[match.id]!,
-																	predictedSetsWon: 2,
-																	predictedSetsLost: 1,
-																},
-															}))
-														}
-													>
-														2-1
-													</button>
-												</>
-											) : (
-												<>
-													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 3 &&
-															picks[match.id]?.predictedSetsLost === 0
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
-														onClick={() =>
-															setPicks((prev) => ({
-																...prev,
-																[match.id]: {
-																	...prev[match.id]!,
-																	predictedSetsWon: 3,
-																	predictedSetsLost: 0,
-																},
-															}))
-														}
-													>
-														3-0
-													</button>
-													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 3 &&
-															picks[match.id]?.predictedSetsLost === 1
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
-														onClick={() =>
-															setPicks((prev) => ({
-																...prev,
-																[match.id]: {
-																	...prev[match.id]!,
-																	predictedSetsWon: 3,
-																	predictedSetsLost: 1,
-																},
-															}))
-														}
-													>
-														3-1
-													</button>
-													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 3 &&
-															picks[match.id]?.predictedSetsLost === 2
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
-														onClick={() =>
-															setPicks((prev) => ({
-																...prev,
-																[match.id]: {
-																	...prev[match.id]!,
-																	predictedSetsWon: 3,
-																	predictedSetsLost: 2,
-																},
-															}))
-														}
-													>
-														3-2
-													</button>
-												</>
-											)}
+										<div className="flex gap-4">
+											<button
+												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
+													picks[match.id]?.predictedWinner === match.player1Name
+														? "border-blue-600 bg-blue-50 text-blue-900"
+														: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
+												onClick={() =>
+													setPicks((prev) => ({
+														...prev,
+														[match.id]: {
+															predictedWinner: match.player1Name,
+															predictedSetsWon:
+																prev[match.id]?.predictedSetsWon ??
+																(tournament.format === "bo5" ? 3 : 2),
+															predictedSetsLost:
+																prev[match.id]?.predictedSetsLost ?? 0,
+														},
+													}))
+												}
+											>
+												{match.player1Seed && `(${match.player1Seed}) `}
+												{match.player1Name}
+											</button>
+											<button
+												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
+													picks[match.id]?.predictedWinner === match.player2Name
+														? "border-blue-600 bg-blue-50 text-blue-900"
+														: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
+												onClick={() =>
+													setPicks((prev) => ({
+														...prev,
+														[match.id]: {
+															predictedWinner: match.player2Name,
+															predictedSetsWon:
+																prev[match.id]?.predictedSetsWon ??
+																(tournament.format === "bo5" ? 3 : 2),
+															predictedSetsLost:
+																prev[match.id]?.predictedSetsLost ?? 0,
+														},
+													}))
+												}
+											>
+												{match.player2Seed && `(${match.player2Seed}) `}
+												{match.player2Name}
+											</button>
 										</div>
 									</div>
-								)}
+
+									{/* Score Prediction */}
+									{picks[match.id]?.predictedWinner && (
+										<div>
+											<label className="mb-2 block font-medium text-gray-700 text-sm">
+												Predicted Score
+											</label>
+											<div
+												className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
+											>
+												{tournament.format === "bo3" ? (
+													<>
+														<button
+															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																picks[match.id]?.predictedSetsWon === 2 &&
+																picks[match.id]?.predictedSetsLost === 0
+																	? "border-blue-600 bg-blue-50 text-blue-900"
+																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
+															onClick={() =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsWon: 2,
+																		predictedSetsLost: 0,
+																	},
+																}))
+															}
+														>
+															2-0
+														</button>
+														<button
+															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																picks[match.id]?.predictedSetsWon === 2 &&
+																picks[match.id]?.predictedSetsLost === 1
+																	? "border-blue-600 bg-blue-50 text-blue-900"
+																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
+															onClick={() =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsWon: 2,
+																		predictedSetsLost: 1,
+																	},
+																}))
+															}
+														>
+															2-1
+														</button>
+													</>
+												) : (
+													<>
+														<button
+															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																picks[match.id]?.predictedSetsWon === 3 &&
+																picks[match.id]?.predictedSetsLost === 0
+																	? "border-blue-600 bg-blue-50 text-blue-900"
+																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
+															onClick={() =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsWon: 3,
+																		predictedSetsLost: 0,
+																	},
+																}))
+															}
+														>
+															3-0
+														</button>
+														<button
+															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																picks[match.id]?.predictedSetsWon === 3 &&
+																picks[match.id]?.predictedSetsLost === 1
+																	? "border-blue-600 bg-blue-50 text-blue-900"
+																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
+															onClick={() =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsWon: 3,
+																		predictedSetsLost: 1,
+																	},
+																}))
+															}
+														>
+															3-1
+														</button>
+														<button
+															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																picks[match.id]?.predictedSetsWon === 3 &&
+																picks[match.id]?.predictedSetsLost === 2
+																	? "border-blue-600 bg-blue-50 text-blue-900"
+																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
+															onClick={() =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsWon: 3,
+																		predictedSetsLost: 2,
+																	},
+																}))
+															}
+														>
+															3-2
+														</button>
+													</>
+												)}
+											</div>
+										</div>
+									)}
+								</div>
 							</div>
-						</div>
-					))}
-				</div>
+						))}
+					</div>
+				)}
 
 				{/* Submit Button */}
 				<div className="sticky bottom-4 rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
