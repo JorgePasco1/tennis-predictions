@@ -1,0 +1,917 @@
+{
+	"id": "023df752-e5de-47ff-8289-87de542031f2",
+	"prevId": "202fb943-724c-4a3f-83cc-0f822c1bf835",
+	"version": "7",
+	"dialect": "postgresql",
+	"tables": {
+		"public.match_pick": {
+			"name": "match_pick",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"user_round_pick_id": {
+					"name": "user_round_pick_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"match_id": {
+					"name": "match_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"predicted_winner": {
+					"name": "predicted_winner",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"predicted_sets_won": {
+					"name": "predicted_sets_won",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"predicted_sets_lost": {
+					"name": "predicted_sets_lost",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"is_winner_correct": {
+					"name": "is_winner_correct",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_exact_score": {
+					"name": "is_exact_score",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"points_earned": {
+					"name": "points_earned",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"match_pick_user_round_pick_id_idx": {
+					"name": "match_pick_user_round_pick_id_idx",
+					"columns": [
+						{
+							"expression": "user_round_pick_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"match_pick_match_id_idx": {
+					"name": "match_pick_match_id_idx",
+					"columns": [
+						{
+							"expression": "match_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
+			"foreignKeys": {
+				"match_pick_user_round_pick_id_user_round_pick_id_fk": {
+					"name": "match_pick_user_round_pick_id_user_round_pick_id_fk",
+					"tableFrom": "match_pick",
+					"tableTo": "user_round_pick",
+					"columnsFrom": ["user_round_pick_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"match_pick_match_id_match_id_fk": {
+					"name": "match_pick_match_id_match_id_fk",
+					"tableFrom": "match_pick",
+					"tableTo": "match",
+					"columnsFrom": ["match_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"match_pick_unique": {
+					"name": "match_pick_unique",
+					"nullsNotDistinct": false,
+					"columns": ["user_round_pick_id", "match_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.match": {
+			"name": "match",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"round_id": {
+					"name": "round_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"match_number": {
+					"name": "match_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"player1_name": {
+					"name": "player1_name",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"player2_name": {
+					"name": "player2_name",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"player1_seed": {
+					"name": "player1_seed",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"player2_seed": {
+					"name": "player2_seed",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"winner_name": {
+					"name": "winner_name",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"final_score": {
+					"name": "final_score",
+					"type": "varchar(50)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"sets_won": {
+					"name": "sets_won",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"sets_lost": {
+					"name": "sets_lost",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status": {
+					"name": "status",
+					"type": "match_status",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'pending'"
+				},
+				"finalized_at": {
+					"name": "finalized_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"finalized_by": {
+					"name": "finalized_by",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"deleted_at": {
+					"name": "deleted_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"match_round_id_idx": {
+					"name": "match_round_id_idx",
+					"columns": [
+						{
+							"expression": "round_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"match_status_idx": {
+					"name": "match_status_idx",
+					"columns": [
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
+			"foreignKeys": {
+				"match_round_id_round_id_fk": {
+					"name": "match_round_id_round_id_fk",
+					"tableFrom": "match",
+					"tableTo": "round",
+					"columnsFrom": ["round_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"match_finalized_by_user_id_fk": {
+					"name": "match_finalized_by_user_id_fk",
+					"tableFrom": "match",
+					"tableTo": "user",
+					"columnsFrom": ["finalized_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.round_scoring_rule": {
+			"name": "round_scoring_rule",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"round_id": {
+					"name": "round_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"points_per_winner": {
+					"name": "points_per_winner",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 10
+				},
+				"points_exact_score": {
+					"name": "points_exact_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 5
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"round_scoring_rule_round_id_round_id_fk": {
+					"name": "round_scoring_rule_round_id_round_id_fk",
+					"tableFrom": "round_scoring_rule",
+					"tableTo": "round",
+					"columnsFrom": ["round_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"round_scoring_rule_round_id_unique": {
+					"name": "round_scoring_rule_round_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["round_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.round": {
+			"name": "round",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"tournament_id": {
+					"name": "tournament_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"round_number": {
+					"name": "round_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"name": {
+					"name": "name",
+					"type": "varchar(100)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"is_active": {
+					"name": "is_active",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
+				},
+				"is_finalized": {
+					"name": "is_finalized",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
+				},
+				"submissions_closed_at": {
+					"name": "submissions_closed_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"submissions_closed_by": {
+					"name": "submissions_closed_by",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"round_tournament_id_idx": {
+					"name": "round_tournament_id_idx",
+					"columns": [
+						{
+							"expression": "tournament_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"round_is_active_idx": {
+					"name": "round_is_active_idx",
+					"columns": [
+						{
+							"expression": "is_active",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"round_submissions_closed_idx": {
+					"name": "round_submissions_closed_idx",
+					"columns": [
+						{
+							"expression": "submissions_closed_at",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
+			"foreignKeys": {
+				"round_tournament_id_tournament_id_fk": {
+					"name": "round_tournament_id_tournament_id_fk",
+					"tableFrom": "round",
+					"tableTo": "tournament",
+					"columnsFrom": ["tournament_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"round_submissions_closed_by_user_id_fk": {
+					"name": "round_submissions_closed_by_user_id_fk",
+					"tableFrom": "round",
+					"tableTo": "user",
+					"columnsFrom": ["submissions_closed_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.tournament": {
+			"name": "tournament",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"name": {
+					"name": "name",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"slug": {
+					"name": "slug",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"year": {
+					"name": "year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"format": {
+					"name": "format",
+					"type": "tournament_format",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'bo3'"
+				},
+				"atp_url": {
+					"name": "atp_url",
+					"type": "varchar(500)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status": {
+					"name": "status",
+					"type": "tournament_status",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'draft'"
+				},
+				"current_round_number": {
+					"name": "current_round_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"start_date": {
+					"name": "start_date",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"end_date": {
+					"name": "end_date",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"uploaded_by": {
+					"name": "uploaded_by",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"deleted_at": {
+					"name": "deleted_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {
+				"tournament_status_idx": {
+					"name": "tournament_status_idx",
+					"columns": [
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"tournament_year_idx": {
+					"name": "tournament_year_idx",
+					"columns": [
+						{
+							"expression": "year",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"tournament_slug_idx": {
+					"name": "tournament_slug_idx",
+					"columns": [
+						{
+							"expression": "slug",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
+			"foreignKeys": {
+				"tournament_uploaded_by_user_id_fk": {
+					"name": "tournament_uploaded_by_user_id_fk",
+					"tableFrom": "tournament",
+					"tableTo": "user",
+					"columnsFrom": ["uploaded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"tournament_slug_unique": {
+					"name": "tournament_slug_unique",
+					"nullsNotDistinct": false,
+					"columns": ["slug"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.user_round_pick": {
+			"name": "user_round_pick",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"round_id": {
+					"name": "round_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"is_draft": {
+					"name": "is_draft",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
+				},
+				"submitted_at": {
+					"name": "submitted_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"total_points": {
+					"name": "total_points",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"correct_winners": {
+					"name": "correct_winners",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"exact_scores": {
+					"name": "exact_scores",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"scored_at": {
+					"name": "scored_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"user_round_pick_user_id_idx": {
+					"name": "user_round_pick_user_id_idx",
+					"columns": [
+						{
+							"expression": "user_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"user_round_pick_round_id_idx": {
+					"name": "user_round_pick_round_id_idx",
+					"columns": [
+						{
+							"expression": "round_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
+			"foreignKeys": {
+				"user_round_pick_user_id_user_id_fk": {
+					"name": "user_round_pick_user_id_user_id_fk",
+					"tableFrom": "user_round_pick",
+					"tableTo": "user",
+					"columnsFrom": ["user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"user_round_pick_round_id_round_id_fk": {
+					"name": "user_round_pick_round_id_round_id_fk",
+					"tableFrom": "user_round_pick",
+					"tableTo": "round",
+					"columnsFrom": ["round_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"user_round_pick_unique": {
+					"name": "user_round_pick_unique",
+					"nullsNotDistinct": false,
+					"columns": ["user_id", "round_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.user": {
+			"name": "user",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "varchar(255)",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"clerk_id": {
+					"name": "clerk_id",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"email": {
+					"name": "email",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"display_name": {
+					"name": "display_name",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"image_url": {
+					"name": "image_url",
+					"type": "varchar(500)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"role": {
+					"name": "role",
+					"type": "user_role",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'user'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"user_clerk_id_idx": {
+					"name": "user_clerk_id_idx",
+					"columns": [
+						{
+							"expression": "clerk_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				},
+				"user_email_idx": {
+					"name": "user_email_idx",
+					"columns": [
+						{
+							"expression": "email",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"user_clerk_id_unique": {
+					"name": "user_clerk_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["clerk_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		}
+	},
+	"enums": {
+		"public.match_status": {
+			"name": "match_status",
+			"schema": "public",
+			"values": ["pending", "finalized"]
+		},
+		"public.tournament_format": {
+			"name": "tournament_format",
+			"schema": "public",
+			"values": ["bo3", "bo5"]
+		},
+		"public.tournament_status": {
+			"name": "tournament_status",
+			"schema": "public",
+			"values": ["draft", "active", "archived"]
+		},
+		"public.user_role": {
+			"name": "user_role",
+			"schema": "public",
+			"values": ["user", "admin"]
+		}
+	},
+	"schemas": {},
+	"sequences": {},
+	"roles": {},
+	"policies": {},
+	"views": {},
+	"_meta": {
+		"columns": {},
+		"schemas": {},
+		"tables": {}
+	}
+}

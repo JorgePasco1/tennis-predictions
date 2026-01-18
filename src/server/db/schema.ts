@@ -34,6 +34,7 @@ export const users = createTable(
 		clerkId: varchar("clerk_id", { length: 255 }).notNull().unique(),
 		email: varchar({ length: 255 }).notNull(),
 		displayName: varchar("display_name", { length: 255 }).notNull(),
+		imageUrl: varchar("image_url", { length: 500 }),
 		role: userRoleEnum().notNull().default("user"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
