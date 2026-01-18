@@ -67,7 +67,10 @@ export function AchievementBadge({
 	className,
 }: AchievementBadgeProps) {
 	const config = getCategoryConfig(category);
-	const gradient = badgeColor ? badgeColors[badgeColor] : badgeColors.blue;
+	const gradient =
+		badgeColor && badgeColors[badgeColor]
+			? badgeColors[badgeColor]
+			: badgeColors.blue;
 
 	const sizeClasses = {
 		sm: "w-12 h-12",
@@ -153,7 +156,10 @@ export function AchievementBadgeCompact({
 	className?: string;
 }) {
 	const config = getCategoryConfig(category);
-	const gradient = badgeColor ? badgeColors[badgeColor] : badgeColors.blue;
+	const gradient =
+		badgeColor && badgeColors[badgeColor]
+			? badgeColors[badgeColor]
+			: badgeColors.blue;
 
 	return (
 		<span

@@ -79,6 +79,13 @@ export function CountdownTimer({
 	const [isOpen, setIsOpen] = useState(false);
 	const [hasExpired, setHasExpired] = useState(false);
 
+	// Reset state when deadline or opensAt changes (e.g., if deadline is extended)
+	useEffect(() => {
+		setHasExpired(false);
+		setTimeRemaining(null);
+		setIsOpen(false);
+	}, [deadline, opensAt]);
+
 	useEffect(() => {
 		if (!deadline) return;
 
@@ -241,6 +248,13 @@ export function CountdownTimerCompact({
 	);
 	const [isOpen, setIsOpen] = useState(false);
 	const [hasExpired, setHasExpired] = useState(false);
+
+	// Reset state when deadline or opensAt changes (e.g., if deadline is extended)
+	useEffect(() => {
+		setHasExpired(false);
+		setTimeRemaining(null);
+		setIsOpen(false);
+	}, [deadline, opensAt]);
 
 	useEffect(() => {
 		if (!deadline) return;

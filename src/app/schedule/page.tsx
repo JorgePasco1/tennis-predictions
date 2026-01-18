@@ -118,15 +118,16 @@ export default async function SchedulePage() {
 																	{round.opensAt && !round.isActive && (
 																		<p className="text-muted-foreground text-sm">
 																			Opens:{" "}
-																			{new Date(
-																				round.opensAt,
-																			).toLocaleDateString(undefined, {
-																				weekday: "short",
-																				month: "short",
-																				day: "numeric",
-																				hour: "numeric",
-																				minute: "2-digit",
-																			})}
+																			{new Date(round.opensAt).toLocaleString(
+																				undefined,
+																				{
+																					weekday: "short",
+																					month: "short",
+																					day: "numeric",
+																					hour: "numeric",
+																					minute: "2-digit",
+																				},
+																			)}
 																		</p>
 																	)}
 																</div>

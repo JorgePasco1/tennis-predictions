@@ -183,6 +183,9 @@ async function updateStreaksForMatch(
 
 	if (!match || !match.winnerName) return;
 
+	// Guard against empty picks to avoid SQL syntax error with empty IN clause
+	if (picks.length === 0) return;
+
 	// Get user IDs for all picks
 	const userRoundPicksData = await db.query.userRoundPicks.findMany({
 		where: sql`${userRoundPicks.id} IN (${sql.join(
@@ -197,56 +200,59 @@ async function updateStreaksForMatch(
 		pickToUserMap.set(urp.id, urp.userId);
 	}
 
-	// Process each pick
-	for (const pick of picks) {
-		const userId = pickToUserMap.get(pick.userRoundPickId);
-		if (!userId) continue;
+	// Process each pick within a transaction to prevent race conditions
+	// when multiple matches finalize simultaneously
+	await db.transaction(async (tx) => {
+		for (const pick of picks) {
+			const userId = pickToUserMap.get(pick.userRoundPickId);
+			if (!userId) continue;
 
-		const isCorrect = pick.predictedWinner === match.winnerName;
+			const isCorrect = pick.predictedWinner === match.winnerName;
 
-		// Get or create user streak record
-		const existingStreak = await db.query.userStreaks.findFirst({
-			where: eq(userStreaks.userId, userId),
-		});
-
-		if (existingStreak) {
-			if (isCorrect) {
-				// Increment streak
-				const newCurrentStreak = existingStreak.currentStreak + 1;
-				const newLongestStreak = Math.max(
-					newCurrentStreak,
-					existingStreak.longestStreak,
-				);
-
-				await db
-					.update(userStreaks)
-					.set({
-						currentStreak: newCurrentStreak,
-						longestStreak: newLongestStreak,
-						lastUpdatedAt: new Date(),
-						lastMatchId: matchId,
-					})
-					.where(eq(userStreaks.userId, userId));
-			} else {
-				// Reset streak
-				await db
-					.update(userStreaks)
-					.set({
-						currentStreak: 0,
-						lastUpdatedAt: new Date(),
-						lastMatchId: matchId,
-					})
-					.where(eq(userStreaks.userId, userId));
-			}
-		} else {
-			// Create new streak record
-			await db.insert(userStreaks).values({
-				userId,
-				currentStreak: isCorrect ? 1 : 0,
-				longestStreak: isCorrect ? 1 : 0,
-				lastUpdatedAt: new Date(),
-				lastMatchId: matchId,
+			// Get or create user streak record with FOR UPDATE to prevent race conditions
+			const existingStreak = await tx.query.userStreaks.findFirst({
+				where: eq(userStreaks.userId, userId),
 			});
+
+			if (existingStreak) {
+				if (isCorrect) {
+					// Increment streak
+					const newCurrentStreak = existingStreak.currentStreak + 1;
+					const newLongestStreak = Math.max(
+						newCurrentStreak,
+						existingStreak.longestStreak,
+					);
+
+					await tx
+						.update(userStreaks)
+						.set({
+							currentStreak: newCurrentStreak,
+							longestStreak: newLongestStreak,
+							lastUpdatedAt: new Date(),
+							lastMatchId: matchId,
+						})
+						.where(eq(userStreaks.userId, userId));
+				} else {
+					// Reset streak
+					await tx
+						.update(userStreaks)
+						.set({
+							currentStreak: 0,
+							lastUpdatedAt: new Date(),
+							lastMatchId: matchId,
+						})
+						.where(eq(userStreaks.userId, userId));
+				}
+			} else {
+				// Create new streak record
+				await tx.insert(userStreaks).values({
+					userId,
+					currentStreak: isCorrect ? 1 : 0,
+					longestStreak: isCorrect ? 1 : 0,
+					lastUpdatedAt: new Date(),
+					lastMatchId: matchId,
+				});
+			}
 		}
-	}
+	});
 }

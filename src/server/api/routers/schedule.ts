@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -21,6 +21,7 @@ export const scheduleRouter = createTRPCRouter({
 			const limit = input?.limit ?? 10;
 
 			// Get all rounds with deadlines in the future from active tournaments
+			// Fetch without limit, then filter and apply limit after
 			const upcomingRounds = await ctx.db.query.rounds.findMany({
 				where: and(
 					or(
@@ -28,12 +29,16 @@ export const scheduleRouter = createTRPCRouter({
 						gte(rounds.deadline, now),
 						// Or has a future opensAt (not yet open)
 						gte(rounds.opensAt, now),
-						// Or is active and not yet closed
-						and(eq(rounds.isActive, true), isNull(rounds.submissionsClosedAt)),
+						// Or is active, not yet closed, AND has a future deadline (or no deadline)
+						// This excludes active rounds with past deadlines
+						and(
+							eq(rounds.isActive, true),
+							isNull(rounds.submissionsClosedAt),
+							or(gte(rounds.deadline, now), isNull(rounds.deadline)),
+						),
 					),
 				),
 				orderBy: [asc(rounds.deadline), asc(rounds.opensAt)],
-				limit,
 				with: {
 					tournament: {
 						columns: {
@@ -46,10 +51,10 @@ export const scheduleRouter = createTRPCRouter({
 				},
 			});
 
-			// Filter to only include rounds from active tournaments
-			const filteredRounds = upcomingRounds.filter(
-				(round) => round.tournament.status === "active",
-			);
+			// Filter to only include rounds from active tournaments, then apply limit
+			const filteredRounds = upcomingRounds
+				.filter((round) => round.tournament.status === "active")
+				.slice(0, limit);
 
 			return filteredRounds.map((round) => ({
 				id: round.id,
@@ -152,6 +157,7 @@ export const scheduleRouter = createTRPCRouter({
 			const limit = input?.limit ?? 10;
 
 			const topStreaks = await ctx.db.query.userStreaks.findMany({
+				where: gt(userStreaks.currentStreak, 0),
 				orderBy: (streaks, { desc }) => [desc(streaks.currentStreak)],
 				limit,
 				with: {
@@ -165,14 +171,12 @@ export const scheduleRouter = createTRPCRouter({
 				},
 			});
 
-			return topStreaks
-				.filter((streak) => streak.currentStreak > 0)
-				.map((streak) => ({
-					userId: streak.userId,
-					displayName: streak.user.displayName,
-					imageUrl: streak.user.imageUrl,
-					currentStreak: streak.currentStreak,
-					longestStreak: streak.longestStreak,
-				}));
+			return topStreaks.map((streak) => ({
+				userId: streak.userId,
+				displayName: streak.user.displayName,
+				imageUrl: streak.user.imageUrl,
+				currentStreak: streak.currentStreak,
+				longestStreak: streak.longestStreak,
+			}));
 		}),
 });
