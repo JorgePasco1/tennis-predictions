@@ -77,19 +77,59 @@ export default async function TournamentDetailPage({
 
 					{/* Active Round Alert */}
 					{activeRound && (
-						<Alert className="mb-8 border-green-500 bg-green-50">
-							<AlertTitle className="text-2xl text-green-900">
-								{activeRound.name} - Picks Now Open!
+						<Alert
+							className={cn(
+								"mb-8",
+								activeRound.submissionsClosedAt
+									? "border-yellow-500 bg-yellow-50"
+									: "border-green-500 bg-green-50",
+							)}
+						>
+							<AlertTitle
+								className={cn(
+									"text-2xl",
+									activeRound.submissionsClosedAt
+										? "text-yellow-900"
+										: "text-green-900",
+								)}
+							>
+								{activeRound.name} -{" "}
+								{activeRound.submissionsClosedAt
+									? "Submissions Closed"
+									: "Picks Now Open!"}
 							</AlertTitle>
-							<AlertDescription className="text-green-800">
-								Submit your predictions for this round before it closes
+							<AlertDescription
+								className={
+									activeRound.submissionsClosedAt
+										? "text-yellow-800"
+										: "text-green-800"
+								}
+							>
+								{activeRound.submissionsClosedAt ? (
+									<>
+										Submissions for this round were closed on{" "}
+										{new Date(activeRound.submissionsClosedAt).toLocaleString()}
+										.{userPicks && !userPicks.isDraft && " You can view your submitted picks."}
+									</>
+								) : (
+									"Submit your predictions for this round before it closes"
+								)}
 							</AlertDescription>
 							<Button
 								asChild
-								className="col-start-2 mt-4 bg-green-600 hover:bg-green-700"
+								className={cn(
+									"col-start-2 mt-4",
+									activeRound.submissionsClosedAt
+										? "bg-gray-600 hover:bg-gray-700"
+										: "bg-green-600 hover:bg-green-700",
+								)}
 							>
 								<Link href={`/tournaments/${slug}/picks`}>
-									{getPicksButtonText()}
+									{activeRound.submissionsClosedAt
+										? userPicks && !userPicks.isDraft
+											? "View My Picks"
+											: "View Round"
+										: getPicksButtonText()}
 								</Link>
 							</Button>
 						</Alert>
@@ -102,25 +142,34 @@ export default async function TournamentDetailPage({
 							{tournament.rounds.map((round) => (
 								<Card
 									className={cn(
-										round.isActive
-											? "border-green-500 bg-green-50"
-											: round.isFinalized
-												? "bg-muted"
-												: "",
+										round.isActive && round.submissionsClosedAt
+											? "border-yellow-500 bg-yellow-50"
+											: round.isActive
+												? "border-green-500 bg-green-50"
+												: round.isFinalized
+													? "bg-muted"
+													: "",
 									)}
 									key={round.id}
 								>
 									<CardContent className="p-6">
 										<div className="mb-2 flex items-center justify-between">
 											<h3 className="font-semibold text-lg">{round.name}</h3>
-											{round.isActive && (
-												<Badge className="bg-green-600 hover:bg-green-700">
-													Active
-												</Badge>
-											)}
-											{round.isFinalized && (
-												<Badge variant="secondary">Finalized</Badge>
-											)}
+											<div className="flex gap-2">
+												{round.isActive && !round.submissionsClosedAt && (
+													<Badge className="bg-green-600 hover:bg-green-700">
+														Active
+													</Badge>
+												)}
+												{round.isActive && round.submissionsClosedAt && (
+													<Badge className="bg-yellow-600 hover:bg-yellow-700">
+														Closed
+													</Badge>
+												)}
+												{round.isFinalized && (
+													<Badge variant="secondary">Finalized</Badge>
+												)}
+											</div>
 										</div>
 										<p className="mb-4 text-muted-foreground text-sm">
 											{round.matches.length} matches
