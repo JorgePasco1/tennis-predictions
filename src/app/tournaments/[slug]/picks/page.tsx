@@ -381,6 +381,7 @@ export default function PicksPage({
 	);
 	const totalMatchesCount = activeRound.matches.length;
 	const filteredMatchesCount = filteredMatches.length;
+	const isSubmissionsClosed = !!activeRound.submissionsClosedAt;
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -411,8 +412,31 @@ export default function PicksPage({
 					</p>
 				</div>
 
+				{/* Submissions Closed Banner */}
+				{isSubmissionsClosed && (
+					<div className="mb-8 rounded-lg border border-red-300 bg-red-50 p-6">
+						<div className="mb-2 font-semibold text-red-900 text-xl">
+							🔒 Submissions Closed
+						</div>
+						<p className="text-red-800">
+							This round was closed for submissions on{" "}
+							{new Date(activeRound.submissionsClosedAt!).toLocaleDateString(
+								"en-US",
+								{
+									month: "long",
+									day: "numeric",
+									year: "numeric",
+									hour: "numeric",
+									minute: "2-digit",
+								},
+							)}
+							. You can no longer submit or modify picks for this round.
+						</p>
+					</div>
+				)}
+
 				{/* Draft Status Banner */}
-				{existingPicks?.isDraft && (
+				{!isSubmissionsClosed && existingPicks?.isDraft && (
 					<div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
 						<div className="mb-2 font-semibold text-blue-900">
 							📝 Draft Saved
@@ -432,13 +456,17 @@ export default function PicksPage({
 				)}
 
 				{/* Warning */}
-				<div className="mb-8 rounded-lg border border-yellow-200 bg-yellow-50 p-6">
-					<div className="mb-2 font-semibold text-yellow-900">⚠️ Important</div>
-					<p className="text-yellow-800">
-						Once you submit your picks, they cannot be changed. Make sure all
-						your predictions are correct before submitting!
-					</p>
-				</div>
+				{!isSubmissionsClosed && (
+					<div className="mb-8 rounded-lg border border-yellow-200 bg-yellow-50 p-6">
+						<div className="mb-2 font-semibold text-yellow-900">
+							⚠️ Important
+						</div>
+						<p className="text-yellow-800">
+							Once you submit your picks, they cannot be changed. Make sure all
+							your predictions are correct before submitting!
+						</p>
+					</div>
+				)}
 
 				{/* ATP URL Reference */}
 				{tournament.atpUrl && (
@@ -515,8 +543,11 @@ export default function PicksPage({
 												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
 													picks[match.id]?.predictedWinner === match.player1Name
 														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
+														: isSubmissionsClosed
+															? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
 												}`}
+												disabled={isSubmissionsClosed}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -538,8 +569,11 @@ export default function PicksPage({
 												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
 													picks[match.id]?.predictedWinner === match.player2Name
 														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-300 text-gray-700 hover:border-gray-400"
+														: isSubmissionsClosed
+															? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
 												}`}
+												disabled={isSubmissionsClosed}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -576,8 +610,11 @@ export default function PicksPage({
 																picks[match.id]?.predictedSetsWon === 2 &&
 																picks[match.id]?.predictedSetsLost === 0
 																	? "border-blue-600 bg-blue-50 text-blue-900"
-																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+																	: isSubmissionsClosed
+																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
+															disabled={isSubmissionsClosed}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -596,8 +633,11 @@ export default function PicksPage({
 																picks[match.id]?.predictedSetsWon === 2 &&
 																picks[match.id]?.predictedSetsLost === 1
 																	? "border-blue-600 bg-blue-50 text-blue-900"
-																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+																	: isSubmissionsClosed
+																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
+															disabled={isSubmissionsClosed}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -619,8 +659,11 @@ export default function PicksPage({
 																picks[match.id]?.predictedSetsWon === 3 &&
 																picks[match.id]?.predictedSetsLost === 0
 																	? "border-blue-600 bg-blue-50 text-blue-900"
-																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+																	: isSubmissionsClosed
+																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
+															disabled={isSubmissionsClosed}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -639,8 +682,11 @@ export default function PicksPage({
 																picks[match.id]?.predictedSetsWon === 3 &&
 																picks[match.id]?.predictedSetsLost === 1
 																	? "border-blue-600 bg-blue-50 text-blue-900"
-																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+																	: isSubmissionsClosed
+																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
+															disabled={isSubmissionsClosed}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -659,8 +705,11 @@ export default function PicksPage({
 																picks[match.id]?.predictedSetsWon === 3 &&
 																picks[match.id]?.predictedSetsLost === 2
 																	? "border-blue-600 bg-blue-50 text-blue-900"
-																	: "border-gray-300 text-gray-700 hover:border-gray-400"
+																	: isSubmissionsClosed
+																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
+															disabled={isSubmissionsClosed}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -682,25 +731,6 @@ export default function PicksPage({
 								</div>
 							</div>
 						))}
-					</div>
-				)}
-
-				{/* Submissions Closed Warning */}
-				{activeRound.submissionsClosedAt && (
-					<div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4">
-						<div className="flex items-start gap-3">
-							<div className="text-2xl">⚠️</div>
-							<div>
-								<div className="font-semibold text-yellow-900">
-									Submissions Closed
-								</div>
-								<div className="text-sm text-yellow-800">
-									This round was closed on{" "}
-									{new Date(activeRound.submissionsClosedAt).toLocaleString()}.
-									You can no longer submit or save picks.
-								</div>
-							</div>
-						</div>
 					</div>
 				)}
 
