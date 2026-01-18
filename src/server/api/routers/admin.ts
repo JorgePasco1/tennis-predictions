@@ -308,6 +308,85 @@ export const adminRouter = createTRPCRouter({
 		}),
 
 	/**
+	 * Close submissions for a round
+	 * This prevents new picks and automatically finalizes all existing drafts
+	 */
+	closeRoundSubmissions: adminProcedure
+		.input(
+			z.object({
+				roundId: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get the round with its tournament
+			const round = await ctx.db.query.rounds.findFirst({
+				where: eq(rounds.id, input.roundId),
+				with: {
+					tournament: true,
+				},
+			});
+
+			if (!round) {
+				throw new Error("Round not found");
+			}
+
+			// Validate round is active
+			if (!round.isActive) {
+				throw new Error("Can only close submissions for active rounds");
+			}
+
+			// Check if already closed
+			if (round.submissionsClosedAt) {
+				throw new Error("Submissions have already been closed for this round");
+			}
+
+			// Close submissions and finalize drafts in a transaction
+			const result = await ctx.db.transaction(async (tx) => {
+				const now = new Date();
+
+				// Close submissions
+				await tx
+					.update(rounds)
+					.set({
+						submissionsClosedAt: now,
+						submissionsClosedBy: ctx.user.id,
+					})
+					.where(eq(rounds.id, input.roundId));
+
+				// Find all draft picks for this round
+				const draftPicks = await tx.query.userRoundPicks.findMany({
+					where: and(
+						eq(userRoundPicks.roundId, input.roundId),
+						eq(userRoundPicks.isDraft, true),
+					),
+				});
+
+				// Convert all drafts to final submissions
+				if (draftPicks.length > 0) {
+					await tx
+						.update(userRoundPicks)
+						.set({
+							isDraft: false,
+							submittedAt: now,
+						})
+						.where(
+							and(
+								eq(userRoundPicks.roundId, input.roundId),
+								eq(userRoundPicks.isDraft, true),
+							),
+						);
+				}
+
+				return { draftsFinalized: draftPicks.length };
+			});
+
+			return {
+				success: true,
+				draftsFinalized: result.draftsFinalized,
+			};
+		}),
+
+	/**
 	 * Finalize a match result
 	 */
 	finalizeMatch: adminProcedure

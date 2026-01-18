@@ -5,5 +5,6 @@
 - [X] Improve scoring system
 - [X] In picks page, When clicking on save with unpicked matches, tapping or clicking on the button should take you to that missing item.
 - [ ] Be able to see other's submissions once you have submitted.
-- [ ] Implement scoring for finalized matches.
+  - [ ] Compare your picks against other player
+- [x] Implement scoring for finalized matches.
 - [x] Search on your results

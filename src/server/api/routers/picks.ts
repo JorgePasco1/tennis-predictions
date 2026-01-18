@@ -81,6 +81,13 @@ export const picksRouter = createTRPCRouter({
 				});
 			}
 
+			if (round.submissionsClosedAt) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Submissions for this round have been closed",
+				});
+			}
+
 			// Check if user has already submitted picks for this round
 			const existingPicks = await ctx.db.query.userRoundPicks.findFirst({
 				where: and(
@@ -340,6 +347,13 @@ export const picksRouter = createTRPCRouter({
 				throw new TRPCError({
 					code: "BAD_REQUEST",
 					message: "This round is not currently accepting picks",
+				});
+			}
+
+			if (round.submissionsClosedAt) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Submissions for this round have been closed",
 				});
 			}
 

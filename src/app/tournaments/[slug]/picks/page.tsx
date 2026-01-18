@@ -87,6 +87,14 @@ export default function PicksPage({
 	const handleSaveDraft = async (isAutoSave = false) => {
 		if (!activeRound || Object.keys(picks).length === 0) return;
 
+		// Check if submissions are closed - fail silently for auto-save
+		if (activeRound.submissionsClosedAt) {
+			if (!isAutoSave) {
+				toast.error("Submissions for this round have been closed");
+			}
+			return;
+		}
+
 		const picksArray = Object.entries(picks).map(([matchId, pick]) => ({
 			matchId: Number(matchId),
 			...pick,
@@ -168,6 +176,11 @@ export default function PicksPage({
 	};
 
 	const handleSubmitClick = () => {
+		if (activeRound?.submissionsClosedAt) {
+			toast.error("Submissions for this round have been closed");
+			return;
+		}
+
 		if (!allPicksComplete) {
 			toast.error("Please complete all picks before submitting");
 			scrollToFirstIncomplete();
@@ -706,6 +719,25 @@ export default function PicksPage({
 					</div>
 				)}
 
+				{/* Submissions Closed Warning */}
+				{activeRound.submissionsClosedAt && (
+					<div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4">
+						<div className="flex items-start gap-3">
+							<div className="text-2xl">⚠️</div>
+							<div>
+								<div className="font-semibold text-yellow-900">
+									Submissions Closed
+								</div>
+								<div className="text-sm text-yellow-800">
+									This round was closed on{" "}
+									{new Date(activeRound.submissionsClosedAt).toLocaleString()}.
+									You can no longer submit or save picks.
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+
 				{/* Submit Button */}
 				<div className="sticky bottom-4 rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
 					<div className="flex items-center justify-between">
@@ -723,7 +755,9 @@ export default function PicksPage({
 							<button
 								className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
 								disabled={
-									saveDraftMutation.isPending || Object.keys(picks).length === 0
+									saveDraftMutation.isPending ||
+									Object.keys(picks).length === 0 ||
+									!!activeRound.submissionsClosedAt
 								}
 								onClick={() => handleSaveDraft(false)}
 							>
@@ -731,10 +765,13 @@ export default function PicksPage({
 							</button>
 							<button
 								className={`rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 ${
-									!allPicksComplete || submitPicksMutation.isPending
+									!allPicksComplete ||
+									submitPicksMutation.isPending ||
+									activeRound.submissionsClosedAt
 										? "cursor-not-allowed opacity-50"
 										: ""
 								}`}
+								disabled={!!activeRound.submissionsClosedAt}
 								onClick={handleSubmitClick}
 							>
 								{submitPicksMutation.isPending

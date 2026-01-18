@@ -86,6 +86,12 @@ export const rounds = createTable(
 		name: varchar({ length: 100 }).notNull(),
 		isActive: boolean("is_active").notNull().default(false),
 		isFinalized: boolean("is_finalized").notNull().default(false),
+		submissionsClosedAt: timestamp("submissions_closed_at", {
+			withTimezone: true,
+		}),
+		submissionsClosedBy: varchar("submissions_closed_by", {
+			length: 255,
+		}).references(() => users.id),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
@@ -93,6 +99,7 @@ export const rounds = createTable(
 	(table) => [
 		index("round_tournament_id_idx").on(table.tournamentId),
 		index("round_is_active_idx").on(table.isActive),
+		index("round_submissions_closed_idx").on(table.submissionsClosedAt),
 	],
 );
 

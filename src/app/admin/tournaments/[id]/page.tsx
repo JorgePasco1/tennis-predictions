@@ -43,6 +43,18 @@ export default function AdminTournamentManagePage({
 		onSuccess: () => refetch(),
 	});
 
+	const closeSubmissionsMutation = api.admin.closeRoundSubmissions.useMutation({
+		onSuccess: (result) => {
+			refetch();
+			toast.success(
+				`Submissions closed! ${result.draftsFinalized} draft(s) were automatically finalized.`,
+			);
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to close submissions");
+		},
+	});
+
 	const [selectedRound, setSelectedRound] = useState<number | null>(null);
 	const [isEditingProperties, setIsEditingProperties] = useState(false);
 	const [editForm, setEditForm] = useState({
@@ -166,6 +178,23 @@ export default function AdminTournamentManagePage({
 			toast.error(
 				error instanceof Error ? error.message : "Failed to unfinalize match",
 			);
+		}
+	};
+
+	const handleCloseSubmissions = async (roundId: number, roundName: string) => {
+		if (
+			!confirm(
+				`Close submissions for ${roundName}?\n\nThis will:\n• Prevent new picks or draft saves\n• Automatically finalize all existing drafts\n\nThis action cannot be easily undone.`,
+			)
+		) {
+			return;
+		}
+
+		try {
+			await closeSubmissionsMutation.mutateAsync({ roundId });
+		} catch (error) {
+			// Error toast is already handled by the mutation's onError
+			console.error("Failed to close submissions:", error);
 		}
 	};
 
@@ -378,6 +407,45 @@ export default function AdminTournamentManagePage({
 								{round.name}
 							</button>
 						))}
+					</div>
+				</div>
+
+				{/* Submission Control */}
+				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
+						Submission Control
+					</h2>
+					<p className="mb-4 text-gray-600 text-sm">
+						Close submissions for a round to prevent new picks and automatically
+						finalize all existing drafts.
+					</p>
+					<div className="flex flex-wrap gap-2">
+						{tournament.rounds.map((round) => {
+							const isClosed = !!round.submissionsClosedAt;
+							const canClose = round.isActive && !isClosed;
+
+							return (
+								<div className="flex flex-col" key={round.id}>
+									<button
+										className={`rounded px-4 py-2 font-medium transition ${
+											canClose
+												? "bg-red-500 text-white hover:bg-red-600"
+												: "cursor-not-allowed bg-gray-200 text-gray-500"
+										}`}
+										disabled={!canClose || closeSubmissionsMutation.isPending}
+										onClick={() => handleCloseSubmissions(round.id, round.name)}
+										type="button"
+									>
+										{isClosed ? "✓ Closed" : `Close ${round.name}`}
+									</button>
+									{isClosed && round.submissionsClosedAt && (
+										<span className="mt-1 text-gray-500 text-xs">
+											{new Date(round.submissionsClosedAt).toLocaleString()}
+										</span>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				</div>
 
