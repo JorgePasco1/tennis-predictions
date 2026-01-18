@@ -131,3 +131,34 @@ export async function recalculateRoundScores(
 		await calculateMatchPickScores(db, match.id);
 	}
 }
+
+/**
+ * Unfinalize a match and reset all related scores
+ * Called when a match result needs to be corrected
+ */
+export async function unfinalizeMatchScores(
+	db: NodePgDatabase<typeof schema>,
+	matchId: number,
+): Promise<void> {
+	// Get all picks for this match before resetting
+	const picks = await db.query.matchPicks.findMany({
+		where: eq(matchPicks.matchId, matchId),
+	});
+
+	// Reset all match picks to unscored state
+	await db
+		.update(matchPicks)
+		.set({
+			isWinnerCorrect: null,
+			isExactScore: null,
+			pointsEarned: 0,
+		})
+		.where(eq(matchPicks.matchId, matchId));
+
+	// Recalculate user round pick totals for all affected users
+	const userRoundPickIds = [...new Set(picks.map((p) => p.userRoundPickId))];
+
+	for (const userRoundPickId of userRoundPickIds) {
+		await recalculateUserRoundPickTotals(db, userRoundPickId);
+	}
+}

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { adminProcedure, createTRPCRouter } from "~/server/api/trpc";
 import {
 	matches,
+	matchPicks,
 	roundScoringRules,
 	rounds,
 	tournamentFormatEnum,
@@ -16,7 +17,10 @@ import {
 	parseAtpDraw,
 	validateParsedDraw,
 } from "~/server/services/drawParser";
-import { calculateMatchPickScores } from "~/server/services/scoring";
+import {
+	calculateMatchPickScores,
+	unfinalizeMatchScores,
+} from "~/server/services/scoring";
 import { getScoringForRound } from "~/server/utils/scoring-config";
 
 export const adminRouter = createTRPCRouter({
@@ -369,6 +373,53 @@ export const adminRouter = createTRPCRouter({
 			await calculateMatchPickScores(ctx.db, input.matchId);
 
 			return updatedMatch;
+		}),
+
+	/**
+	 * Unfinalize a match and roll back all scoring
+	 */
+	unfinalizeMatch: adminProcedure
+		.input(
+			z.object({
+				matchId: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get the match
+			const match = await ctx.db.query.matches.findFirst({
+				where: and(eq(matches.id, input.matchId), isNull(matches.deletedAt)),
+			});
+
+			if (!match) {
+				throw new Error("Match not found");
+			}
+
+			if (match.status !== "finalized") {
+				throw new Error("Match is not finalized and cannot be unfinalized");
+			}
+
+			// Use transaction to ensure atomic rollback
+			return await ctx.db.transaction(async (tx) => {
+				// Reset the match to pending status
+				const [resetMatch] = await tx
+					.update(matches)
+					.set({
+						winnerName: null,
+						finalScore: null,
+						setsWon: null,
+						setsLost: null,
+						status: "pending",
+						finalizedAt: null,
+						finalizedBy: null,
+					})
+					.where(eq(matches.id, input.matchId))
+					.returning();
+
+				// Reset all scores for this match
+				await unfinalizeMatchScores(tx, input.matchId);
+
+				return resetMatch;
+			});
 		}),
 
 	/**
