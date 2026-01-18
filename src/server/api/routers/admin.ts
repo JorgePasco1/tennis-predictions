@@ -17,6 +17,7 @@ import {
 	validateParsedDraw,
 } from "~/server/services/drawParser";
 import { calculateMatchPickScores } from "~/server/services/scoring";
+import { getScoringForRound } from "~/server/utils/scoring-config";
 
 export const adminRouter = createTRPCRouter({
 	/**
@@ -218,11 +219,12 @@ export const adminRouter = createTRPCRouter({
 						throw new Error(`Failed to create round ${roundData.roundNumber}`);
 					}
 
-					// Create default scoring rule for this round
+					// Create scoring rule for this round using progressive scoring
+					const scoring = getScoringForRound(roundData.name);
 					await tx.insert(roundScoringRules).values({
 						roundId: round.id,
-						pointsPerWinner: 10,
-						pointsExactScore: 5,
+						pointsPerWinner: scoring.pointsPerWinner,
+						pointsExactScore: scoring.pointsExactScore,
 					});
 
 					// Insert matches for this round

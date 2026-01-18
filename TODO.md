@@ -2,4 +2,5 @@
 - [ ] Add a profile settings page (Implement Manage Account button)
 - [x] Add a personal stats page
 - [x] Draft mode for picks
-- [ ] In picks page, When clicking on save with unpicked matches, tapping or clicking on the button should take you to that missing item.
+- [X] Improve scoring system
+- [X] In picks page, When clicking on save with unpicked matches, tapping or clicking on the button should take you to that missing item.
