@@ -81,8 +81,10 @@ export default async function TournamentsPage() {
 									• Submit your predictions for each match before the deadline
 								</li>
 								<li>
-									• Earn 10 points for correct winners, +5 for exact scores
+									• Points increase each round: R128→2, R64→3, R32→5, R16→8,
+									QF→12, SF→18, F→30
 								</li>
+								<li>• Bonus: Predict the exact score for +50% extra points</li>
 								<li>• Check the leaderboard to see your ranking</li>
 							</ul>
 						</AlertDescription>
