@@ -1,6 +1,10 @@
 import { BarChart3, FileText, Trophy } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+	CountdownTimer,
+	CountdownTimerCompact,
+} from "~/components/countdown/CountdownTimer";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -115,7 +119,18 @@ export default async function TournamentDetailPage({
 											" You can view your submitted picks."}
 									</>
 								) : (
-									"Submit your predictions for this round before it closes"
+									<div className="flex flex-col gap-2">
+										<span>
+											Submit your predictions for this round before it closes
+										</span>
+										{activeRound.deadline && (
+											<CountdownTimer
+												className="mt-2"
+												deadline={activeRound.deadline}
+												opensAt={activeRound.opensAt}
+											/>
+										)}
+									</div>
 								)}
 							</AlertDescription>
 							<Button
@@ -174,9 +189,22 @@ export default async function TournamentDetailPage({
 												)}
 											</div>
 										</div>
-										<p className="mb-4 text-muted-foreground text-sm">
+										<p className="mb-2 text-muted-foreground text-sm">
 											{round.matches.length} matches
 										</p>
+										{round.isActive &&
+											!round.submissionsClosedAt &&
+											round.deadline && (
+												<div className="mb-2 flex items-center gap-2 text-sm">
+													<span className="text-muted-foreground">
+														Deadline:
+													</span>
+													<CountdownTimerCompact
+														deadline={round.deadline}
+														opensAt={round.opensAt}
+													/>
+												</div>
+											)}
 										{round.scoringRule && (
 											<p className="text-muted-foreground text-sm">
 												Scoring: {round.scoringRule.pointsPerWinner} pts/winner,

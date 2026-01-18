@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CountdownTimer } from "~/components/countdown/CountdownTimer";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -398,18 +399,29 @@ export default function PicksPage({
 
 			<main className="container mx-auto px-4 py-8">
 				<div className="mb-8">
-					<h1 className="mb-2 font-bold text-4xl text-gray-900">
-						Submit Your Picks
-					</h1>
-					<p className="text-gray-600">
-						{tournament.name} • {activeRound.name}
-						{activeRound.scoringRule && (
-							<span className="block text-sm">
-								Scoring: {activeRound.scoringRule.pointsPerWinner} pts/winner,{" "}
-								{activeRound.scoringRule.pointsExactScore} pts/exact score
-							</span>
+					<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+						<div>
+							<h1 className="mb-2 font-bold text-4xl text-gray-900">
+								Submit Your Picks
+							</h1>
+							<p className="text-gray-600">
+								{tournament.name} • {activeRound.name}
+								{activeRound.scoringRule && (
+									<span className="block text-sm">
+										Scoring: {activeRound.scoringRule.pointsPerWinner}{" "}
+										pts/winner, {activeRound.scoringRule.pointsExactScore}{" "}
+										pts/exact score
+									</span>
+								)}
+							</p>
+						</div>
+						{!isSubmissionsClosed && activeRound.deadline && (
+							<CountdownTimer
+								deadline={activeRound.deadline}
+								opensAt={activeRound.opensAt}
+							/>
 						)}
-					</p>
+					</div>
 				</div>
 
 				{/* Submissions Closed Banner */}

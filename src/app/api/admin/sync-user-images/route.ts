@@ -1,6 +1,5 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "~/server/db";
 import { users } from "~/server/db/schema";
 
@@ -46,8 +45,7 @@ export async function POST() {
 				results.skipped++;
 			}
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
+			const message = error instanceof Error ? error.message : "Unknown error";
 			results.errors.push(`User ${user.id}: ${message}`);
 		}
 	}

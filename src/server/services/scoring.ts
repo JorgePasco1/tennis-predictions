@@ -6,6 +6,7 @@ import {
 	matchPicks,
 	rounds,
 	userRoundPicks,
+	userStreaks,
 } from "~/server/db/schema";
 
 /**
@@ -82,6 +83,9 @@ export async function calculateMatchPickScores(
 	for (const userRoundPickId of userRoundPickIds) {
 		await recalculateUserRoundPickTotals(db, userRoundPickId);
 	}
+
+	// Update streaks for all users who had picks on this match
+	await updateStreaksForMatch(db, matchId, picks);
 }
 
 /**
@@ -160,5 +164,89 @@ export async function unfinalizeMatchScores(
 
 	for (const userRoundPickId of userRoundPickIds) {
 		await recalculateUserRoundPickTotals(db, userRoundPickId);
+	}
+}
+
+/**
+ * Update user streaks based on match results
+ * Called after scoring picks for a match
+ */
+async function updateStreaksForMatch(
+	db: NodePgDatabase<typeof schema>,
+	matchId: number,
+	picks: { userRoundPickId: number; predictedWinner: string }[],
+): Promise<void> {
+	// Get the match to check winner
+	const match = await db.query.matches.findFirst({
+		where: eq(matches.id, matchId),
+	});
+
+	if (!match || !match.winnerName) return;
+
+	// Get user IDs for all picks
+	const userRoundPicksData = await db.query.userRoundPicks.findMany({
+		where: sql`${userRoundPicks.id} IN (${sql.join(
+			[...new Set(picks.map((p) => p.userRoundPickId))].map((id) => sql`${id}`),
+			sql`, `,
+		)})`,
+	});
+
+	// Create a map of userRoundPickId to userId
+	const pickToUserMap = new Map<number, string>();
+	for (const urp of userRoundPicksData) {
+		pickToUserMap.set(urp.id, urp.userId);
+	}
+
+	// Process each pick
+	for (const pick of picks) {
+		const userId = pickToUserMap.get(pick.userRoundPickId);
+		if (!userId) continue;
+
+		const isCorrect = pick.predictedWinner === match.winnerName;
+
+		// Get or create user streak record
+		const existingStreak = await db.query.userStreaks.findFirst({
+			where: eq(userStreaks.userId, userId),
+		});
+
+		if (existingStreak) {
+			if (isCorrect) {
+				// Increment streak
+				const newCurrentStreak = existingStreak.currentStreak + 1;
+				const newLongestStreak = Math.max(
+					newCurrentStreak,
+					existingStreak.longestStreak,
+				);
+
+				await db
+					.update(userStreaks)
+					.set({
+						currentStreak: newCurrentStreak,
+						longestStreak: newLongestStreak,
+						lastUpdatedAt: new Date(),
+						lastMatchId: matchId,
+					})
+					.where(eq(userStreaks.userId, userId));
+			} else {
+				// Reset streak
+				await db
+					.update(userStreaks)
+					.set({
+						currentStreak: 0,
+						lastUpdatedAt: new Date(),
+						lastMatchId: matchId,
+					})
+					.where(eq(userStreaks.userId, userId));
+			}
+		} else {
+			// Create new streak record
+			await db.insert(userStreaks).values({
+				userId,
+				currentStreak: isCorrect ? 1 : 0,
+				longestStreak: isCorrect ? 1 : 0,
+				lastUpdatedAt: new Date(),
+				lastMatchId: matchId,
+			});
+		}
 	}
 }
