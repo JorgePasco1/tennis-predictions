@@ -109,7 +109,10 @@ export default async function TournamentDetailPage({
 									<>
 										Submissions for this round were closed on{" "}
 										{new Date(activeRound.submissionsClosedAt).toLocaleString()}
-										.{userPicks && !userPicks.isDraft && " You can view your submitted picks."}
+										.
+										{userPicks &&
+											!userPicks.isDraft &&
+											" You can view your submitted picks."}
 									</>
 								) : (
 									"Submit your predictions for this round before it closes"

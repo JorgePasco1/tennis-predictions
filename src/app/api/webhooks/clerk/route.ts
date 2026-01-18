@@ -1,5 +1,4 @@
 import type { WebhookEvent } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { env } from "~/env";
@@ -56,6 +55,7 @@ export async function POST(req: Request) {
 			first_name,
 			last_name,
 			username,
+			image_url,
 			public_metadata,
 		} = evt.data;
 
@@ -86,6 +86,7 @@ export async function POST(req: Request) {
 					clerkId: id,
 					email,
 					displayName,
+					imageUrl: image_url ?? null,
 					role,
 				})
 				.onConflictDoUpdate({
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
 					set: {
 						email,
 						displayName,
+						imageUrl: image_url ?? null,
 						role,
 					},
 				});
