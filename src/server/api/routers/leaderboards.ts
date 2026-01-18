@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -13,6 +13,7 @@ import {
 export const leaderboardsRouter = createTRPCRouter({
 	/**
 	 * Get tournament-specific leaderboard
+	 * Returns leaderboard entries and the current user's submission status
 	 */
 	getTournamentLeaderboard: protectedProcedure
 		.input(
@@ -41,8 +42,29 @@ export const leaderboardsRouter = createTRPCRouter({
 			const roundIds = tournamentRounds.map((r) => r.id);
 
 			if (roundIds.length === 0) {
-				return [];
+				return {
+					entries: [],
+					currentUserSubmittedRoundIds: [],
+				};
 			}
+
+			// Get rounds where current user has submitted (non-draft) picks
+			const currentUserSubmissions = await ctx.db.query.userRoundPicks.findMany(
+				{
+					where: and(
+						eq(userRoundPicks.userId, ctx.user.id),
+						inArray(userRoundPicks.roundId, roundIds),
+						eq(userRoundPicks.isDraft, false),
+					),
+					columns: {
+						roundId: true,
+					},
+				},
+			);
+
+			const currentUserSubmittedRoundIds = currentUserSubmissions.map(
+				(s) => s.roundId,
+			);
 
 			// Build the leaderboard query
 			// Group by user, sum total points, get earliest submission time
@@ -50,7 +72,7 @@ export const leaderboardsRouter = createTRPCRouter({
 				.select({
 					userId: userRoundPicks.userId,
 					displayName: users.displayName,
-					email: users.email,
+					imageUrl: users.imageUrl,
 					totalPoints: sql<number>`SUM(${userRoundPicks.totalPoints})`,
 					correctWinners: sql<number>`SUM(${userRoundPicks.correctWinners})`,
 					exactScores: sql<number>`SUM(${userRoundPicks.exactScores})`,
@@ -60,19 +82,27 @@ export const leaderboardsRouter = createTRPCRouter({
 				.from(userRoundPicks)
 				.innerJoin(users, eq(userRoundPicks.userId, users.id))
 				.where(
-					sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					and(
+						sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+						eq(userRoundPicks.isDraft, false),
+					),
 				)
-				.groupBy(userRoundPicks.userId, users.displayName, users.email)
+				.groupBy(userRoundPicks.userId, users.displayName, users.imageUrl)
 				.orderBy(
 					desc(sql`SUM(${userRoundPicks.totalPoints})`),
 					asc(sql`MIN(${userRoundPicks.submittedAt})`),
 				);
 
 			// Add rank to each entry
-			return leaderboard.map((entry, index) => ({
+			const entries = leaderboard.map((entry, index) => ({
 				...entry,
 				rank: index + 1,
 			}));
+
+			return {
+				entries,
+				currentUserSubmittedRoundIds,
+			};
 		}),
 
 	/**
@@ -86,8 +116,19 @@ export const leaderboardsRouter = createTRPCRouter({
 
 		const tournamentIds = allTournaments.map((t) => t.id);
 
+		// Get active tournaments for displaying links
+		const activeTournaments = allTournaments
+			.filter((t) => t.status === "active")
+			.map((t) => ({
+				id: t.id,
+				name: t.name,
+				year: t.year,
+				slug: t.slug,
+			}))
+			.sort((a, b) => b.year - a.year || a.name.localeCompare(b.name));
+
 		if (tournamentIds.length === 0) {
-			return [];
+			return { leaderboard: [], activeTournaments };
 		}
 
 		// Get all rounds for all tournaments
@@ -101,7 +142,7 @@ export const leaderboardsRouter = createTRPCRouter({
 		const roundIds = allRounds.map((r) => r.id);
 
 		if (roundIds.length === 0) {
-			return [];
+			return { leaderboard: [], activeTournaments };
 		}
 
 		// Build the all-time leaderboard
@@ -109,7 +150,7 @@ export const leaderboardsRouter = createTRPCRouter({
 			.select({
 				userId: userRoundPicks.userId,
 				displayName: users.displayName,
-				email: users.email,
+				imageUrl: users.imageUrl,
 				totalPoints: sql<number>`SUM(${userRoundPicks.totalPoints})`,
 				correctWinners: sql<number>`SUM(${userRoundPicks.correctWinners})`,
 				exactScores: sql<number>`SUM(${userRoundPicks.exactScores})`,
@@ -125,12 +166,15 @@ export const leaderboardsRouter = createTRPCRouter({
 			.from(userRoundPicks)
 			.innerJoin(users, eq(userRoundPicks.userId, users.id))
 			.where(
-				sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+				and(
+					sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					eq(userRoundPicks.isDraft, false),
+				),
 			)
 			.groupBy(
 				userRoundPicks.userId,
 				users.displayName,
-				users.email,
+				users.imageUrl,
 				users.createdAt,
 			)
 			.orderBy(
@@ -140,10 +184,15 @@ export const leaderboardsRouter = createTRPCRouter({
 			);
 
 		// Add rank to each entry
-		return leaderboard.map((entry, index) => ({
+		const rankedLeaderboard = leaderboard.map((entry, index) => ({
 			...entry,
 			rank: index + 1,
 		}));
+
+		return {
+			leaderboard: rankedLeaderboard,
+			activeTournaments,
+		};
 	}),
 
 	/**

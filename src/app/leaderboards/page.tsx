@@ -1,6 +1,9 @@
-import { Info } from "lucide-react";
+import { Info, Trophy } from "lucide-react";
+import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import {
 	Table,
@@ -10,11 +13,21 @@ import {
 	TableHeader,
 	TableRow,
 } from "~/components/ui/table";
-import { cn } from "~/lib/utils";
+import { cn, formatDisplayName } from "~/lib/utils";
 import { api, HydrateClient } from "~/trpc/server";
 
+function getInitials(displayName: string): string {
+	const parts = displayName.trim().split(/\s+/);
+	if (parts.length === 1) return parts[0]?.[0]?.toUpperCase() ?? "?";
+	return (
+		(parts[0]?.[0]?.toUpperCase() ?? "") +
+		(parts[parts.length - 1]?.[0]?.toUpperCase() ?? "")
+	);
+}
+
 export default async function AllTimeLeaderboardPage() {
-	const leaderboard = await api.leaderboards.getAllTimeLeaderboard();
+	const data = await api.leaderboards.getAllTimeLeaderboard();
+	const { leaderboard, activeTournaments } = data;
 
 	return (
 		<HydrateClient>
@@ -26,6 +39,25 @@ export default async function AllTimeLeaderboardPage() {
 							Top predictors across all tournaments
 						</p>
 					</div>
+
+					{/* Active Tournament Links */}
+					{activeTournaments.length > 0 && (
+						<Card className="mb-8 p-6">
+							<div className="mb-4 flex items-center gap-2">
+								<Trophy className="h-5 w-5 text-primary" />
+								<h2 className="font-semibold text-lg">Active Tournaments</h2>
+							</div>
+							<div className="flex flex-wrap gap-3">
+								{activeTournaments.map((tournament) => (
+									<Button asChild key={tournament.id} variant="outline">
+										<Link href={`/leaderboards/${tournament.id}`}>
+											{tournament.name} {tournament.year}
+										</Link>
+									</Button>
+								))}
+							</div>
+						</Card>
+					)}
 
 					{leaderboard.length === 0 ? (
 						<Card className="p-12 text-center">
@@ -70,11 +102,21 @@ export default async function AllTimeLeaderboardPage() {
 													</Badge>
 												</TableCell>
 												<TableCell>
-													<div className="font-semibold">
-														{entry.displayName}
-													</div>
-													<div className="text-muted-foreground text-sm">
-														{entry.email}
+													<div className="flex items-center gap-3">
+														<Avatar className="size-8">
+															{entry.imageUrl && (
+																<AvatarImage
+																	alt={entry.displayName}
+																	src={entry.imageUrl}
+																/>
+															)}
+															<AvatarFallback className="text-xs">
+																{getInitials(entry.displayName)}
+															</AvatarFallback>
+														</Avatar>
+														<span className="font-semibold">
+															{formatDisplayName(entry.displayName)}
+														</span>
 													</div>
 												</TableCell>
 												<TableCell className="text-right">
