@@ -72,7 +72,7 @@ export function PicksComparisonSheet({
 
 	return (
 		<Sheet onOpenChange={onOpenChange} open={open}>
-			<SheetContent className="w-full overflow-y-auto sm:max-w-lg" side="right">
+			<SheetContent className="w-full overflow-y-auto px-6 sm:max-w-lg" side="right">
 				<SheetHeader>
 					<SheetTitle>
 						Compare Picks with {formatDisplayName(otherUserDisplayName)}
