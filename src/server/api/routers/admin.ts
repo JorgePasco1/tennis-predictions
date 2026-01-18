@@ -350,8 +350,10 @@ export const adminRouter = createTRPCRouter({
 					"Invalid score: if sets won is 2, sets lost must be 0 or 1",
 				);
 			}
-			if (input.setsWon === 3 && input.setsLost !== 2) {
-				throw new Error("Invalid score: if sets won is 3, sets lost must be 2");
+			if (input.setsWon === 3 && input.setsLost > 2) {
+				throw new Error(
+					"Invalid score: if sets won is 3, sets lost must be 0, 1, or 2",
+				);
 			}
 
 			// Update match with result
