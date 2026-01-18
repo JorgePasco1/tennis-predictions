@@ -1,7 +1,9 @@
+import { achievementsRouter } from "~/server/api/routers/achievements";
 import { adminRouter } from "~/server/api/routers/admin";
 import { leaderboardsRouter } from "~/server/api/routers/leaderboards";
 import { picksRouter } from "~/server/api/routers/picks";
 import { resultsRouter } from "~/server/api/routers/results";
+import { scheduleRouter } from "~/server/api/routers/schedule";
 import { tournamentsRouter } from "~/server/api/routers/tournaments";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -16,6 +18,8 @@ export const appRouter = createTRPCRouter({
 	picks: picksRouter,
 	leaderboards: leaderboardsRouter,
 	results: resultsRouter,
+	schedule: scheduleRouter,
+	achievements: achievementsRouter,
 });
 
 // export type definition of API

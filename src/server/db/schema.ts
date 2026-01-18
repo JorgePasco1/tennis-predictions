@@ -3,9 +3,11 @@ import {
 	boolean,
 	index,
 	integer,
+	json,
 	pgEnum,
 	pgTableCreator,
 	serial,
+	text,
 	timestamp,
 	unique,
 	varchar,
@@ -25,6 +27,12 @@ export const tournamentStatusEnum = pgEnum("tournament_status", [
 ]);
 export const tournamentFormatEnum = pgEnum("tournament_format", ["bo3", "bo5"]);
 export const matchStatusEnum = pgEnum("match_status", ["pending", "finalized"]);
+export const achievementCategoryEnum = pgEnum("achievement_category", [
+	"round",
+	"streak",
+	"milestone",
+	"special",
+]);
 
 // Users table
 export const users = createTable(
@@ -87,6 +95,8 @@ export const rounds = createTable(
 		name: varchar({ length: 100 }).notNull(),
 		isActive: boolean("is_active").notNull().default(false),
 		isFinalized: boolean("is_finalized").notNull().default(false),
+		opensAt: timestamp("opens_at", { withTimezone: true }),
+		deadline: timestamp("deadline", { withTimezone: true }),
 		submissionsClosedAt: timestamp("submissions_closed_at", {
 			withTimezone: true,
 		}),
@@ -101,6 +111,7 @@ export const rounds = createTable(
 		index("round_tournament_id_idx").on(table.tournamentId),
 		index("round_is_active_idx").on(table.isActive),
 		index("round_submissions_closed_idx").on(table.submissionsClosedAt),
+		index("round_deadline_idx").on(table.deadline),
 	],
 );
 
@@ -207,10 +218,93 @@ export const matchPicks = createTable(
 	],
 );
 
+// User streaks table (for tracking prediction streaks)
+export const userStreaks = createTable(
+	"user_streak",
+	{
+		id: serial().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.unique()
+			.references(() => users.id),
+		currentStreak: integer("current_streak").notNull().default(0),
+		longestStreak: integer("longest_streak").notNull().default(0),
+		lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }),
+		lastMatchId: integer("last_match_id").references(() => matches.id),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("user_streak_user_id_idx").on(table.userId),
+		index("user_streak_current_streak_idx").on(table.currentStreak),
+	],
+);
+
+// Achievement definitions table
+export const achievementDefinitions = createTable(
+	"achievement_definition",
+	{
+		id: serial().primaryKey(),
+		code: varchar({ length: 50 }).notNull().unique(),
+		name: varchar({ length: 100 }).notNull(),
+		description: text().notNull(),
+		category: achievementCategoryEnum().notNull(),
+		iconUrl: varchar("icon_url", { length: 500 }),
+		badgeColor: varchar("badge_color", { length: 50 }),
+		threshold: integer(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("achievement_def_code_idx").on(table.code),
+		index("achievement_def_category_idx").on(table.category),
+	],
+);
+
+// User achievements table (junction table for unlocked achievements)
+export const userAchievements = createTable(
+	"user_achievement",
+	{
+		id: serial().primaryKey(),
+		userId: varchar("user_id", { length: 255 })
+			.notNull()
+			.references(() => users.id),
+		achievementId: integer("achievement_id")
+			.notNull()
+			.references(() => achievementDefinitions.id),
+		unlockedAt: timestamp("unlocked_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		context: json().$type<{
+			tournamentId?: number;
+			roundId?: number;
+			matchId?: number;
+			value?: number;
+		}>(),
+		tournamentId: integer("tournament_id").references(() => tournaments.id),
+		roundId: integer("round_id").references(() => rounds.id),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("user_achievement_user_id_idx").on(table.userId),
+		index("user_achievement_achievement_id_idx").on(table.achievementId),
+		unique("user_achievement_unique").on(table.userId, table.achievementId),
+	],
+);
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
 	tournaments: many(tournaments),
 	userRoundPicks: many(userRoundPicks),
+	streak: one(userStreaks, {
+		fields: [users.id],
+		references: [userStreaks.userId],
+	}),
+	achievements: many(userAchievements),
 }));
 
 export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
@@ -281,3 +375,43 @@ export const matchPicksRelations = relations(matchPicks, ({ one }) => ({
 		references: [matches.id],
 	}),
 }));
+
+export const userStreaksRelations = relations(userStreaks, ({ one }) => ({
+	user: one(users, {
+		fields: [userStreaks.userId],
+		references: [users.id],
+	}),
+	lastMatch: one(matches, {
+		fields: [userStreaks.lastMatchId],
+		references: [matches.id],
+	}),
+}));
+
+export const achievementDefinitionsRelations = relations(
+	achievementDefinitions,
+	({ many }) => ({
+		userAchievements: many(userAchievements),
+	}),
+);
+
+export const userAchievementsRelations = relations(
+	userAchievements,
+	({ one }) => ({
+		user: one(users, {
+			fields: [userAchievements.userId],
+			references: [users.id],
+		}),
+		achievement: one(achievementDefinitions, {
+			fields: [userAchievements.achievementId],
+			references: [achievementDefinitions.id],
+		}),
+		tournament: one(tournaments, {
+			fields: [userAchievements.tournamentId],
+			references: [tournaments.id],
+		}),
+		round: one(rounds, {
+			fields: [userAchievements.roundId],
+			references: [rounds.id],
+		}),
+	}),
+);

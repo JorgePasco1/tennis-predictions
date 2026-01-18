@@ -72,7 +72,10 @@ export function PicksComparisonSheet({
 
 	return (
 		<Sheet onOpenChange={onOpenChange} open={open}>
-			<SheetContent className="w-full overflow-y-auto sm:max-w-lg" side="right">
+			<SheetContent
+				className="w-full overflow-y-auto px-6 sm:max-w-lg"
+				side="right"
+			>
 				<SheetHeader>
 					<SheetTitle>
 						Compare Picks with {formatDisplayName(otherUserDisplayName)}
@@ -242,7 +245,7 @@ function MatchComparisonCard({
 				</span>
 				<Badge
 					className={cn(
-						"text-xs",
+						"text-white text-xs",
 						sameScore
 							? "bg-green-500"
 							: sameWinner
@@ -256,14 +259,16 @@ function MatchComparisonCard({
 			</div>
 
 			{/* Players */}
-			<div className="mb-3 text-center text-sm">
-				<span className="font-medium">
-					{formatSeed(match.player1Seed)} {match.player1Name}
-				</span>
-				<span className="mx-2 text-muted-foreground">vs</span>
-				<span className="font-medium">
-					{formatSeed(match.player2Seed)} {match.player2Name}
-				</span>
+			<div className="mb-3 text-center">
+				<div className="font-semibold text-lg leading-tight">
+					<span>
+						{formatSeed(match.player1Seed)} {match.player1Name}
+					</span>
+					<span className="mx-2 text-muted-foreground">vs</span>
+					<span>
+						{formatSeed(match.player2Seed)} {match.player2Name}
+					</span>
+				</div>
 			</div>
 
 			{/* Picks comparison */}
@@ -281,11 +286,17 @@ function MatchComparisonCard({
 							{match.status === "finalized" && (
 								<div className="mt-1">
 									{currentUserPick.isExactScore ? (
-										<Badge className="bg-green-500 text-xs" variant="secondary">
+										<Badge
+											className="bg-green-500 text-white text-xs"
+											variant="secondary"
+										>
 											+{currentUserPick.pointsEarned}
 										</Badge>
 									) : currentUserPick.isWinnerCorrect ? (
-										<Badge className="bg-blue-500 text-xs" variant="secondary">
+										<Badge
+											className="bg-blue-500 text-white text-xs"
+											variant="secondary"
+										>
 											+{currentUserPick.pointsEarned}
 										</Badge>
 									) : (
@@ -314,11 +325,17 @@ function MatchComparisonCard({
 							{match.status === "finalized" && (
 								<div className="mt-1">
 									{otherUserPick.isExactScore ? (
-										<Badge className="bg-green-500 text-xs" variant="secondary">
+										<Badge
+											className="bg-green-500 text-white text-xs"
+											variant="secondary"
+										>
 											+{otherUserPick.pointsEarned}
 										</Badge>
 									) : otherUserPick.isWinnerCorrect ? (
-										<Badge className="bg-blue-500 text-xs" variant="secondary">
+										<Badge
+											className="bg-blue-500 text-white text-xs"
+											variant="secondary"
+										>
 											+{otherUserPick.pointsEarned}
 										</Badge>
 									) : (

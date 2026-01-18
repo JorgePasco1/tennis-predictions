@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CountdownTimer } from "~/components/countdown/CountdownTimer";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -98,6 +99,14 @@ export default function PicksPage({
 			return;
 		}
 
+		// Check if round is not yet open - fail silently for auto-save
+		if (activeRound.opensAt && new Date() < new Date(activeRound.opensAt)) {
+			if (!isAutoSave) {
+				toast.error("This round is not yet open for submissions");
+			}
+			return;
+		}
+
 		const picksArray = Object.entries(picks).map(([matchId, pick]) => ({
 			matchId: Number(matchId),
 			...pick,
@@ -181,6 +190,14 @@ export default function PicksPage({
 	const handleSubmitClick = () => {
 		if (activeRound?.submissionsClosedAt) {
 			toast.error("Submissions for this round have been closed");
+			return;
+		}
+
+		if (
+			activeRound?.opensAt &&
+			new Date() < new Date(activeRound.opensAt)
+		) {
+			toast.error("This round is not yet open for submissions");
 			return;
 		}
 
@@ -382,6 +399,10 @@ export default function PicksPage({
 	const totalMatchesCount = activeRound.matches.length;
 	const filteredMatchesCount = filteredMatches.length;
 	const isSubmissionsClosed = !!activeRound.submissionsClosedAt;
+	const isNotYetOpen = !!(
+		activeRound.opensAt && new Date() < new Date(activeRound.opensAt)
+	);
+	const isDisabled = isSubmissionsClosed || isNotYetOpen;
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -398,18 +419,29 @@ export default function PicksPage({
 
 			<main className="container mx-auto px-4 py-8">
 				<div className="mb-8">
-					<h1 className="mb-2 font-bold text-4xl text-gray-900">
-						Submit Your Picks
-					</h1>
-					<p className="text-gray-600">
-						{tournament.name} • {activeRound.name}
-						{activeRound.scoringRule && (
-							<span className="block text-sm">
-								Scoring: {activeRound.scoringRule.pointsPerWinner} pts/winner,{" "}
-								{activeRound.scoringRule.pointsExactScore} pts/exact score
-							</span>
+					<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+						<div>
+							<h1 className="mb-2 font-bold text-4xl text-gray-900">
+								Submit Your Picks
+							</h1>
+							<p className="text-gray-600">
+								{tournament.name} • {activeRound.name}
+								{activeRound.scoringRule && (
+									<span className="block text-sm">
+										Scoring: {activeRound.scoringRule.pointsPerWinner}{" "}
+										pts/winner, {activeRound.scoringRule.pointsExactScore}{" "}
+										pts/exact score
+									</span>
+								)}
+							</p>
+						</div>
+						{!isSubmissionsClosed && activeRound.deadline && (
+							<CountdownTimer
+								deadline={activeRound.deadline}
+								opensAt={activeRound.opensAt}
+							/>
 						)}
-					</p>
+					</div>
 				</div>
 
 				{/* Submissions Closed Banner */}
@@ -431,6 +463,26 @@ export default function PicksPage({
 								},
 							)}
 							. You can no longer submit or modify picks for this round.
+						</p>
+					</div>
+				)}
+
+				{/* Not Yet Open Banner */}
+				{isNotYetOpen && (
+					<div className="mb-8 rounded-lg border border-blue-300 bg-blue-50 p-6">
+						<div className="mb-2 font-semibold text-blue-900 text-xl">
+							⏳ Round Not Yet Open
+						</div>
+						<p className="text-blue-800">
+							This round will open for submissions on{" "}
+							{new Date(activeRound.opensAt!).toLocaleDateString("en-US", {
+								month: "long",
+								day: "numeric",
+								year: "numeric",
+								hour: "numeric",
+								minute: "2-digit",
+							})}
+							. You cannot submit or save picks until then.
 						</p>
 					</div>
 				)}
@@ -543,11 +595,11 @@ export default function PicksPage({
 												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
 													picks[match.id]?.predictedWinner === match.player1Name
 														? "border-blue-600 bg-blue-50 text-blue-900"
-														: isSubmissionsClosed
+														: isDisabled
 															? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 															: "border-gray-300 text-gray-700 hover:border-gray-400"
 												}`}
-												disabled={isSubmissionsClosed}
+												disabled={isDisabled}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -569,11 +621,11 @@ export default function PicksPage({
 												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
 													picks[match.id]?.predictedWinner === match.player2Name
 														? "border-blue-600 bg-blue-50 text-blue-900"
-														: isSubmissionsClosed
+														: isDisabled
 															? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 															: "border-gray-300 text-gray-700 hover:border-gray-400"
 												}`}
-												disabled={isSubmissionsClosed}
+												disabled={isDisabled}
 												onClick={() =>
 													setPicks((prev) => ({
 														...prev,
@@ -614,7 +666,7 @@ export default function PicksPage({
 																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
-															disabled={isSubmissionsClosed}
+															disabled={isDisabled}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -637,7 +689,7 @@ export default function PicksPage({
 																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
-															disabled={isSubmissionsClosed}
+															disabled={isDisabled}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -663,7 +715,7 @@ export default function PicksPage({
 																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
-															disabled={isSubmissionsClosed}
+															disabled={isDisabled}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -686,7 +738,7 @@ export default function PicksPage({
 																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
-															disabled={isSubmissionsClosed}
+															disabled={isDisabled}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -709,7 +761,7 @@ export default function PicksPage({
 																		? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
 																		: "border-gray-300 text-gray-700 hover:border-gray-400"
 															}`}
-															disabled={isSubmissionsClosed}
+															disabled={isDisabled}
 															onClick={() =>
 																setPicks((prev) => ({
 																	...prev,
@@ -753,7 +805,7 @@ export default function PicksPage({
 								disabled={
 									saveDraftMutation.isPending ||
 									Object.keys(picks).length === 0 ||
-									!!activeRound.submissionsClosedAt
+									isDisabled
 								}
 								onClick={() => handleSaveDraft(false)}
 							>
@@ -761,13 +813,11 @@ export default function PicksPage({
 							</button>
 							<button
 								className={`rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 ${
-									!allPicksComplete ||
-									submitPicksMutation.isPending ||
-									activeRound.submissionsClosedAt
+									!allPicksComplete || submitPicksMutation.isPending || isDisabled
 										? "cursor-not-allowed opacity-50"
 										: ""
 								}`}
-								disabled={!!activeRound.submissionsClosedAt}
+								disabled={isDisabled}
 								onClick={handleSubmitClick}
 							>
 								{submitPicksMutation.isPending

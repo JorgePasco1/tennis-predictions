@@ -90,6 +90,14 @@ export const picksRouter = createTRPCRouter({
 				});
 			}
 
+			// Check if round has opened yet
+			if (round.opensAt && new Date() < new Date(round.opensAt)) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "This round is not yet open for submissions",
+				});
+			}
+
 			// Check if user has already submitted picks for this round
 			const existingPicks = await ctx.db.query.userRoundPicks.findFirst({
 				where: and(
@@ -358,6 +366,14 @@ export const picksRouter = createTRPCRouter({
 				throw new TRPCError({
 					code: "BAD_REQUEST",
 					message: "Submissions for this round have been closed",
+				});
+			}
+
+			// Check if round has opened yet
+			if (round.opensAt && new Date() < new Date(round.opensAt)) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "This round is not yet open for submissions",
 				});
 			}
 
