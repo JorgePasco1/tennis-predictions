@@ -8,8 +8,7 @@
   - [X] Compare your picks against other player
 - [x] Implement scoring for finalized matches.
 - [x] Search on your results
-- [ ] Countdown timers
-- [ ] Streak Tracking
-- [ ] Achievement System
-- [ ] Bracket Challenge
+- [x] Countdown timers
+- [x] Streak Tracking
+- [x] Achievement System
 - [ ] Add new round
