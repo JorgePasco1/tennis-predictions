@@ -256,14 +256,16 @@ function MatchComparisonCard({
 			</div>
 
 			{/* Players */}
-			<div className="mb-3 text-center text-sm">
-				<span className="font-medium">
-					{formatSeed(match.player1Seed)} {match.player1Name}
-				</span>
-				<span className="mx-2 text-muted-foreground">vs</span>
-				<span className="font-medium">
-					{formatSeed(match.player2Seed)} {match.player2Name}
-				</span>
+			<div className="mb-3 text-center">
+				<div className="font-semibold text-lg leading-tight">
+					<span>
+						{formatSeed(match.player1Seed)} {match.player1Name}
+					</span>
+					<span className="mx-2 text-muted-foreground">vs</span>
+					<span>
+						{formatSeed(match.player2Seed)} {match.player2Name}
+					</span>
+				</div>
 			</div>
 
 			{/* Picks comparison */}
