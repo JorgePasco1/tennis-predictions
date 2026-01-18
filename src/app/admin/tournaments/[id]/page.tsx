@@ -87,6 +87,15 @@ export default function AdminTournamentManagePage({
 			}
 		>
 	>({});
+	const [showCloseDialog, setShowCloseDialog] = useState(false);
+	const [closeDialogData, setCloseDialogData] = useState<{
+		roundId: number;
+		roundName: string;
+	} | null>(null);
+	const [showUnfinalizeDialog, setShowUnfinalizeDialog] = useState(false);
+	const [unfinalizeMatchId, setUnfinalizeMatchId] = useState<number | null>(
+		null,
+	);
 
 	if (!tournament) {
 		return (
@@ -178,17 +187,18 @@ export default function AdminTournamentManagePage({
 		}
 	};
 
-	const handleUnfinalizeMatch = async (matchId: number) => {
-		if (
-			!confirm(
-				"Are you sure you want to unfinalize this match? This will reset all user scores for this match.",
-			)
-		) {
-			return;
-		}
+	const handleUnfinalizeMatch = (matchId: number) => {
+		setUnfinalizeMatchId(matchId);
+		setShowUnfinalizeDialog(true);
+	};
+
+	const handleConfirmUnfinalize = async () => {
+		if (!unfinalizeMatchId) return;
+
+		setShowUnfinalizeDialog(false);
 
 		try {
-			await unfinalizeMatchMutation.mutateAsync({ matchId });
+			await unfinalizeMatchMutation.mutateAsync({ matchId: unfinalizeMatchId });
 			toast.success("Match unfinalized successfully");
 		} catch (error) {
 			toast.error(
@@ -197,17 +207,20 @@ export default function AdminTournamentManagePage({
 		}
 	};
 
-	const handleCloseSubmissions = async (roundId: number, roundName: string) => {
-		if (
-			!confirm(
-				`Close submissions for ${roundName}?\n\nThis will:\n• Prevent new picks or draft saves\n• Automatically finalize all existing drafts\n\nThis action cannot be easily undone.`,
-			)
-		) {
-			return;
-		}
+	const handleCloseSubmissions = (roundId: number, roundName: string) => {
+		setCloseDialogData({ roundId, roundName });
+		setShowCloseDialog(true);
+	};
+
+	const handleConfirmClose = async () => {
+		if (!closeDialogData) return;
+
+		setShowCloseDialog(false);
 
 		try {
-			await closeSubmissionsMutation.mutateAsync({ roundId });
+			await closeSubmissionsMutation.mutateAsync({
+				roundId: closeDialogData.roundId,
+			});
 		} catch (error) {
 			// Error toast is already handled by the mutation's onError
 			console.error("Failed to close submissions:", error);
@@ -713,6 +726,62 @@ export default function AdminTournamentManagePage({
 						})()}
 				</div>
 			</main>
+
+			{/* Close Submissions Confirmation Dialog */}
+			<AlertDialog onOpenChange={setShowCloseDialog} open={showCloseDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Close Submissions?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Close submissions for {closeDialogData?.roundName}?
+							<div className="mt-3 space-y-2 text-left">
+								<p className="font-medium">This will:</p>
+								<ul className="list-inside list-disc space-y-1">
+									<li>Prevent new picks or draft saves</li>
+									<li>Automatically finalize all existing drafts</li>
+								</ul>
+								<p className="mt-3 font-medium text-yellow-700">
+									This action cannot be easily undone.
+								</p>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-red-600 hover:bg-red-700"
+							onClick={handleConfirmClose}
+						>
+							Close Submissions
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Unfinalize Match Confirmation Dialog */}
+			<AlertDialog
+				onOpenChange={setShowUnfinalizeDialog}
+				open={showUnfinalizeDialog}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Unfinalize Match?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Are you sure you want to unfinalize this match? This will reset
+							all user scores for this match.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-red-600 hover:bg-red-700"
+							onClick={handleConfirmUnfinalize}
+						>
+							Unfinalize Match
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }
