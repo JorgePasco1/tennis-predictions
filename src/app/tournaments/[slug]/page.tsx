@@ -24,6 +24,26 @@ export default async function TournamentDetailPage({
 
 	const activeRound = tournament.rounds.find((r) => r.isActive);
 
+	// Fetch user's picks for the active round to determine button text
+	let userPicks = null;
+	if (activeRound) {
+		try {
+			userPicks = await api.picks.getUserRoundPicks({
+				roundId: activeRound.id,
+			});
+		} catch {
+			// User not authenticated or no picks yet
+			userPicks = null;
+		}
+	}
+
+	// Determine button text based on pick status
+	const getPicksButtonText = () => {
+		if (!userPicks) return "Submit Picks";
+		if (userPicks.isDraft) return "Continue Picking";
+		return "View My Picks";
+	};
+
 	return (
 		<HydrateClient>
 			<div className="min-h-screen bg-muted/30">
@@ -68,7 +88,9 @@ export default async function TournamentDetailPage({
 								asChild
 								className="col-start-2 mt-4 bg-green-600 hover:bg-green-700"
 							>
-								<Link href={`/tournaments/${slug}/picks`}>Submit Picks</Link>
+								<Link href={`/tournaments/${slug}/picks`}>
+									{getPicksButtonText()}
+								</Link>
 							</Button>
 						</Alert>
 					)}
