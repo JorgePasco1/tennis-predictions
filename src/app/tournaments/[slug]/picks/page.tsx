@@ -284,22 +284,20 @@ export default function PicksPage({
 										</label>
 										<div className="flex gap-4">
 											<div
-												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
-													pick.predictedWinner === pick.match.player1Name
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-200 bg-gray-50 text-gray-500"
-												}`}
+												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${pick.predictedWinner === pick.match.player1Name
+													? "border-blue-600 bg-blue-50 text-blue-900"
+													: "border-gray-200 bg-gray-50 text-gray-500"
+													}`}
 											>
 												{pick.match.player1Seed &&
 													`(${pick.match.player1Seed}) `}
 												{pick.match.player1Name}
 											</div>
 											<div
-												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
-													pick.predictedWinner === pick.match.player2Name
-														? "border-blue-600 bg-blue-50 text-blue-900"
-														: "border-gray-200 bg-gray-50 text-gray-500"
-												}`}
+												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${pick.predictedWinner === pick.match.player2Name
+													? "border-blue-600 bg-blue-50 text-blue-900"
+													: "border-gray-200 bg-gray-50 text-gray-500"
+													}`}
 											>
 												{pick.match.player2Seed &&
 													`(${pick.match.player2Seed}) `}
@@ -346,6 +344,12 @@ export default function PicksPage({
 					</h1>
 					<p className="text-gray-600">
 						{tournament.name} • {activeRound.name}
+						{activeRound.scoringRule && (
+							<span className="block text-sm">
+								Scoring: {activeRound.scoringRule.pointsPerWinner} pts/winner,{" "}
+								{activeRound.scoringRule.pointsExactScore} pts/exact score
+							</span>
+						)}
 					</p>
 				</div>
 
@@ -429,11 +433,10 @@ export default function PicksPage({
 									</label>
 									<div className="flex gap-4">
 										<button
-											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
-												picks[match.id]?.predictedWinner === match.player1Name
-													? "border-blue-600 bg-blue-50 text-blue-900"
-													: "border-gray-300 text-gray-700 hover:border-gray-400"
-											}`}
+											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${picks[match.id]?.predictedWinner === match.player1Name
+												? "border-blue-600 bg-blue-50 text-blue-900"
+												: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
 											onClick={() =>
 												setPicks((prev) => ({
 													...prev,
@@ -452,11 +455,10 @@ export default function PicksPage({
 											{match.player1Name}
 										</button>
 										<button
-											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
-												picks[match.id]?.predictedWinner === match.player2Name
-													? "border-blue-600 bg-blue-50 text-blue-900"
-													: "border-gray-300 text-gray-700 hover:border-gray-400"
-											}`}
+											className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${picks[match.id]?.predictedWinner === match.player2Name
+												? "border-blue-600 bg-blue-50 text-blue-900"
+												: "border-gray-300 text-gray-700 hover:border-gray-400"
+												}`}
 											onClick={() =>
 												setPicks((prev) => ({
 													...prev,
@@ -489,12 +491,11 @@ export default function PicksPage({
 											{tournament.format === "bo3" ? (
 												<>
 													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 2 &&
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${picks[match.id]?.predictedSetsWon === 2 &&
 															picks[match.id]?.predictedSetsLost === 0
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
 														onClick={() =>
 															setPicks((prev) => ({
 																...prev,
@@ -509,12 +510,11 @@ export default function PicksPage({
 														2-0
 													</button>
 													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 2 &&
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${picks[match.id]?.predictedSetsWon === 2 &&
 															picks[match.id]?.predictedSetsLost === 1
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
 														onClick={() =>
 															setPicks((prev) => ({
 																...prev,
@@ -532,12 +532,11 @@ export default function PicksPage({
 											) : (
 												<>
 													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 3 &&
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${picks[match.id]?.predictedSetsWon === 3 &&
 															picks[match.id]?.predictedSetsLost === 0
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
 														onClick={() =>
 															setPicks((prev) => ({
 																...prev,
@@ -552,12 +551,11 @@ export default function PicksPage({
 														3-0
 													</button>
 													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 3 &&
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${picks[match.id]?.predictedSetsWon === 3 &&
 															picks[match.id]?.predictedSetsLost === 1
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
 														onClick={() =>
 															setPicks((prev) => ({
 																...prev,
@@ -572,12 +570,11 @@ export default function PicksPage({
 														3-1
 													</button>
 													<button
-														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-															picks[match.id]?.predictedSetsWon === 3 &&
+														className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${picks[match.id]?.predictedSetsWon === 3 &&
 															picks[match.id]?.predictedSetsLost === 2
-																? "border-blue-600 bg-blue-50 text-blue-900"
-																: "border-gray-300 text-gray-700 hover:border-gray-400"
-														}`}
+															? "border-blue-600 bg-blue-50 text-blue-900"
+															: "border-gray-300 text-gray-700 hover:border-gray-400"
+															}`}
 														onClick={() =>
 															setPicks((prev) => ({
 																...prev,
@@ -625,8 +622,10 @@ export default function PicksPage({
 								{saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
 							</button>
 							<button
-								className="rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-								disabled={!allPicksComplete || submitPicksMutation.isPending}
+								className={`rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 ${!allPicksComplete || submitPicksMutation.isPending
+									? "cursor-not-allowed opacity-50"
+									: ""
+									}`}
 								onClick={handleSubmitClick}
 							>
 								{submitPicksMutation.isPending
