@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -38,6 +38,7 @@ export const picksRouter = createTRPCRouter({
 					clerkId: ctx.user.id,
 					email: ctx.user.email,
 					displayName: ctx.user.displayName,
+					imageUrl: ctx.user.imageUrl,
 					role: ctx.user.role,
 				})
 				.onConflictDoUpdate({
@@ -45,6 +46,7 @@ export const picksRouter = createTRPCRouter({
 					set: {
 						email: ctx.user.email,
 						displayName: ctx.user.displayName,
+						imageUrl: ctx.user.imageUrl,
 						role: ctx.user.role,
 					},
 				});
@@ -307,6 +309,7 @@ export const picksRouter = createTRPCRouter({
 					clerkId: ctx.user.id,
 					email: ctx.user.email,
 					displayName: ctx.user.displayName,
+					imageUrl: ctx.user.imageUrl,
 					role: ctx.user.role,
 				})
 				.onConflictDoUpdate({
@@ -314,6 +317,7 @@ export const picksRouter = createTRPCRouter({
 					set: {
 						email: ctx.user.email,
 						displayName: ctx.user.displayName,
+						imageUrl: ctx.user.imageUrl,
 						role: ctx.user.role,
 					},
 				});
@@ -481,5 +485,232 @@ export const picksRouter = createTRPCRouter({
 
 				return userRoundPick;
 			});
+		}),
+
+	/**
+	 * Get comparison data between current user and another user for a round
+	 * Only allowed if the current user has submitted (non-draft) picks for this round
+	 */
+	getPicksComparison: protectedProcedure
+		.input(
+			z.object({
+				roundId: z.number().int(),
+				otherUserId: z.string(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			// Verify round exists and get tournament info
+			const round = await ctx.db.query.rounds.findFirst({
+				where: eq(rounds.id, input.roundId),
+				with: {
+					tournament: true,
+					matches: {
+						where: isNull(matches.deletedAt),
+						orderBy: (matches, { asc }) => [asc(matches.matchNumber)],
+					},
+				},
+			});
+
+			if (!round) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Round not found",
+				});
+			}
+
+			// Check if current user has submitted (non-draft) picks for this round
+			const currentUserPicks = await ctx.db.query.userRoundPicks.findFirst({
+				where: and(
+					eq(userRoundPicks.userId, ctx.user.id),
+					eq(userRoundPicks.roundId, input.roundId),
+					eq(userRoundPicks.isDraft, false),
+				),
+				with: {
+					matchPicks: true,
+				},
+			});
+
+			if (!currentUserPicks) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message:
+						"You must submit your picks before viewing other players' picks",
+				});
+			}
+
+			// Get other user's picks (only non-draft)
+			const otherUserPicks = await ctx.db.query.userRoundPicks.findFirst({
+				where: and(
+					eq(userRoundPicks.userId, input.otherUserId),
+					eq(userRoundPicks.roundId, input.roundId),
+					eq(userRoundPicks.isDraft, false),
+				),
+				with: {
+					matchPicks: true,
+					user: {
+						columns: {
+							id: true,
+							displayName: true,
+						},
+					},
+				},
+			});
+
+			if (!otherUserPicks) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "This user has not submitted picks for this round",
+				});
+			}
+
+			// Build comparison data
+			const matchComparisons = round.matches.map((match) => {
+				const currentUserPick = currentUserPicks.matchPicks.find(
+					(p) => p.matchId === match.id,
+				);
+				const otherUserPick = otherUserPicks.matchPicks.find(
+					(p) => p.matchId === match.id,
+				);
+
+				const sameWinner =
+					currentUserPick?.predictedWinner === otherUserPick?.predictedWinner;
+				const sameScore =
+					sameWinner &&
+					currentUserPick?.predictedSetsWon ===
+						otherUserPick?.predictedSetsWon &&
+					currentUserPick?.predictedSetsLost ===
+						otherUserPick?.predictedSetsLost;
+
+				return {
+					match: {
+						id: match.id,
+						matchNumber: match.matchNumber,
+						player1Name: match.player1Name,
+						player2Name: match.player2Name,
+						player1Seed: match.player1Seed,
+						player2Seed: match.player2Seed,
+						winnerName: match.winnerName,
+						finalScore: match.finalScore,
+						status: match.status,
+					},
+					currentUserPick: currentUserPick
+						? {
+								predictedWinner: currentUserPick.predictedWinner,
+								predictedSetsWon: currentUserPick.predictedSetsWon,
+								predictedSetsLost: currentUserPick.predictedSetsLost,
+								isWinnerCorrect: currentUserPick.isWinnerCorrect,
+								isExactScore: currentUserPick.isExactScore,
+								pointsEarned: currentUserPick.pointsEarned,
+							}
+						: null,
+					otherUserPick: otherUserPick
+						? {
+								predictedWinner: otherUserPick.predictedWinner,
+								predictedSetsWon: otherUserPick.predictedSetsWon,
+								predictedSetsLost: otherUserPick.predictedSetsLost,
+								isWinnerCorrect: otherUserPick.isWinnerCorrect,
+								isExactScore: otherUserPick.isExactScore,
+								pointsEarned: otherUserPick.pointsEarned,
+							}
+						: null,
+					sameWinner,
+					sameScore,
+				};
+			});
+
+			return {
+				round: {
+					id: round.id,
+					name: round.name,
+					roundNumber: round.roundNumber,
+				},
+				tournament: {
+					id: round.tournament.id,
+					name: round.tournament.name,
+				},
+				otherUser: {
+					id: otherUserPicks.user.id,
+					displayName: otherUserPicks.user.displayName,
+				},
+				currentUserStats: {
+					totalPoints: currentUserPicks.totalPoints,
+					correctWinners: currentUserPicks.correctWinners,
+					exactScores: currentUserPicks.exactScores,
+				},
+				otherUserStats: {
+					totalPoints: otherUserPicks.totalPoints,
+					correctWinners: otherUserPicks.correctWinners,
+					exactScores: otherUserPicks.exactScores,
+				},
+				matchComparisons,
+			};
+		}),
+
+	/**
+	 * Get rounds where both current user and another user have submitted picks for a tournament
+	 */
+	getCommonSubmittedRounds: protectedProcedure
+		.input(
+			z.object({
+				tournamentId: z.number().int(),
+				otherUserId: z.string(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			// Get all rounds for this tournament
+			const tournamentRounds = await ctx.db.query.rounds.findMany({
+				where: eq(rounds.tournamentId, input.tournamentId),
+				orderBy: [desc(rounds.roundNumber)],
+			});
+
+			if (tournamentRounds.length === 0) {
+				return [];
+			}
+
+			const roundIds = tournamentRounds.map((r) => r.id);
+
+			// Get current user's submitted rounds
+			const currentUserRoundPicks = await ctx.db.query.userRoundPicks.findMany({
+				where: and(
+					eq(userRoundPicks.userId, ctx.user.id),
+					inArray(userRoundPicks.roundId, roundIds),
+					eq(userRoundPicks.isDraft, false),
+				),
+				columns: {
+					roundId: true,
+				},
+			});
+
+			// Get other user's submitted rounds
+			const otherUserRoundPicks = await ctx.db.query.userRoundPicks.findMany({
+				where: and(
+					eq(userRoundPicks.userId, input.otherUserId),
+					inArray(userRoundPicks.roundId, roundIds),
+					eq(userRoundPicks.isDraft, false),
+				),
+				columns: {
+					roundId: true,
+				},
+			});
+
+			const currentUserRoundIds = new Set(
+				currentUserRoundPicks.map((p) => p.roundId),
+			);
+			const otherUserRoundIds = new Set(
+				otherUserRoundPicks.map((p) => p.roundId),
+			);
+
+			// Find common rounds
+			const commonRounds = tournamentRounds.filter(
+				(r) => currentUserRoundIds.has(r.id) && otherUserRoundIds.has(r.id),
+			);
+
+			return commonRounds.map((r) => ({
+				id: r.id,
+				name: r.name,
+				roundNumber: r.roundNumber,
+				isActive: r.isActive,
+				isFinalized: r.isFinalized,
+			}));
 		}),
 });
