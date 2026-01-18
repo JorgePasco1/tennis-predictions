@@ -273,15 +273,25 @@ export const leaderboardsRouter = createTRPCRouter({
 			(sum, p) => sum + p.exactScores,
 			0,
 		);
+		// Count only finalized matches (where isWinnerCorrect is not null)
+		const totalFinalizedPredictions = userPicks.reduce(
+			(sum, p) =>
+				sum + p.matchPicks.filter((mp) => mp.isWinnerCorrect !== null).length,
+			0,
+		);
 		const totalPredictions = userPicks.reduce(
 			(sum, p) => sum + p.matchPicks.length,
 			0,
 		);
 
 		const accuracy =
-			totalPredictions > 0 ? (totalCorrectWinners / totalPredictions) * 100 : 0;
+			totalFinalizedPredictions > 0
+				? (totalCorrectWinners / totalFinalizedPredictions) * 100
+				: 0;
 		const exactScoreRate =
-			totalPredictions > 0 ? (totalExactScores / totalPredictions) * 100 : 0;
+			totalFinalizedPredictions > 0
+				? (totalExactScores / totalFinalizedPredictions) * 100
+				: 0;
 
 		// Get rank from all-time leaderboard
 		const allTimeLeaderboard = await ctx.db
@@ -309,6 +319,7 @@ export const leaderboardsRouter = createTRPCRouter({
 				exactScores: number;
 				roundsPlayed: number;
 				predictions: number;
+				finalizedPredictions: number;
 			}
 		>();
 
@@ -324,6 +335,7 @@ export const leaderboardsRouter = createTRPCRouter({
 					exactScores: 0,
 					roundsPlayed: 0,
 					predictions: 0,
+					finalizedPredictions: 0,
 				});
 			}
 			const t = tournamentMap.get(tid)!;
@@ -332,13 +344,18 @@ export const leaderboardsRouter = createTRPCRouter({
 			t.exactScores += pick.exactScores;
 			t.roundsPlayed += 1;
 			t.predictions += pick.matchPicks.length;
+			t.finalizedPredictions += pick.matchPicks.filter(
+				(mp) => mp.isWinnerCorrect !== null,
+			).length;
 		}
 
 		const tournamentsList = Array.from(tournamentMap.values())
 			.map((t) => ({
 				...t,
 				accuracy:
-					t.predictions > 0 ? (t.correctWinners / t.predictions) * 100 : 0,
+					t.finalizedPredictions > 0
+						? (t.correctWinners / t.finalizedPredictions) * 100
+						: 0,
 			}))
 			.sort((a, b) => b.points - a.points);
 
