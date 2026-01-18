@@ -3,6 +3,21 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { toast } from "sonner";
+import {
+	filterMatchesByPlayerName,
+	SearchInput,
+	SearchResultsCount,
+} from "~/components/match-search";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { api } from "~/trpc/react";
 
 export default function AdminTournamentManagePage({
@@ -56,6 +71,7 @@ export default function AdminTournamentManagePage({
 	});
 
 	const [selectedRound, setSelectedRound] = useState<number | null>(null);
+	const [searchQuery, setSearchQuery] = useState("");
 	const [isEditingProperties, setIsEditingProperties] = useState(false);
 	const [editForm, setEditForm] = useState({
 		format: "",
@@ -476,194 +492,225 @@ export default function AdminTournamentManagePage({
 						</select>
 					</div>
 
-					{/* Matches */}
+					{/* Search */}
 					{selectedRound && (
-						<div className="space-y-4">
-							{tournament.rounds
-								.find((r) => r.id === selectedRound)
-								?.matches.map((match) => (
-									<div
-										className={`rounded-lg border p-4 ${
-											match.status === "finalized"
-												? "border-green-300 bg-green-50"
-												: "border-gray-200 bg-white"
-										}`}
-										key={match.id}
-									>
-										<div className="mb-4">
-											<div className="mb-2 flex items-start justify-between">
-												<div>
-													<div className="font-semibold text-gray-900">
-														Match {match.matchNumber}
-													</div>
-													<div className="text-gray-600">
-														{match.player1Seed && `(${match.player1Seed}) `}
-														{match.player1Name} vs{" "}
-														{match.player2Seed && `(${match.player2Seed}) `}
-														{match.player2Name}
-													</div>
-												</div>
-												{match.status === "finalized" && (
-													<span className="rounded-full bg-green-600 px-3 py-1 font-medium text-white text-xs">
-														Finalized
-													</span>
-												)}
-											</div>
-											{match.status === "finalized" && (
-												<div className="mt-2 space-y-2">
-													<div className="text-green-800 text-sm">
-														Winner: {match.winnerName} • Score:{" "}
-														{match.finalScore}
-													</div>
-													<button
-														className="rounded bg-red-600 px-3 py-1.5 font-semibold text-sm text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-														disabled={unfinalizeMatchMutation.isPending}
-														onClick={() => handleUnfinalizeMatch(match.id)}
-														type="button"
-													>
-														{unfinalizeMatchMutation.isPending
-															? "Unfinalizing..."
-															: "Unfinalize Match"}
-													</button>
-												</div>
-											)}
-										</div>
-
-										{match.status === "pending" && (
-											<div className="space-y-3 border-t pt-4">
-												<div>
-													<label className="mb-1 block text-gray-700 text-sm">
-														Winner
-													</label>
-													<select
-														className="w-full rounded border px-3 py-2 text-sm"
-														onChange={(e) =>
-															setMatchResults((prev) => ({
-																...prev,
-																[match.id]: {
-																	...prev[match.id],
-																	winnerName: e.target.value,
-																},
-															}))
-														}
-														value={matchResults[match.id]?.winnerName ?? ""}
-													>
-														<option value="">Select winner...</option>
-														<option value={match.player1Name}>
-															{match.player1Name}
-														</option>
-														<option value={match.player2Name}>
-															{match.player2Name}
-														</option>
-													</select>
-												</div>
-
-												{matchResults[match.id]?.winnerName && (
-													<div>
-														<label className="mb-2 block text-gray-700 text-sm">
-															Score
-														</label>
-														<div
-															className={`grid gap-3 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
-														>
-															{tournament.format === "bo3" ? (
-																<>
-																	<button
-																		className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																			matchResults[match.id]?.setsWon === 2 &&
-																			matchResults[match.id]?.setsLost === 0
-																				? "border-blue-600 bg-blue-50 text-blue-900"
-																				: "border-gray-300 text-gray-700 hover:border-gray-400"
-																		}`}
-																		onClick={() =>
-																			handleScoreSelect(match.id, 2, 0)
-																		}
-																		type="button"
-																	>
-																		2-0
-																	</button>
-																	<button
-																		className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																			matchResults[match.id]?.setsWon === 2 &&
-																			matchResults[match.id]?.setsLost === 1
-																				? "border-blue-600 bg-blue-50 text-blue-900"
-																				: "border-gray-300 text-gray-700 hover:border-gray-400"
-																		}`}
-																		onClick={() =>
-																			handleScoreSelect(match.id, 2, 1)
-																		}
-																		type="button"
-																	>
-																		2-1
-																	</button>
-																</>
-															) : (
-																<>
-																	<button
-																		className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																			matchResults[match.id]?.setsWon === 3 &&
-																			matchResults[match.id]?.setsLost === 0
-																				? "border-blue-600 bg-blue-50 text-blue-900"
-																				: "border-gray-300 text-gray-700 hover:border-gray-400"
-																		}`}
-																		onClick={() =>
-																			handleScoreSelect(match.id, 3, 0)
-																		}
-																		type="button"
-																	>
-																		3-0
-																	</button>
-																	<button
-																		className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																			matchResults[match.id]?.setsWon === 3 &&
-																			matchResults[match.id]?.setsLost === 1
-																				? "border-blue-600 bg-blue-50 text-blue-900"
-																				: "border-gray-300 text-gray-700 hover:border-gray-400"
-																		}`}
-																		onClick={() =>
-																			handleScoreSelect(match.id, 3, 1)
-																		}
-																		type="button"
-																	>
-																		3-1
-																	</button>
-																	<button
-																		className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																			matchResults[match.id]?.setsWon === 3 &&
-																			matchResults[match.id]?.setsLost === 2
-																				? "border-blue-600 bg-blue-50 text-blue-900"
-																				: "border-gray-300 text-gray-700 hover:border-gray-400"
-																		}`}
-																		onClick={() =>
-																			handleScoreSelect(match.id, 3, 2)
-																		}
-																		type="button"
-																	>
-																		3-2
-																	</button>
-																</>
-															)}
-														</div>
-													</div>
-												)}
-
-												<button
-													className="rounded bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-													disabled={
-														!matchResults[match.id]?.winnerName ||
-														matchResults[match.id]?.setsWon === undefined ||
-														finalizeMatchMutation.isPending
-													}
-													onClick={() => handleFinalizeMatch(match.id)}
-												>
-													Finalize Result
-												</button>
-											</div>
-										)}
-									</div>
-								))}
+						<div className="mb-4">
+							<SearchInput onChange={setSearchQuery} value={searchQuery} />
 						</div>
 					)}
+
+					{/* Matches */}
+					{selectedRound &&
+						(() => {
+							const selectedRoundData = tournament.rounds.find(
+								(r) => r.id === selectedRound,
+							);
+							const allMatches = selectedRoundData?.matches || [];
+							const filteredMatches = filterMatchesByPlayerName(
+								allMatches,
+								searchQuery,
+							);
+							const totalMatches = allMatches.length;
+							const filteredCount = filteredMatches.length;
+
+							return (
+								<>
+									<SearchResultsCount
+										filteredCount={filteredCount}
+										searchQuery={searchQuery}
+										totalCount={totalMatches}
+									/>
+									<div className="space-y-4">
+										{filteredMatches.map((match) => (
+											<div
+												className={`rounded-lg border p-4 ${
+													match.status === "finalized"
+														? "border-green-300 bg-green-50"
+														: "border-gray-200 bg-white"
+												}`}
+												key={match.id}
+											>
+												<div className="mb-4">
+													<div className="mb-2 flex items-start justify-between">
+														<div>
+															<div className="font-semibold text-gray-900">
+																Match {match.matchNumber}
+															</div>
+															<div className="text-gray-600">
+																{match.player1Seed && `(${match.player1Seed}) `}
+																{match.player1Name} vs{" "}
+																{match.player2Seed && `(${match.player2Seed}) `}
+																{match.player2Name}
+															</div>
+														</div>
+														{match.status === "finalized" && (
+															<span className="rounded-full bg-green-600 px-3 py-1 font-medium text-white text-xs">
+																Finalized
+															</span>
+														)}
+													</div>
+													{match.status === "finalized" && (
+														<div className="mt-2 space-y-2">
+															<div className="text-green-800 text-sm">
+																Winner: {match.winnerName} • Score:{" "}
+																{match.finalScore}
+															</div>
+															<button
+																className="rounded bg-red-600 px-3 py-1.5 font-semibold text-sm text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+																disabled={unfinalizeMatchMutation.isPending}
+																onClick={() => handleUnfinalizeMatch(match.id)}
+																type="button"
+															>
+																{unfinalizeMatchMutation.isPending
+																	? "Unfinalizing..."
+																	: "Unfinalize Match"}
+															</button>
+														</div>
+													)}
+												</div>
+
+												{match.status === "pending" && (
+													<div className="space-y-3 border-t pt-4">
+														<div>
+															<label className="mb-1 block text-gray-700 text-sm">
+																Winner
+															</label>
+															<select
+																className="w-full rounded border px-3 py-2 text-sm"
+																onChange={(e) =>
+																	setMatchResults((prev) => ({
+																		...prev,
+																		[match.id]: {
+																			...prev[match.id],
+																			winnerName: e.target.value,
+																		},
+																	}))
+																}
+																value={matchResults[match.id]?.winnerName ?? ""}
+															>
+																<option value="">Select winner...</option>
+																<option value={match.player1Name}>
+																	{match.player1Name}
+																</option>
+																<option value={match.player2Name}>
+																	{match.player2Name}
+																</option>
+															</select>
+														</div>
+
+														{matchResults[match.id]?.winnerName && (
+															<div>
+																<label className="mb-2 block text-gray-700 text-sm">
+																	Score
+																</label>
+																<div
+																	className={`grid gap-3 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
+																>
+																	{tournament.format === "bo3" ? (
+																		<>
+																			<button
+																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																					matchResults[match.id]?.setsWon ===
+																						2 &&
+																					matchResults[match.id]?.setsLost === 0
+																						? "border-blue-600 bg-blue-50 text-blue-900"
+																						: "border-gray-300 text-gray-700 hover:border-gray-400"
+																				}`}
+																				onClick={() =>
+																					handleScoreSelect(match.id, 2, 0)
+																				}
+																				type="button"
+																			>
+																				2-0
+																			</button>
+																			<button
+																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																					matchResults[match.id]?.setsWon ===
+																						2 &&
+																					matchResults[match.id]?.setsLost === 1
+																						? "border-blue-600 bg-blue-50 text-blue-900"
+																						: "border-gray-300 text-gray-700 hover:border-gray-400"
+																				}`}
+																				onClick={() =>
+																					handleScoreSelect(match.id, 2, 1)
+																				}
+																				type="button"
+																			>
+																				2-1
+																			</button>
+																		</>
+																	) : (
+																		<>
+																			<button
+																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																					matchResults[match.id]?.setsWon ===
+																						3 &&
+																					matchResults[match.id]?.setsLost === 0
+																						? "border-blue-600 bg-blue-50 text-blue-900"
+																						: "border-gray-300 text-gray-700 hover:border-gray-400"
+																				}`}
+																				onClick={() =>
+																					handleScoreSelect(match.id, 3, 0)
+																				}
+																				type="button"
+																			>
+																				3-0
+																			</button>
+																			<button
+																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																					matchResults[match.id]?.setsWon ===
+																						3 &&
+																					matchResults[match.id]?.setsLost === 1
+																						? "border-blue-600 bg-blue-50 text-blue-900"
+																						: "border-gray-300 text-gray-700 hover:border-gray-400"
+																				}`}
+																				onClick={() =>
+																					handleScoreSelect(match.id, 3, 1)
+																				}
+																				type="button"
+																			>
+																				3-1
+																			</button>
+																			<button
+																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																					matchResults[match.id]?.setsWon ===
+																						3 &&
+																					matchResults[match.id]?.setsLost === 2
+																						? "border-blue-600 bg-blue-50 text-blue-900"
+																						: "border-gray-300 text-gray-700 hover:border-gray-400"
+																				}`}
+																				onClick={() =>
+																					handleScoreSelect(match.id, 3, 2)
+																				}
+																				type="button"
+																			>
+																				3-2
+																			</button>
+																		</>
+																	)}
+																</div>
+															</div>
+														)}
+
+														<button
+															className="rounded bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+															disabled={
+																!matchResults[match.id]?.winnerName ||
+																matchResults[match.id]?.setsWon === undefined ||
+																finalizeMatchMutation.isPending
+															}
+															onClick={() => handleFinalizeMatch(match.id)}
+														>
+															Finalize Result
+														</button>
+													</div>
+												)}
+											</div>
+										))}
+									</div>
+								</>
+							);
+						})()}
 				</div>
 			</main>
 		</div>

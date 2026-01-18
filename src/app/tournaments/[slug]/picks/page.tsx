@@ -1,10 +1,14 @@
 "use client";
 
-import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+	filterMatchesByPlayerName,
+	SearchInput,
+	SearchResultsCount,
+} from "~/components/match-search";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -15,7 +19,6 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
-import { Input } from "~/components/ui/input";
 import { api } from "~/trpc/react";
 
 export default function PicksPage({
@@ -212,37 +215,13 @@ export default function PicksPage({
 		}
 	};
 
-	// Filter matches based on search query
-	const filterMatches = <
-		T extends { match: { player1Name: string; player2Name: string } },
-	>(
-		matches: T[],
-	) => {
-		if (!searchQuery.trim()) return matches;
-		const query = searchQuery.toLowerCase();
-		return matches.filter((item) => {
-			const match = item.match;
-			return (
-				match.player1Name.toLowerCase().includes(query) ||
-				match.player2Name.toLowerCase().includes(query)
-			);
-		});
-	};
-
-	// Filter function for active round matches (editable view)
-	const filterActiveMatches = (matches: typeof activeRound.matches) => {
-		if (!searchQuery.trim()) return matches;
-		const query = searchQuery.toLowerCase();
-		return matches.filter(
-			(match) =>
-				match.player1Name.toLowerCase().includes(query) ||
-				match.player2Name.toLowerCase().includes(query),
-		);
-	};
-
 	// If user has already submitted final picks for this round, show readonly view
 	if (existingPicks && !existingPicks.isDraft) {
-		const filteredPicks = filterMatches(existingPicks.matchPicks);
+		// Filter matchPicks which have a nested match property
+		const filteredPicks = existingPicks.matchPicks.filter((item) => {
+			if (!searchQuery.trim()) return true;
+			return filterMatchesByPlayerName([item.match], searchQuery).length > 0;
+		});
 		const totalMatches = existingPicks.matchPicks.length;
 		const filteredCount = filteredPicks.length;
 		return (
@@ -305,22 +284,14 @@ export default function PicksPage({
 
 					{/* Search Input */}
 					<div className="mb-6">
-						<div className="relative">
-							<Search className="absolute top-3 left-3 h-5 w-5 text-gray-400" />
-							<Input
-								className="pl-10 text-base"
-								onChange={(e) => setSearchQuery(e.target.value)}
-								placeholder="Search by player name..."
-								type="text"
-								value={searchQuery}
+						<SearchInput onChange={setSearchQuery} value={searchQuery} />
+						<div className="mt-2">
+							<SearchResultsCount
+								filteredCount={filteredCount}
+								searchQuery={searchQuery}
+								totalCount={totalMatches}
 							/>
 						</div>
-						{searchQuery.trim() && (
-							<div className="mt-2 text-gray-600 text-sm">
-								Showing {filteredCount} of {totalMatches} matches
-								{filteredCount === 0 && " - No matches found"}
-							</div>
-						)}
 					</div>
 
 					{/* Matches - Readonly */}
@@ -404,7 +375,10 @@ export default function PicksPage({
 	}
 
 	// Editable picks view - filter matches
-	const filteredMatches = filterActiveMatches(activeRound.matches);
+	const filteredMatches = filterMatchesByPlayerName(
+		activeRound.matches,
+		searchQuery,
+	);
 	const totalMatchesCount = activeRound.matches.length;
 	const filteredMatchesCount = filteredMatches.length;
 
@@ -488,22 +462,14 @@ export default function PicksPage({
 
 				{/* Search Input */}
 				<div className="mb-6">
-					<div className="relative">
-						<Search className="absolute top-3 left-3 h-5 w-5 text-gray-400" />
-						<Input
-							className="pl-10 text-base"
-							onChange={(e) => setSearchQuery(e.target.value)}
-							placeholder="Search by player name..."
-							type="text"
-							value={searchQuery}
+					<SearchInput onChange={setSearchQuery} value={searchQuery} />
+					<div className="mt-2">
+						<SearchResultsCount
+							filteredCount={filteredMatchesCount}
+							searchQuery={searchQuery}
+							totalCount={totalMatchesCount}
 						/>
 					</div>
-					{searchQuery.trim() && (
-						<div className="mt-2 text-gray-600 text-sm">
-							Showing {filteredMatchesCount} of {totalMatchesCount} matches
-							{filteredMatchesCount === 0 && " - No matches found"}
-						</div>
-					)}
 				</div>
 
 				{/* Matches */}

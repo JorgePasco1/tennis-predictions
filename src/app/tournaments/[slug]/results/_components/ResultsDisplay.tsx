@@ -1,10 +1,14 @@
 "use client";
 
-import { CheckCircle2, Search, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
+import {
+	filterMatchesByPlayerName,
+	SearchInput,
+	SearchResultsCount,
+} from "~/components/match-search";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
 
 type Match = {
@@ -48,15 +52,7 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 	// Filter rounds and matches based on search query
 	const filteredRoundsData = roundsData.map((round) => ({
 		...round,
-		matches: round.matches.filter((match) => {
-			if (!searchQuery.trim()) return true;
-
-			const query = searchQuery.toLowerCase();
-			return (
-				match.player1Name.toLowerCase().includes(query) ||
-				match.player2Name.toLowerCase().includes(query)
-			);
-		}),
+		matches: filterMatchesByPlayerName(round.matches, searchQuery),
 	}));
 
 	// Only show rounds that have matching matches
@@ -77,24 +73,15 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 	return (
 		<div className="space-y-6">
 			{/* Search Input */}
-			<div className="relative">
-				<Search className="absolute top-3 left-3 h-5 w-5 text-muted-foreground" />
-				<Input
-					className="pl-10 text-base"
-					onChange={(e) => setSearchQuery(e.target.value)}
-					placeholder="Search by player name..."
-					type="text"
-					value={searchQuery}
-				/>
-			</div>
+			<SearchInput onChange={setSearchQuery} value={searchQuery} />
 
 			{/* Search results info */}
-			{searchQuery.trim() && (
-				<div className="text-muted-foreground text-sm">
-					Showing {filteredMatchCount} of {totalMatches} matches
-					{filteredMatchCount === 0 && " - No matches found"}
-				</div>
-			)}
+			<SearchResultsCount
+				className="text-muted-foreground text-sm"
+				filteredCount={filteredMatchCount}
+				searchQuery={searchQuery}
+				totalCount={totalMatches}
+			/>
 
 			{/* Results */}
 			{visibleRounds.length === 0 && searchQuery.trim() ? (
