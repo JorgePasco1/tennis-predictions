@@ -4,7 +4,7 @@ Get all unresolved review comments from a specific pull request using the GitHub
 
 ## Usage
 
-```
+```text
 /pr-unresolved <pr-number>
 ```
 
@@ -76,7 +76,7 @@ When the user runs this command with a PR number:
 
 ## Example Output
 
-```
+```text
 Found 3 unresolved review threads on PR#4:
 
 ## Thread 1: Line 205
