@@ -12,3 +12,7 @@
 - [x] Streak Tracking
 - [x] Achievement System
 - [ ] Add new round
+- [ ] Update scoring to give 2 + 1
+- [ ] Register retired for match result, does not give points.
+- [ ] Improve navigation between pages
+  - [ ] admins can go to the config page from any other page (match, predicts, etc)
