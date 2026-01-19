@@ -14,5 +14,6 @@
 - [ ] Add new round
 - [ ] Update scoring to give 2 + 1
 - [ ] Register retired for match result, does not give points.
+- [x] Add closed matches context to Results & Your Picks page and to leaderboards. Adjust things like: Correct: 24/64 (It should be 24/closed matches not the entire 64).
 - [ ] Improve navigation between pages
   - [ ] admins can go to the config page from any other page (match, predicts, etc)
