@@ -40,6 +40,8 @@ type Round = {
 		correctWinners: number;
 		exactScores: number;
 	} | null;
+	totalMatches: number;
+	finalizedMatches: number;
 };
 
 interface ResultsDisplayProps {
@@ -95,9 +97,6 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 			) : (
 				<div className="space-y-8">
 					{visibleRounds.map((round) => {
-						const hasResults = round.matches.some(
-							(m) => m.status === "finalized",
-						);
 						const hasPicks = round.userRoundPick !== null;
 
 						return (
@@ -118,10 +117,13 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 													</span>
 													<span className="text-muted-foreground">
 														Correct: {round.userRoundPick.correctWinners}/
-														{
-															roundsData.find((r) => r.id === round.id)?.matches
-																.length
-														}
+														{round.finalizedMatches}
+														{round.finalizedMatches < round.totalMatches && (
+															<span className="ml-1 text-muted-foreground/70">
+																({round.finalizedMatches}/{round.totalMatches}{" "}
+																played)
+															</span>
+														)}
 													</span>
 													<span className="text-muted-foreground">
 														Exact Scores: {round.userRoundPick.exactScores}

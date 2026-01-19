@@ -3,12 +3,13 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
-	matchPicks,
+	matches,
 	rounds,
 	tournaments,
 	userRoundPicks,
 	users,
 } from "~/server/db/schema";
+import { getScoringForRound } from "~/server/utils/scoring-config";
 
 export const leaderboardsRouter = createTRPCRouter({
 	/**
@@ -34,9 +35,15 @@ export const leaderboardsRouter = createTRPCRouter({
 				throw new Error("Tournament not found");
 			}
 
-			// Get all rounds for this tournament
+			// Get all rounds for this tournament with their matches
 			const tournamentRounds = await ctx.db.query.rounds.findMany({
 				where: eq(rounds.tournamentId, input.tournamentId),
+				with: {
+					matches: {
+						where: isNull(matches.deletedAt),
+					},
+				},
+				orderBy: [rounds.roundNumber],
 			});
 
 			const roundIds = tournamentRounds.map((r) => r.id);
@@ -45,8 +52,50 @@ export const leaderboardsRouter = createTRPCRouter({
 				return {
 					entries: [],
 					currentUserSubmittedRoundIds: [],
+					tournamentStats: {
+						totalMatches: 0,
+						finalizedMatches: 0,
+						maxPossiblePoints: 0,
+						rounds: [],
+					},
 				};
 			}
+
+			// Calculate tournament statistics
+			const roundStats = tournamentRounds.map((round) => {
+				const totalMatches = round.matches.length;
+				const finalizedMatches = round.matches.filter(
+					(m) => m.status === "finalized",
+				).length;
+				const scoring = getScoringForRound(round.name);
+				const maxPossiblePoints =
+					finalizedMatches *
+					(scoring.pointsPerWinner + scoring.pointsExactScore);
+
+				return {
+					roundId: round.id,
+					roundName: round.name,
+					roundNumber: round.roundNumber,
+					totalMatches,
+					finalizedMatches,
+					pointsPerWinner: scoring.pointsPerWinner,
+					pointsExactScore: scoring.pointsExactScore,
+					maxPossiblePoints,
+				};
+			});
+
+			const tournamentStats = {
+				totalMatches: roundStats.reduce((sum, r) => sum + r.totalMatches, 0),
+				finalizedMatches: roundStats.reduce(
+					(sum, r) => sum + r.finalizedMatches,
+					0,
+				),
+				maxPossiblePoints: roundStats.reduce(
+					(sum, r) => sum + r.maxPossiblePoints,
+					0,
+				),
+				rounds: roundStats,
+			};
 
 			// Get rounds where current user has submitted (non-draft) picks
 			const currentUserSubmissions = await ctx.db.query.userRoundPicks.findMany(
@@ -102,6 +151,7 @@ export const leaderboardsRouter = createTRPCRouter({
 			return {
 				entries,
 				currentUserSubmittedRoundIds,
+				tournamentStats,
 			};
 		}),
 

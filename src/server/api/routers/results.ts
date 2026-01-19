@@ -2,12 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-	matches,
-	matchPicks,
-	rounds,
-	userRoundPicks,
-} from "~/server/db/schema";
+import { matches, rounds, userRoundPicks } from "~/server/db/schema";
 
 export const resultsRouter = createTRPCRouter({
 	/**
@@ -152,10 +147,17 @@ export const resultsRouter = createTRPCRouter({
 					};
 				});
 
+				// Count finalized matches for accurate statistics display
+				const finalizedMatches = round.matches.filter(
+					(m) => m.status === "finalized",
+				).length;
+
 				return {
 					...round,
 					matches: matchesWithPicks,
 					userRoundPick: userRoundPick ?? null,
+					totalMatches: round.matches.length,
+					finalizedMatches,
 				};
 			});
 

@@ -19,7 +19,8 @@ export default async function TournamentLeaderboardPage({
 		api.leaderboards.getTournamentLeaderboard({ tournamentId: id }),
 	]);
 
-	const { entries, currentUserSubmittedRoundIds } = leaderboardData;
+	const { entries, currentUserSubmittedRoundIds, tournamentStats } =
+		leaderboardData;
 
 	return (
 		<HydrateClient>
@@ -35,6 +36,48 @@ export default async function TournamentLeaderboardPage({
 						<h1 className="mb-2 font-bold text-4xl">Tournament Leaderboard</h1>
 						<p className="text-muted-foreground">{tournament.name}</p>
 					</div>
+
+					{/* Tournament Progress */}
+					{tournamentStats.totalMatches > 0 && (
+						<Card className="mb-6 p-4">
+							<div className="flex flex-wrap items-center justify-between gap-4">
+								<div className="flex flex-wrap gap-6">
+									<div>
+										<div className="font-semibold text-2xl">
+											{tournamentStats.finalizedMatches}/
+											{tournamentStats.totalMatches}
+										</div>
+										<div className="text-muted-foreground text-sm">
+											Matches Played
+										</div>
+									</div>
+									<div>
+										<div className="font-semibold text-2xl">
+											{tournamentStats.maxPossiblePoints}
+										</div>
+										<div className="text-muted-foreground text-sm">
+											Max Possible Points
+										</div>
+									</div>
+									<div>
+										<div className="font-semibold text-2xl">
+											{tournamentStats.totalMatches > 0
+												? Math.round(
+														(tournamentStats.finalizedMatches /
+															tournamentStats.totalMatches) *
+															100,
+													)
+												: 0}
+											%
+										</div>
+										<div className="text-muted-foreground text-sm">
+											Complete
+										</div>
+									</div>
+								</div>
+							</div>
+						</Card>
+					)}
 
 					{entries.length === 0 ? (
 						<Card className="p-12 text-center">
