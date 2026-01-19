@@ -1,11 +1,20 @@
 /**
- * Progressive Round-Based Scoring Configuration
+ * Hybrid Round-Based Scoring Configuration
  *
- * Maps round names to their point values using a moderate progression:
- * 2-3-5-8-12-18-30 points per round
+ * Uses a predominantly flat system with slight late-round increases:
+ * - R128 through QF: 10 winner / 5 exact score
+ * - Semi Finals: 12 winner / 6 exact score
+ * - Final: 15 winner / 8 exact score
  *
- * Exact score bonus: +50% (multiply base points by 1.5, rounded up)
+ * Exact score bonus: ~50% of winner points (fixed per round)
+ *
+ * See docs/SCORING.md for full documentation.
  */
+
+interface RoundScoring {
+	pointsPerWinner: number;
+	pointsExactScore: number;
+}
 
 /**
  * Gets the scoring configuration for a given round name
@@ -13,25 +22,19 @@
  * @param roundName - The name of the round (e.g., "Round of 128", "Semi Finals", "Final")
  * @returns Object with pointsPerWinner and pointsExactScore
  */
-export function getScoringForRound(roundName: string): {
-	pointsPerWinner: number;
-	pointsExactScore: number;
-} {
-	const roundScoring: Record<string, number> = {
-		"Round of 128": 2,
-		"Round of 64": 3,
-		"Round of 32": 5,
-		"Round of 16": 8,
-		"Quarter Finals": 12,
-		"Semi Finals": 18,
-		Final: 30,
+export function getScoringForRound(roundName: string): RoundScoring {
+	const roundScoring: Record<string, RoundScoring> = {
+		"Round of 128": { pointsPerWinner: 10, pointsExactScore: 5 },
+		"Round of 64": { pointsPerWinner: 10, pointsExactScore: 5 },
+		"Round of 32": { pointsPerWinner: 10, pointsExactScore: 5 },
+		"Round of 16": { pointsPerWinner: 10, pointsExactScore: 5 },
+		"Quarter Finals": { pointsPerWinner: 10, pointsExactScore: 5 },
+		"Semi Finals": { pointsPerWinner: 12, pointsExactScore: 6 },
+		Final: { pointsPerWinner: 15, pointsExactScore: 8 },
 	};
 
-	const winnerPoints = roundScoring[roundName] ?? 10; // fallback to 10 for unknown rounds
-	const exactScorePoints = Math.ceil(winnerPoints * 1.5);
-
-	return {
-		pointsPerWinner: winnerPoints,
-		pointsExactScore: exactScorePoints,
-	};
+	// Default to 10/5 for unknown rounds
+	return (
+		roundScoring[roundName] ?? { pointsPerWinner: 10, pointsExactScore: 5 }
+	);
 }
