@@ -70,6 +70,21 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
+	const closeRoundMutation = api.admin.closeRound.useMutation({
+		onSuccess: (result) => {
+			refetch();
+			const message = result.nextRoundActivated
+				? "Round closed! Next round has been activated."
+				: result.hasNextRound
+					? "Round closed! Winners have been propagated to the next round."
+					: "Round closed!";
+			toast.success(message);
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to close round");
+		},
+	});
+
 	const [selectedRound, setSelectedRound] = useState<number | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isEditingProperties, setIsEditingProperties] = useState(false);
@@ -84,6 +99,7 @@ export default function AdminTournamentManagePage({
 				winnerName: string;
 				setsWon?: number;
 				setsLost?: number;
+				isRetirement?: boolean;
 			}
 		>
 	>({});
@@ -96,6 +112,13 @@ export default function AdminTournamentManagePage({
 	const [unfinalizeMatchId, setUnfinalizeMatchId] = useState<number | null>(
 		null,
 	);
+	const [showCloseRoundDialog, setShowCloseRoundDialog] = useState(false);
+	const [closeRoundDialogData, setCloseRoundDialogData] = useState<{
+		roundId: number;
+		roundName: string;
+		hasNextRound: boolean;
+	} | null>(null);
+	const [activateNextRound, setActivateNextRound] = useState(false);
 
 	if (!tournament) {
 		return (
@@ -174,6 +197,7 @@ export default function AdminTournamentManagePage({
 				setsWon: result.setsWon,
 				setsLost: result.setsLost,
 				finalScore,
+				isRetirement: result.isRetirement ?? false,
 			});
 			// Clear the form
 			setMatchResults((prev) => {
@@ -224,6 +248,32 @@ export default function AdminTournamentManagePage({
 		} catch (error) {
 			// Error toast is already handled by the mutation's onError
 			console.error("Failed to close submissions:", error);
+		}
+	};
+
+	const handleOpenCloseRoundDialog = (
+		roundId: number,
+		roundName: string,
+		hasNextRound: boolean,
+	) => {
+		setCloseRoundDialogData({ roundId, roundName, hasNextRound });
+		setActivateNextRound(false);
+		setShowCloseRoundDialog(true);
+	};
+
+	const handleConfirmCloseRound = async () => {
+		if (!closeRoundDialogData) return;
+
+		setShowCloseRoundDialog(false);
+
+		try {
+			await closeRoundMutation.mutateAsync({
+				roundId: closeRoundDialogData.roundId,
+				activateNextRound,
+			});
+		} catch (error) {
+			// Error toast is already handled by the mutation's onError
+			console.error("Failed to close round:", error);
 		}
 	};
 
@@ -478,6 +528,78 @@ export default function AdminTournamentManagePage({
 					</div>
 				</div>
 
+				{/* Round Finalization */}
+				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
+						Round Finalization
+					</h2>
+					<p className="mb-4 text-gray-600 text-sm">
+						Close a round after all matches are finalized. This will propagate
+						winners to the next round.
+					</p>
+					<div className="space-y-3">
+						{tournament.rounds.map((round) => {
+							const activeMatches = round.matches.filter((m) => !m.deletedAt);
+							const pendingMatches = activeMatches.filter(
+								(m) => m.status === "pending",
+							);
+							const allFinalized = pendingMatches.length === 0;
+							const isClosed = round.isFinalized;
+							const canClose = allFinalized && !isClosed;
+							const nextRound = tournament.rounds.find(
+								(r) => r.roundNumber === round.roundNumber + 1,
+							);
+
+							return (
+								<div
+									className="flex items-center justify-between rounded border border-gray-200 p-3"
+									key={round.id}
+								>
+									<div>
+										<span className="font-medium">{round.name}</span>
+										<span className="ml-2 text-gray-500 text-sm">
+											{isClosed ? (
+												<span className="text-green-600">✓ Closed</span>
+											) : allFinalized ? (
+												<span className="text-blue-600">
+													Ready to close ({activeMatches.length}/
+													{activeMatches.length} finalized)
+												</span>
+											) : (
+												<span className="text-orange-600">
+													{pendingMatches.length} match(es) pending
+												</span>
+											)}
+										</span>
+									</div>
+									<button
+										className={`rounded px-4 py-2 font-medium text-sm transition ${
+											canClose
+												? "bg-purple-600 text-white hover:bg-purple-700"
+												: "cursor-not-allowed bg-gray-200 text-gray-500"
+										}`}
+										disabled={!canClose || closeRoundMutation.isPending}
+										onClick={() =>
+											handleOpenCloseRoundDialog(
+												round.id,
+												round.name,
+												!!nextRound,
+											)
+										}
+										type="button"
+									>
+										{isClosed
+											? "Closed"
+											: closeRoundMutation.isPending
+												? "Closing..."
+												: "Close Round"}
+									</button>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+
 				{/* Round Selection */}
 				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
 					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
@@ -557,9 +679,16 @@ export default function AdminTournamentManagePage({
 															</div>
 														</div>
 														{match.status === "finalized" && (
-															<span className="rounded-full bg-green-600 px-3 py-1 font-medium text-white text-xs">
-																Finalized
-															</span>
+															<div className="flex gap-2">
+																{match.isRetirement && (
+																	<span className="rounded-full bg-red-600 px-3 py-1 font-medium text-white text-xs">
+																		RET
+																	</span>
+																)}
+																<span className="rounded-full bg-green-600 px-3 py-1 font-medium text-white text-xs">
+																	Finalized
+																</span>
+															</div>
 														)}
 													</div>
 													{match.status === "finalized" && (
@@ -568,6 +697,12 @@ export default function AdminTournamentManagePage({
 																Winner: {match.winnerName} • Score:{" "}
 																{match.finalScore}
 															</div>
+															{match.isRetirement && (
+																<div className="text-orange-700 text-sm">
+																	No points awarded for this match due to
+																	retirement
+																</div>
+															)}
 															<button
 																className="rounded bg-red-600 px-3 py-1.5 font-semibold text-sm text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
 																disabled={unfinalizeMatchMutation.isPending}
@@ -612,97 +747,198 @@ export default function AdminTournamentManagePage({
 														</div>
 
 														{matchResults[match.id]?.winnerName && (
-															<div>
-																<label className="mb-2 block text-gray-700 text-sm">
-																	Score
+															<>
+																{/* Retirement checkbox */}
+																<label className="flex cursor-pointer items-center gap-2">
+																	<input
+																		checked={
+																			matchResults[match.id]?.isRetirement ??
+																			false
+																		}
+																		className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+																		onChange={(e) =>
+																			setMatchResults((prev) => ({
+																				...prev,
+																				[match.id]: {
+																					...prev[match.id],
+																					winnerName:
+																						prev[match.id]?.winnerName ?? "",
+																					isRetirement: e.target.checked,
+																					// Reset score when toggling retirement
+																					setsWon: undefined,
+																					setsLost: undefined,
+																				},
+																			}))
+																		}
+																		type="checkbox"
+																	/>
+																	<span className="text-gray-700 text-sm">
+																		Match ended by retirement
+																	</span>
 																</label>
-																<div
-																	className={`grid gap-3 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
-																>
-																	{tournament.format === "bo3" ? (
-																		<>
-																			<button
-																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																					matchResults[match.id]?.setsWon ===
-																						2 &&
-																					matchResults[match.id]?.setsLost === 0
-																						? "border-blue-600 bg-blue-50 text-blue-900"
-																						: "border-gray-300 text-gray-700 hover:border-gray-400"
-																				}`}
-																				onClick={() =>
-																					handleScoreSelect(match.id, 2, 0)
-																				}
-																				type="button"
-																			>
-																				2-0
-																			</button>
-																			<button
-																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																					matchResults[match.id]?.setsWon ===
-																						2 &&
-																					matchResults[match.id]?.setsLost === 1
-																						? "border-blue-600 bg-blue-50 text-blue-900"
-																						: "border-gray-300 text-gray-700 hover:border-gray-400"
-																				}`}
-																				onClick={() =>
-																					handleScoreSelect(match.id, 2, 1)
-																				}
-																				type="button"
-																			>
-																				2-1
-																			</button>
-																		</>
+
+																{matchResults[match.id]?.isRetirement && (
+																	<div className="rounded bg-orange-50 p-2 text-orange-700 text-sm">
+																		No points will be awarded for this match
+																	</div>
+																)}
+
+																<div>
+																	<label className="mb-2 block text-gray-700 text-sm">
+																		Score
+																	</label>
+																	{matchResults[match.id]?.isRetirement ? (
+																		// Retirement score options - all possible scores
+																		<div className="grid grid-cols-4 gap-2">
+																			{(
+																				(tournament.format === "bo3"
+																					? [
+																							[0, 0],
+																							[1, 0],
+																							[0, 1],
+																							[1, 1],
+																							[2, 0],
+																							[2, 1],
+																							[0, 2],
+																							[1, 2],
+																						]
+																					: [
+																							[0, 0],
+																							[1, 0],
+																							[0, 1],
+																							[1, 1],
+																							[2, 0],
+																							[2, 1],
+																							[0, 2],
+																							[1, 2],
+																							[2, 2],
+																							[3, 0],
+																							[3, 1],
+																							[3, 2],
+																							[0, 3],
+																							[1, 3],
+																							[2, 3],
+																						]) as [number, number][]
+																			).map(([won, lost]) => (
+																				<button
+																					className={`rounded-lg border-2 px-3 py-1.5 font-semibold text-sm transition ${
+																						matchResults[match.id]?.setsWon ===
+																							won &&
+																						matchResults[match.id]?.setsLost ===
+																							lost
+																							? "border-orange-600 bg-orange-50 text-orange-900"
+																							: "border-gray-300 text-gray-700 hover:border-gray-400"
+																					}`}
+																					key={`${won}-${lost}`}
+																					onClick={() =>
+																						handleScoreSelect(
+																							match.id,
+																							won,
+																							lost,
+																						)
+																					}
+																					type="button"
+																				>
+																					{won}-{lost}
+																				</button>
+																			))}
+																		</div>
 																	) : (
-																		<>
-																			<button
-																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																					matchResults[match.id]?.setsWon ===
-																						3 &&
-																					matchResults[match.id]?.setsLost === 0
-																						? "border-blue-600 bg-blue-50 text-blue-900"
-																						: "border-gray-300 text-gray-700 hover:border-gray-400"
-																				}`}
-																				onClick={() =>
-																					handleScoreSelect(match.id, 3, 0)
-																				}
-																				type="button"
-																			>
-																				3-0
-																			</button>
-																			<button
-																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																					matchResults[match.id]?.setsWon ===
-																						3 &&
-																					matchResults[match.id]?.setsLost === 1
-																						? "border-blue-600 bg-blue-50 text-blue-900"
-																						: "border-gray-300 text-gray-700 hover:border-gray-400"
-																				}`}
-																				onClick={() =>
-																					handleScoreSelect(match.id, 3, 1)
-																				}
-																				type="button"
-																			>
-																				3-1
-																			</button>
-																			<button
-																				className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
-																					matchResults[match.id]?.setsWon ===
-																						3 &&
-																					matchResults[match.id]?.setsLost === 2
-																						? "border-blue-600 bg-blue-50 text-blue-900"
-																						: "border-gray-300 text-gray-700 hover:border-gray-400"
-																				}`}
-																				onClick={() =>
-																					handleScoreSelect(match.id, 3, 2)
-																				}
-																				type="button"
-																			>
-																				3-2
-																			</button>
-																		</>
+																		// Normal score options - only winning scores
+																		<div
+																			className={`grid gap-3 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
+																		>
+																			{tournament.format === "bo3" ? (
+																				<>
+																					<button
+																						className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																							matchResults[match.id]
+																								?.setsWon === 2 &&
+																							matchResults[match.id]
+																								?.setsLost === 0
+																								? "border-blue-600 bg-blue-50 text-blue-900"
+																								: "border-gray-300 text-gray-700 hover:border-gray-400"
+																						}`}
+																						onClick={() =>
+																							handleScoreSelect(match.id, 2, 0)
+																						}
+																						type="button"
+																					>
+																						2-0
+																					</button>
+																					<button
+																						className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																							matchResults[match.id]
+																								?.setsWon === 2 &&
+																							matchResults[match.id]
+																								?.setsLost === 1
+																								? "border-blue-600 bg-blue-50 text-blue-900"
+																								: "border-gray-300 text-gray-700 hover:border-gray-400"
+																						}`}
+																						onClick={() =>
+																							handleScoreSelect(match.id, 2, 1)
+																						}
+																						type="button"
+																					>
+																						2-1
+																					</button>
+																				</>
+																			) : (
+																				<>
+																					<button
+																						className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																							matchResults[match.id]
+																								?.setsWon === 3 &&
+																							matchResults[match.id]
+																								?.setsLost === 0
+																								? "border-blue-600 bg-blue-50 text-blue-900"
+																								: "border-gray-300 text-gray-700 hover:border-gray-400"
+																						}`}
+																						onClick={() =>
+																							handleScoreSelect(match.id, 3, 0)
+																						}
+																						type="button"
+																					>
+																						3-0
+																					</button>
+																					<button
+																						className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																							matchResults[match.id]
+																								?.setsWon === 3 &&
+																							matchResults[match.id]
+																								?.setsLost === 1
+																								? "border-blue-600 bg-blue-50 text-blue-900"
+																								: "border-gray-300 text-gray-700 hover:border-gray-400"
+																						}`}
+																						onClick={() =>
+																							handleScoreSelect(match.id, 3, 1)
+																						}
+																						type="button"
+																					>
+																						3-1
+																					</button>
+																					<button
+																						className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
+																							matchResults[match.id]
+																								?.setsWon === 3 &&
+																							matchResults[match.id]
+																								?.setsLost === 2
+																								? "border-blue-600 bg-blue-50 text-blue-900"
+																								: "border-gray-300 text-gray-700 hover:border-gray-400"
+																						}`}
+																						onClick={() =>
+																							handleScoreSelect(match.id, 3, 2)
+																						}
+																						type="button"
+																					>
+																						3-2
+																					</button>
+																				</>
+																			)}
+																		</div>
 																	)}
 																</div>
-															</div>
+															</>
 														)}
 
 														<button
@@ -778,6 +1014,59 @@ export default function AdminTournamentManagePage({
 							onClick={handleConfirmUnfinalize}
 						>
 							Unfinalize Match
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Close Round Confirmation Dialog */}
+			<AlertDialog
+				onOpenChange={setShowCloseRoundDialog}
+				open={showCloseRoundDialog}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Close Round?</AlertDialogTitle>
+						<AlertDialogDescription asChild>
+							<div className="text-muted-foreground text-sm">
+								<p>Close {closeRoundDialogData?.roundName}?</p>
+								<div className="mt-3 space-y-2 text-left">
+									<p className="font-medium text-foreground">This will:</p>
+									<ul className="list-inside list-disc space-y-1">
+										<li>Mark the round as finalized</li>
+										{closeRoundDialogData?.hasNextRound && (
+											<li>Propagate winners to the next round</li>
+										)}
+									</ul>
+									<p className="mt-3 font-medium text-yellow-700">
+										This action cannot be easily undone.
+									</p>
+								</div>
+								{closeRoundDialogData?.hasNextRound && (
+									<div className="mt-4">
+										<label className="flex cursor-pointer items-center gap-2">
+											<input
+												checked={activateNextRound}
+												className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+												onChange={(e) => setActivateNextRound(e.target.checked)}
+												type="checkbox"
+											/>
+											<span className="text-gray-700">
+												Activate next round automatically
+											</span>
+										</label>
+									</div>
+								)}
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-purple-600 hover:bg-purple-700"
+							onClick={handleConfirmCloseRound}
+						>
+							Close Round
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

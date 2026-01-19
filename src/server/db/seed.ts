@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { achievementDefinitions } from "./schema";
 import { ACHIEVEMENT_DEFINITIONS } from "../services/achievements";
+import { achievementDefinitions } from "./schema";
 
 // Load .env file manually for standalone script
 function loadEnv() {

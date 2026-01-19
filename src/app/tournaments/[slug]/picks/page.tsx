@@ -193,10 +193,7 @@ export default function PicksPage({
 			return;
 		}
 
-		if (
-			activeRound?.opensAt &&
-			new Date() < new Date(activeRound.opensAt)
-		) {
+		if (activeRound?.opensAt && new Date() < new Date(activeRound.opensAt)) {
 			toast.error("This round is not yet open for submissions");
 			return;
 		}
@@ -813,7 +810,9 @@ export default function PicksPage({
 							</button>
 							<button
 								className={`rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition hover:bg-green-700 ${
-									!allPicksComplete || submitPicksMutation.isPending || isDisabled
+									!allPicksComplete ||
+									submitPicksMutation.isPending ||
+									isDisabled
 										? "cursor-not-allowed opacity-50"
 										: ""
 								}`}

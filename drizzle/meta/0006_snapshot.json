@@ -1,6 +1,6 @@
 {
-	"id": "aea6c5ba-4330-4533-a512-db25e61168a5",
-	"prevId": "023df752-e5de-47ff-8289-87de542031f2",
+	"id": "8815c08a-5e15-4d8f-949b-73d5838bf123",
+	"prevId": "aea6c5ba-4330-4533-a512-db25e61168a5",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -330,6 +330,13 @@
 					"type": "varchar(255)",
 					"primaryKey": false,
 					"notNull": false
+				},
+				"is_retirement": {
+					"name": "is_retirement",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
 				},
 				"deleted_at": {
 					"name": "deleted_at",
