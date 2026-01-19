@@ -58,25 +58,37 @@ export default async function TournamentLeaderboardPage({
 
 					<Alert className="mt-8">
 						<Info className="h-4 w-4" />
-						<AlertTitle>Tournament Scoring</AlertTitle>
+						<AlertTitle>How Scoring Works</AlertTitle>
 						<AlertDescription>
-							<ul className="mt-2 space-y-1">
-								<li>
-									• Points are summed across all rounds in this tournament
-								</li>
-								<li>
-									• Ties are broken by earliest submission time (first pick
-									submitted wins)
-								</li>
-								<li>
-									• Only rounds where you submitted picks count toward your
-									total
-								</li>
-								<li>
-									• Click on a player's name to compare picks (requires
-									submitting your own picks first)
-								</li>
-							</ul>
+							<div className="mt-2 space-y-3">
+								<p className="text-sm">
+									Earn points by predicting match winners correctly. Get a bonus
+									for predicting the exact score.
+								</p>
+								<div className="rounded border bg-muted/50 p-3">
+									<div className="mb-2 font-medium text-sm">
+										Points per match:
+									</div>
+									<ul className="space-y-1 text-sm">
+										<li>
+											• R128 – QF: <strong>10</strong> pts/winner, +
+											<strong>5</strong> exact score
+										</li>
+										<li>
+											• Semi Finals: <strong>12</strong> pts/winner, +
+											<strong>6</strong> exact score
+										</li>
+										<li>
+											• Final: <strong>15</strong> pts/winner, +
+											<strong>8</strong> exact score
+										</li>
+									</ul>
+								</div>
+								<ul className="space-y-1 text-muted-foreground text-sm">
+									<li>• Ties broken by earliest submission time</li>
+									<li>• Click a player's name to compare picks</li>
+								</ul>
+							</div>
 						</AlertDescription>
 					</Alert>
 				</main>
