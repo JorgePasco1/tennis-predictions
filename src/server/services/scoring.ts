@@ -41,14 +41,37 @@ export async function calculateMatchPickScores(
 		throw new Error(`Match ${matchId} does not have complete result data`);
 	}
 
-	// Get scoring rule (default if not found)
-	const pointsPerWinner = match.round.scoringRule?.pointsPerWinner ?? 10;
-	const pointsExactScore = match.round.scoringRule?.pointsExactScore ?? 5;
-
 	// Get all picks for this match
 	const picks = await db.query.matchPicks.findMany({
 		where: eq(matchPicks.matchId, matchId),
 	});
+
+	// For retirement matches, set all picks to 0 points with null results
+	if (match.isRetirement) {
+		for (const pick of picks) {
+			await db
+				.update(matchPicks)
+				.set({
+					isWinnerCorrect: null,
+					isExactScore: null,
+					pointsEarned: 0,
+				})
+				.where(eq(matchPicks.id, pick.id));
+		}
+
+		// Recalculate user round pick totals
+		const userRoundPickIds = [...new Set(picks.map((p) => p.userRoundPickId))];
+		for (const userRoundPickId of userRoundPickIds) {
+			await recalculateUserRoundPickTotals(db, userRoundPickId);
+		}
+
+		// Skip streak updates for retirement matches
+		return;
+	}
+
+	// Get scoring rule (default if not found)
+	const pointsPerWinner = match.round.scoringRule?.pointsPerWinner ?? 10;
+	const pointsExactScore = match.round.scoringRule?.pointsExactScore ?? 5;
 
 	// Calculate and update each pick
 	for (const pick of picks) {

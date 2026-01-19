@@ -395,8 +395,9 @@ export const adminRouter = createTRPCRouter({
 				matchId: z.number().int(),
 				winnerName: z.string(),
 				finalScore: z.string(),
-				setsWon: z.number().int().min(2).max(3),
-				setsLost: z.number().int().min(0).max(2),
+				setsWon: z.number().int().min(0).max(3),
+				setsLost: z.number().int().min(0).max(3),
+				isRetirement: z.boolean().default(false),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -417,35 +418,43 @@ export const adminRouter = createTRPCRouter({
 				throw new Error("Winner must be one of the match players");
 			}
 
-			// Validate sets
-			if (input.setsWon < 2) {
-				throw new Error("Winner must have won at least 2 sets");
+			// Only apply strict set validation for non-retirement matches
+			if (!input.isRetirement) {
+				if (input.setsWon < 2) {
+					throw new Error("Winner must have won at least 2 sets");
+				}
+				if (input.setsLost >= input.setsWon) {
+					throw new Error("Winner must have won more sets than they lost");
+				}
+				if (input.setsWon === 2 && input.setsLost > 1) {
+					throw new Error(
+						"Invalid score: if sets won is 2, sets lost must be 0 or 1",
+					);
+				}
+				if (input.setsWon === 3 && input.setsLost > 2) {
+					throw new Error(
+						"Invalid score: if sets won is 3, sets lost must be 0, 1, or 2",
+					);
+				}
 			}
-			if (input.setsLost >= input.setsWon) {
-				throw new Error("Winner must have won more sets than they lost");
-			}
-			if (input.setsWon === 2 && input.setsLost > 1) {
-				throw new Error(
-					"Invalid score: if sets won is 2, sets lost must be 0 or 1",
-				);
-			}
-			if (input.setsWon === 3 && input.setsLost > 2) {
-				throw new Error(
-					"Invalid score: if sets won is 3, sets lost must be 0, 1, or 2",
-				);
-			}
+
+			// Build final score - append RET for retirement matches
+			const finalScore = input.isRetirement
+				? `${input.finalScore} RET`
+				: input.finalScore;
 
 			// Update match with result
 			const [updatedMatch] = await ctx.db
 				.update(matches)
 				.set({
 					winnerName: input.winnerName,
-					finalScore: input.finalScore,
+					finalScore,
 					setsWon: input.setsWon,
 					setsLost: input.setsLost,
 					status: "finalized",
 					finalizedAt: new Date(),
 					finalizedBy: ctx.user.id,
+					isRetirement: input.isRetirement,
 				})
 				.where(eq(matches.id, input.matchId))
 				.returning();
@@ -492,6 +501,7 @@ export const adminRouter = createTRPCRouter({
 						status: "pending",
 						finalizedAt: null,
 						finalizedBy: null,
+						isRetirement: false,
 					})
 					.where(eq(matches.id, input.matchId))
 					.returning();
@@ -543,6 +553,138 @@ export const adminRouter = createTRPCRouter({
 				.returning();
 
 			return updatedTournament;
+		}),
+
+	/**
+	 * Close a round - finalize it and propagate winners to next round
+	 */
+	closeRound: adminProcedure
+		.input(
+			z.object({
+				roundId: z.number().int(),
+				activateNextRound: z.boolean().default(false),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get the round with its matches and tournament
+			const round = await ctx.db.query.rounds.findFirst({
+				where: eq(rounds.id, input.roundId),
+				with: {
+					tournament: {
+						with: {
+							rounds: {
+								with: {
+									matches: true,
+								},
+							},
+						},
+					},
+					matches: true,
+				},
+			});
+
+			if (!round) {
+				throw new Error("Round not found");
+			}
+
+			// Check if round is already finalized
+			if (round.isFinalized) {
+				throw new Error("Round is already closed");
+			}
+
+			// Check if all matches are finalized
+			const pendingMatches = round.matches.filter(
+				(m) => m.status === "pending" && !m.deletedAt,
+			);
+			if (pendingMatches.length > 0) {
+				throw new Error(
+					`Cannot close round: ${pendingMatches.length} match(es) are not finalized`,
+				);
+			}
+
+			// Find the next round (by round number)
+			const nextRound = round.tournament.rounds.find(
+				(r) => r.roundNumber === round.roundNumber + 1,
+			);
+
+			// Use transaction for atomic updates
+			return await ctx.db.transaction(async (tx) => {
+				// Mark round as finalized
+				await tx
+					.update(rounds)
+					.set({ isFinalized: true })
+					.where(eq(rounds.id, input.roundId));
+
+				// Propagate winners to next round if it exists
+				if (nextRound) {
+					// Get winners from current round sorted by match number
+					const currentMatchWinners = round.matches
+						.filter((m) => !m.deletedAt && m.winnerName)
+						.sort((a, b) => a.matchNumber - b.matchNumber)
+						.map((m) => m.winnerName);
+
+					// Get next round matches sorted by match number
+					const nextRoundMatches = nextRound.matches
+						.filter((m) => !m.deletedAt)
+						.sort((a, b) => a.matchNumber - b.matchNumber);
+
+					// Match winners to next round:
+					// Match 1 & 2 winners → Next Match 1
+					// Match 3 & 4 winners → Next Match 2
+					// etc.
+					for (let i = 0; i < nextRoundMatches.length; i++) {
+						const player1Index = i * 2;
+						const player2Index = i * 2 + 1;
+
+						const player1Name = currentMatchWinners[player1Index];
+						const player2Name = currentMatchWinners[player2Index];
+
+						const updateData: { player1Name?: string; player2Name?: string } =
+							{};
+
+						if (player1Name) {
+							updateData.player1Name = player1Name;
+						}
+						if (player2Name) {
+							updateData.player2Name = player2Name;
+						}
+
+						if (Object.keys(updateData).length > 0) {
+							await tx
+								.update(matches)
+								.set(updateData)
+								.where(eq(matches.id, nextRoundMatches[i]!.id));
+						}
+					}
+
+					// Optionally activate the next round
+					if (input.activateNextRound) {
+						// Deactivate all rounds first
+						await tx
+							.update(rounds)
+							.set({ isActive: false })
+							.where(eq(rounds.tournamentId, round.tournament.id));
+
+						// Activate next round
+						await tx
+							.update(rounds)
+							.set({ isActive: true })
+							.where(eq(rounds.id, nextRound.id));
+
+						// Update tournament's current round number
+						await tx
+							.update(tournaments)
+							.set({ currentRoundNumber: nextRound.roundNumber })
+							.where(eq(tournaments.id, round.tournament.id));
+					}
+				}
+
+				return {
+					success: true,
+					hasNextRound: !!nextRound,
+					nextRoundActivated: input.activateNextRound && !!nextRound,
+				};
+			});
 		}),
 });
 

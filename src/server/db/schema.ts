@@ -151,6 +151,7 @@ export const matches = createTable(
 		finalizedBy: varchar("finalized_by", { length: 255 }).references(
 			() => users.id,
 		),
+		isRetirement: boolean("is_retirement").notNull().default(false),
 		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()

@@ -21,6 +21,7 @@ type Match = {
 	status: string;
 	winnerName: string | null;
 	finalScore: string | null;
+	isRetirement: boolean;
 	userPick: {
 		predictedWinner: string;
 		predictedSetsWon: number;
@@ -142,16 +143,19 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 									{round.matches.map((match) => {
 										const userPick = match.userPick;
 										const isFinalized = match.status === "finalized";
+										const isRetirement = match.isRetirement;
 
 										return (
 											<Card
 												className={cn(
 													isFinalized
-														? userPick?.isWinnerCorrect
-															? "border-green-300 bg-green-50"
-															: userPick
-																? "border-red-300 bg-red-50"
-																: "bg-muted"
+														? isRetirement
+															? "border-gray-300 bg-gray-50"
+															: userPick?.isWinnerCorrect
+																? "border-green-300 bg-green-50"
+																: userPick
+																	? "border-red-300 bg-red-50"
+																	: "bg-muted"
 														: "",
 												)}
 												key={match.id}
@@ -173,7 +177,12 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 															</div>
 														</div>
 														{isFinalized && (
-															<Badge variant="secondary">Final</Badge>
+															<div className="flex gap-2">
+																{isRetirement && (
+																	<Badge className="bg-red-600">RET</Badge>
+																)}
+																<Badge variant="secondary">Final</Badge>
+															</div>
 														)}
 													</div>
 
@@ -189,6 +198,12 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 																</span>{" "}
 																• Score: {match.finalScore}
 															</div>
+															{isRetirement && (
+																<div className="mt-2 text-orange-700 text-sm">
+																	No points awarded for this match due to
+																	retirement
+																</div>
+															)}
 														</div>
 													)}
 
@@ -197,9 +212,11 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 															className={cn(
 																"rounded p-3",
 																isFinalized
-																	? userPick.isWinnerCorrect
-																		? "bg-green-100"
-																		: "bg-red-100"
+																	? isRetirement
+																		? "bg-gray-100"
+																		: userPick.isWinnerCorrect
+																			? "bg-green-100"
+																			: "bg-red-100"
 																	: "bg-blue-50",
 															)}
 														>
@@ -209,7 +226,11 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 																</div>
 																{isFinalized && (
 																	<div className="flex items-center gap-2">
-																		{userPick.isWinnerCorrect ? (
+																		{isRetirement ? (
+																			<span className="flex items-center text-gray-600 text-sm">
+																				Not scored (retirement)
+																			</span>
+																		) : userPick.isWinnerCorrect ? (
 																			<span className="flex items-center text-green-700 text-sm">
 																				<CheckCircle2 className="mr-1 h-4 w-4" />
 																				Correct
@@ -233,7 +254,7 @@ export function ResultsDisplay({ roundsData }: ResultsDisplayProps) {
 																{userPick.predictedSetsWon}-
 																{userPick.predictedSetsLost}
 															</div>
-															{isFinalized && (
+															{isFinalized && !isRetirement && (
 																<div className="mt-1 font-semibold text-sm">
 																	Points Earned: {userPick.pointsEarned}
 																</div>
