@@ -1,11 +1,12 @@
 # Tennis Predictions 🎾
 
-A full-stack web application for predicting ATP Tour tennis tournament results. Compete with friends by submitting match predictions, earning points for correct picks, and climbing the leaderboards.
+[![Vercel Deployment](https://img.shields.io/github/deployments/JorgePasco1/tennis-predictions/production?label=vercel&logo=vercel&logoColor=white)](https://tennis-predictions.vercel.app)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)
+![tRPC](https://img.shields.io/badge/tRPC-11-398CCB?logo=trpc&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-06B6D4?logo=tailwindcss&logoColor=white)
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
-![tRPC](https://img.shields.io/badge/tRPC-11-blue)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-blue)
+A full-stack web application for predicting ATP Tour tennis tournament results. Compete with friends by submitting match predictions, earning points for correct picks, and climbing the leaderboards.
 
 ## ✨ Features
 
