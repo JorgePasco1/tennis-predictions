@@ -96,10 +96,7 @@ We chose a **predominantly flat system with slight late-round increases**:
 - Points are calculated immediately when matches are finalized
 
 ### Tie-Breaking Rules
-When players have the same total points:
-1. Number of correct winner predictions (higher is better)
-2. Number of exact score predictions (higher is better)
-3. Head-to-head comparison on same matches (if applicable)
+When players have the same total points, ties are broken by **earliest submission time**. The player who submitted their first pick earliest wins the tie-breaker.
 
 ## For Developers
 
@@ -109,14 +106,14 @@ When players have the same total points:
 |------|---------|
 | `src/server/utils/scoring-config.ts` | Point values per round |
 | `src/server/utils/scoring-config.test.ts` | Unit tests |
-| `src/server/scripts/migrate-scoring.ts` | Database migration script |
+| `src/server/scripts/recalculate-scores.ts` | Database migration script |
 
 ### How to Modify Scoring
 
 1. Update values in `scoring-config.ts`
 2. Update test expectations in `scoring-config.test.ts`
 3. Run tests: `pnpm vitest run src/server/utils/scoring-config.test.ts`
-4. Run migration for existing data: `pnpm tsx --env-file=.env src/server/scripts/migrate-scoring.ts`
+4. Run migration for existing data: `pnpm tsx --env-file=.env src/server/scripts/recalculate-scores.ts`
 
 ### Configuration Structure
 
