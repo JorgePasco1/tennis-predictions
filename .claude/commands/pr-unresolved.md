@@ -73,7 +73,7 @@ When the user runs this command with a PR number:
 
 6. Evaluate the comments and give a justified decision on whether we should fix each one or not.
 7. Ask the user to confirm which ones they want to fix.
-8. Once finished fixing, reply to the comment with a meaningful message, either if you fixed it or decided not to. Then resolve the comment.
+8. Once finished fixing, reply to each comment individually with a meaningful message, explaining how we fixed or why we decided not to fix. Then resolve each comment.
 
 ## Example Output
 
