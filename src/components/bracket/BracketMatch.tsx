@@ -28,6 +28,7 @@ export interface MatchData {
 interface BracketMatchProps {
 	match: MatchData;
 	compact?: boolean;
+	onClick?: (matchId: number) => void;
 }
 
 function formatPlayerName(name: string, seed: number | null, maxLength = 20) {
@@ -40,7 +41,17 @@ function formatPlayerName(name: string, seed: number | null, maxLength = 20) {
 	return `${seedPrefix}${truncatedName}`;
 }
 
-export function BracketMatch({ match, compact = false }: BracketMatchProps) {
+export function BracketMatch({
+	match,
+	compact = false,
+	onClick,
+}: BracketMatchProps) {
+	const isClickable = !!onClick;
+	const handleClick = () => {
+		if (onClick) {
+			onClick(match.id);
+		}
+	};
 	const isFinalized = match.status === "finalized";
 	const isRetirement = match.isRetirement;
 	const userPick = match.userPick;
@@ -74,7 +85,16 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 						userPick &&
 						!isRetirement &&
 						(userPick.isWinnerCorrect ? "border-green-400" : "border-red-400"),
+					isClickable && "cursor-pointer transition-shadow hover:shadow-md",
 				)}
+				onClick={handleClick}
+				onKeyDown={(e) => {
+					if (isClickable && (e.key === "Enter" || e.key === " ")) {
+						handleClick();
+					}
+				}}
+				role={isClickable ? "button" : undefined}
+				tabIndex={isClickable ? 0 : undefined}
 			>
 				{/* Player 1 */}
 				<div
@@ -178,7 +198,16 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 							: userPick
 								? "border-red-300 bg-red-50"
 								: ""),
+				isClickable && "cursor-pointer transition-shadow hover:shadow-md",
 			)}
+			onClick={handleClick}
+			onKeyDown={(e) => {
+				if (isClickable && (e.key === "Enter" || e.key === " ")) {
+					handleClick();
+				}
+			}}
+			role={isClickable ? "button" : undefined}
+			tabIndex={isClickable ? 0 : undefined}
 		>
 			<div className="mb-2 flex items-center justify-between">
 				<span className="font-medium text-muted-foreground text-sm">

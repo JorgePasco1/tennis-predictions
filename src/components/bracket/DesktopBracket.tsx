@@ -5,9 +5,10 @@ import type { RoundData } from "./MobileBracket";
 
 interface DesktopBracketProps {
 	rounds: RoundData[];
+	onMatchClick?: (matchId: number) => void;
 }
 
-export function DesktopBracket({ rounds }: DesktopBracketProps) {
+export function DesktopBracket({ rounds, onMatchClick }: DesktopBracketProps) {
 	// Sort rounds by round number (ascending for left-to-right display)
 	const sortedRounds = [...rounds].sort(
 		(a, b) => a.roundNumber - b.roundNumber,
@@ -103,7 +104,11 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 											width: `${columnWidth}px`,
 										}}
 									>
-										<BracketMatch compact match={match} />
+										<BracketMatch
+											compact
+											match={match}
+											onClick={onMatchClick}
+										/>
 									</div>
 								);
 							})}

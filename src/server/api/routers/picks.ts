@@ -663,6 +663,122 @@ export const picksRouter = createTRPCRouter({
 		}),
 
 	/**
+	 * Get all picks for a specific match
+	 * Only allowed if the current user has submitted (non-draft) picks for this match's round
+	 */
+	getAllPicksForMatch: protectedProcedure
+		.input(z.object({ matchId: z.number().int() }))
+		.query(async ({ ctx, input }) => {
+			// Get the match with round info
+			const match = await ctx.db.query.matches.findFirst({
+				where: eq(matches.id, input.matchId),
+				with: {
+					round: {
+						with: {
+							tournament: {
+								columns: {
+									id: true,
+									name: true,
+								},
+							},
+						},
+					},
+				},
+			});
+
+			if (!match) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Match not found",
+				});
+			}
+
+			// Check if current user has submitted (non-draft) picks for this round
+			const currentUserRoundPicks = await ctx.db.query.userRoundPicks.findFirst(
+				{
+					where: and(
+						eq(userRoundPicks.userId, ctx.user.id),
+						eq(userRoundPicks.roundId, match.roundId),
+						eq(userRoundPicks.isDraft, false),
+					),
+				},
+			);
+
+			if (!currentUserRoundPicks) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message:
+						"You must submit your picks before viewing other players' picks",
+				});
+			}
+
+			// Get all non-draft user round picks for this round
+			const allRoundPicks = await ctx.db.query.userRoundPicks.findMany({
+				where: and(
+					eq(userRoundPicks.roundId, match.roundId),
+					eq(userRoundPicks.isDraft, false),
+				),
+				with: {
+					user: {
+						columns: {
+							id: true,
+							displayName: true,
+							imageUrl: true,
+						},
+					},
+					matchPicks: {
+						where: eq(matchPicks.matchId, input.matchId),
+					},
+				},
+			});
+
+			// Build the response
+			const picks = allRoundPicks
+				.map((roundPick) => {
+					const matchPick = roundPick.matchPicks[0];
+					if (!matchPick) return null;
+
+					return {
+						user: {
+							id: roundPick.user.id,
+							displayName: roundPick.user.displayName,
+							imageUrl: roundPick.user.imageUrl,
+						},
+						pick: {
+							predictedWinner: matchPick.predictedWinner,
+							predictedSetsWon: matchPick.predictedSetsWon,
+							predictedSetsLost: matchPick.predictedSetsLost,
+							isWinnerCorrect: matchPick.isWinnerCorrect,
+							isExactScore: matchPick.isExactScore,
+							pointsEarned: matchPick.pointsEarned,
+						},
+					};
+				})
+				.filter((p) => p !== null);
+
+			return {
+				match: {
+					id: match.id,
+					matchNumber: match.matchNumber,
+					player1Name: match.player1Name,
+					player2Name: match.player2Name,
+					player1Seed: match.player1Seed,
+					player2Seed: match.player2Seed,
+					winnerName: match.winnerName,
+					finalScore: match.finalScore,
+					status: match.status,
+					isRetirement: match.isRetirement,
+				},
+				round: {
+					id: match.round.id,
+					name: match.round.name,
+				},
+				tournament: match.round.tournament,
+				picks,
+			};
+		}),
+
+	/**
 	 * Get rounds where both current user and another user have submitted picks for a tournament
 	 */
 	getCommonSubmittedRounds: protectedProcedure

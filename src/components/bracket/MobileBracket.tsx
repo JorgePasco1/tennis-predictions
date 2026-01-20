@@ -21,9 +21,10 @@ export interface RoundData {
 
 interface MobileBracketProps {
 	rounds: RoundData[];
+	onMatchClick?: (matchId: number) => void;
 }
 
-export function MobileBracket({ rounds }: MobileBracketProps) {
+export function MobileBracket({ rounds, onMatchClick }: MobileBracketProps) {
 	// Sort rounds by round number (ascending - earlier rounds first)
 	const sortedRounds = [...rounds].sort(
 		(a, b) => a.roundNumber - b.roundNumber,
@@ -91,7 +92,12 @@ export function MobileBracket({ rounds }: MobileBracketProps) {
 						</div>
 					) : (
 						selectedRound.matches.map((match) => (
-							<BracketMatch compact={false} key={match.id} match={match} />
+							<BracketMatch
+								compact={false}
+								key={match.id}
+								match={match}
+								onClick={onMatchClick}
+							/>
 						))
 					)}
 				</div>

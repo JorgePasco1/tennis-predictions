@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { DesktopBracket } from "./DesktopBracket";
+import { MatchPicksModal } from "./MatchPicksModal";
 import { MobileBracket, type RoundData } from "./MobileBracket";
 
 interface TournamentBracketProps {
@@ -8,6 +10,21 @@ interface TournamentBracketProps {
 }
 
 export function TournamentBracket({ rounds }: TournamentBracketProps) {
+	const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
+	const [modalOpen, setModalOpen] = useState(false);
+
+	const handleMatchClick = (matchId: number) => {
+		setSelectedMatchId(matchId);
+		setModalOpen(true);
+	};
+
+	const handleModalOpenChange = (open: boolean) => {
+		setModalOpen(open);
+		if (!open) {
+			setSelectedMatchId(null);
+		}
+	};
+
 	if (rounds.length === 0) {
 		return (
 			<div className="py-12 text-center">
@@ -24,13 +41,20 @@ export function TournamentBracket({ rounds }: TournamentBracketProps) {
 		<>
 			{/* Desktop bracket - hidden on mobile */}
 			<div className="hidden lg:block">
-				<DesktopBracket rounds={rounds} />
+				<DesktopBracket onMatchClick={handleMatchClick} rounds={rounds} />
 			</div>
 
 			{/* Mobile bracket - hidden on desktop */}
 			<div className="lg:hidden">
-				<MobileBracket rounds={rounds} />
+				<MobileBracket onMatchClick={handleMatchClick} rounds={rounds} />
 			</div>
+
+			{/* Match picks modal */}
+			<MatchPicksModal
+				matchId={selectedMatchId}
+				onOpenChange={handleModalOpenChange}
+				open={modalOpen}
+			/>
 		</>
 	);
 }
