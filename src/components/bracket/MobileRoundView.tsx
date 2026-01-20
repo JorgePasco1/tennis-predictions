@@ -6,14 +6,12 @@ import type { RoundData } from "./MobileBracket";
 
 interface MobileRoundViewProps {
 	round: RoundData;
-	roundIndex: number;
 	hasNextRound: boolean;
 	onMatchClick?: (matchId: number) => void;
 }
 
 export function MobileRoundView({
 	round,
-	roundIndex,
 	hasNextRound,
 	onMatchClick,
 }: MobileRoundViewProps) {
@@ -72,7 +70,6 @@ export function MobileRoundView({
 									matchGap={matchGap}
 									matchHeight={matchHeight}
 									matchIndex={matchIndex}
-									roundIndex={roundIndex}
 									topPosition={topPosition}
 								/>
 							)}

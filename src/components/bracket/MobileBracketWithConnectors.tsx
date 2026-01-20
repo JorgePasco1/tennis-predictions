@@ -45,6 +45,15 @@ export function MobileBracketWithConnectors({
 	// Transform calculation for sliding (percentage-based)
 	const translateXPercent = -(selectedRoundIndex * 100); // Each round is 100% of container width
 
+	// Early return if no rounds
+	if (sortedRounds.length === 0) {
+		return (
+			<div className="py-8 text-center text-muted-foreground">
+				No rounds available
+			</div>
+		);
+	}
+
 	// Calculate height for currently selected round (same formula as MobileRoundView)
 	const calculateRoundHeight = (round: RoundData): number => {
 		if (round.matches.length === 0) return 200;
@@ -61,14 +70,6 @@ export function MobileBracketWithConnectors({
 	const currentRoundHeight = calculateRoundHeight(
 		sortedRounds[selectedRoundIndex] ?? sortedRounds[0]!,
 	);
-
-	if (sortedRounds.length === 0) {
-		return (
-			<div className="py-8 text-center text-muted-foreground">
-				No rounds available
-			</div>
-		);
-	}
 
 	return (
 		<div className="space-y-4">
@@ -104,7 +105,6 @@ export function MobileBracketWithConnectors({
 								hasNextRound={index < sortedRounds.length - 1}
 								onMatchClick={onMatchClick}
 								round={round}
-								roundIndex={index}
 							/>
 						</div>
 					))}

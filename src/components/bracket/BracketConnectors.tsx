@@ -5,7 +5,6 @@ interface BracketConnectorsProps {
 	matchHeight: number;
 	matchGap: number;
 	topPosition: number;
-	roundIndex: number;
 }
 
 export function BracketConnectors({
@@ -13,7 +12,6 @@ export function BracketConnectors({
 	matchHeight,
 	matchGap,
 	topPosition,
-	roundIndex,
 }: BracketConnectorsProps) {
 	// Constants
 	const playerRowHeight = matchHeight / 2; // Half of match card height
