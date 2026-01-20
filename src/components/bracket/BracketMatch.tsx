@@ -63,8 +63,9 @@ export function BracketMatch({
 	const userPickedPlayer2 = userPick?.predictedWinner === match.player2Name;
 
 	// Parse "3-0" into [winnerSets, loserSets]
+	const scoreParts = match.finalScore?.split("-").map(Number) ?? [];
 	const [winnerSets, loserSets] =
-		match.finalScore?.split("-").map(Number) ?? [];
+		scoreParts.length === 2 ? scoreParts : [undefined, undefined];
 	const player1Sets = isPlayer1Winner
 		? winnerSets
 		: isPlayer2Winner
@@ -89,7 +90,9 @@ export function BracketMatch({
 				)}
 				onClick={handleClick}
 				onKeyDown={(e) => {
-					if (isClickable && (e.key === "Enter" || e.key === " ")) {
+					if (!isClickable) return;
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
 						handleClick();
 					}
 				}}
@@ -202,7 +205,9 @@ export function BracketMatch({
 			)}
 			onClick={handleClick}
 			onKeyDown={(e) => {
-				if (isClickable && (e.key === "Enter" || e.key === " ")) {
+				if (!isClickable) return;
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
 					handleClick();
 				}
 			}}

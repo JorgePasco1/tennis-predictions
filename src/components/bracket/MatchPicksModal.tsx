@@ -25,6 +25,7 @@ function formatPlayerName(name: string, seed: number | null) {
 function getInitials(name: string) {
 	return name
 		.split(" ")
+		.filter(Boolean)
 		.map((n) => n[0])
 		.join("")
 		.toUpperCase()

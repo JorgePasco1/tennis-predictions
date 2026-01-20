@@ -37,7 +37,18 @@ export default async function TournamentDetailPage({
 					.catch(() => null)
 			: Promise.resolve(null),
 		// Leaderboard data
-		api.leaderboards.getTournamentLeaderboard({ tournamentId: tournament.id }),
+		api.leaderboards
+			.getTournamentLeaderboard({ tournamentId: tournament.id })
+			.catch(() => ({
+				entries: [],
+				currentUserSubmittedRoundIds: [],
+				tournamentStats: {
+					totalMatches: 0,
+					finalizedMatches: 0,
+					maxPossiblePoints: 0,
+					rounds: [],
+				},
+			})),
 		// Results with user picks for bracket
 		api.results
 			.getTournamentResultsWithUserPicks({ tournamentId: tournament.id })

@@ -14,14 +14,6 @@ export function DesktopBracket({ rounds, onMatchClick }: DesktopBracketProps) {
 		(a, b) => a.roundNumber - b.roundNumber,
 	);
 
-	if (sortedRounds.length === 0) {
-		return (
-			<div className="py-8 text-center text-muted-foreground">
-				No rounds available
-			</div>
-		);
-	}
-
 	// Find the first round to determine base match count
 	const firstRound = sortedRounds[0];
 	if (!firstRound) {

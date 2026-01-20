@@ -754,7 +754,7 @@ export const picksRouter = createTRPCRouter({
 						},
 					};
 				})
-				.filter((p) => p !== null);
+				.filter((p): p is NonNullable<typeof p> => p !== null);
 
 			return {
 				match: {
