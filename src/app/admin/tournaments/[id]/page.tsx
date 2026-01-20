@@ -103,9 +103,16 @@ export default function AdminTournamentManagePage({
 	const createRoundMutation = api.admin.createRound.useMutation({
 		onSuccess: (result) => {
 			refetch();
-			toast.success(`Round "${result.name}" created with ${result.matchCount} matches`);
+			toast.success(
+				`Round "${result.name}" created with ${result.matchCount} matches`,
+			);
 			setShowCreateRoundDialog(false);
-			setCreateRoundForm({ name: "", matchCount: 32, opensAt: "", deadline: "" });
+			setCreateRoundForm({
+				name: "",
+				matchCount: 32,
+				opensAt: "",
+				deadline: "",
+			});
 		},
 		onError: (error) => {
 			toast.error(error.message || "Failed to create round");
@@ -153,7 +160,9 @@ export default function AdminTournamentManagePage({
 		opensAt: "",
 		deadline: "",
 	});
-	const [editingRoundDates, setEditingRoundDates] = useState<number | null>(null);
+	const [editingRoundDates, setEditingRoundDates] = useState<number | null>(
+		null,
+	);
 	const [roundDatesForm, setRoundDatesForm] = useState({
 		opensAt: "",
 		deadline: "",
@@ -686,7 +695,7 @@ export default function AdminTournamentManagePage({
 										</div>
 										<div className="flex gap-2">
 											<button
-												className="rounded bg-green-600 px-4 py-2 font-medium text-white text-sm hover:bg-green-700 disabled:opacity-50"
+												className="rounded bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700 disabled:opacity-50"
 												disabled={updateRoundDatesMutation.isPending}
 												onClick={() => handleSaveRoundDates(round.id)}
 												type="button"
