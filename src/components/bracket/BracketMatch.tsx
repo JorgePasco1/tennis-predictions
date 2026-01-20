@@ -51,6 +51,20 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 	const userPickedPlayer1 = userPick?.predictedWinner === match.player1Name;
 	const userPickedPlayer2 = userPick?.predictedWinner === match.player2Name;
 
+	// Parse "3-0" into [winnerSets, loserSets]
+	const [winnerSets, loserSets] =
+		match.finalScore?.split("-").map(Number) ?? [];
+	const player1Sets = isPlayer1Winner
+		? winnerSets
+		: isPlayer2Winner
+			? loserSets
+			: undefined;
+	const player2Sets = isPlayer2Winner
+		? winnerSets
+		: isPlayer1Winner
+			? loserSets
+			: undefined;
+
 	if (compact) {
 		return (
 			<div
@@ -69,19 +83,19 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 						isFinalized && isPlayer1Winner && "bg-green-50 font-semibold",
 					)}
 				>
-					<span
-						className={cn(
-							"truncate",
-							isFinalized && !isPlayer1Winner && "text-muted-foreground",
-						)}
-					>
-						{formatPlayerName(match.player1Name, match.player1Seed, 18)}
-					</span>
-					<div className="flex items-center gap-1">
+					<div className="flex min-w-0 items-center gap-1">
+						<span
+							className={cn(
+								"truncate",
+								isFinalized && !isPlayer1Winner && "text-muted-foreground",
+							)}
+						>
+							{formatPlayerName(match.player1Name, match.player1Seed, 16)}
+						</span>
 						{userPickedPlayer1 && (
 							<span
 								className={cn(
-									"size-1.5 rounded-full",
+									"size-1.5 shrink-0 rounded-full",
 									isFinalized
 										? userPick?.isWinnerCorrect
 											? "bg-green-500"
@@ -91,6 +105,16 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 							/>
 						)}
 					</div>
+					{isFinalized && (
+						<span
+							className={cn(
+								"ml-1 tabular-nums",
+								isPlayer1Winner ? "font-semibold" : "text-muted-foreground",
+							)}
+						>
+							{isRetirement && !isPlayer1Winner ? "Ret" : player1Sets}
+						</span>
+					)}
 				</div>
 
 				{/* Player 2 */}
@@ -100,19 +124,19 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 						isFinalized && isPlayer2Winner && "bg-green-50 font-semibold",
 					)}
 				>
-					<span
-						className={cn(
-							"truncate",
-							isFinalized && !isPlayer2Winner && "text-muted-foreground",
-						)}
-					>
-						{formatPlayerName(match.player2Name, match.player2Seed, 18)}
-					</span>
-					<div className="flex items-center gap-1">
+					<div className="flex min-w-0 items-center gap-1">
+						<span
+							className={cn(
+								"truncate",
+								isFinalized && !isPlayer2Winner && "text-muted-foreground",
+							)}
+						>
+							{formatPlayerName(match.player2Name, match.player2Seed, 16)}
+						</span>
 						{userPickedPlayer2 && (
 							<span
 								className={cn(
-									"size-1.5 rounded-full",
+									"size-1.5 shrink-0 rounded-full",
 									isFinalized
 										? userPick?.isWinnerCorrect
 											? "bg-green-500"
@@ -122,17 +146,17 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 							/>
 						)}
 					</div>
+					{isFinalized && (
+						<span
+							className={cn(
+								"ml-1 tabular-nums",
+								isPlayer2Winner ? "font-semibold" : "text-muted-foreground",
+							)}
+						>
+							{isRetirement && !isPlayer2Winner ? "Ret" : player2Sets}
+						</span>
+					)}
 				</div>
-
-				{/* Score line */}
-				{isFinalized && match.finalScore && (
-					<div className="flex items-center justify-center gap-1 border-t bg-muted/50 px-2 py-1 text-[10px] text-muted-foreground">
-						{match.finalScore}
-						{isRetirement && (
-							<Badge className="h-3 bg-red-600 px-1 text-[8px]">RET</Badge>
-						)}
-					</div>
-				)}
 			</div>
 		);
 	}
@@ -182,9 +206,21 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 						)}
 						{match.player1Name}
 					</span>
-					{userPickedPlayer1 && (
-						<span className="text-blue-600 text-xs">Your pick</span>
-					)}
+					<div className="flex items-center gap-2">
+						{isFinalized && player1Sets !== undefined && (
+							<span
+								className={cn(
+									"tabular-nums",
+									isPlayer1Winner ? "font-semibold" : "text-muted-foreground",
+								)}
+							>
+								{player1Sets}
+							</span>
+						)}
+						{userPickedPlayer1 && (
+							<span className="text-blue-600 text-xs">Your pick</span>
+						)}
+					</div>
 				</div>
 
 				{/* Player 2 */}
@@ -205,39 +241,43 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 						)}
 						{match.player2Name}
 					</span>
-					{userPickedPlayer2 && (
-						<span className="text-blue-600 text-xs">Your pick</span>
-					)}
+					<div className="flex items-center gap-2">
+						{isFinalized && player2Sets !== undefined && (
+							<span
+								className={cn(
+									"tabular-nums",
+									isPlayer2Winner ? "font-semibold" : "text-muted-foreground",
+								)}
+							>
+								{player2Sets}
+							</span>
+						)}
+						{userPickedPlayer2 && (
+							<span className="text-blue-600 text-xs">Your pick</span>
+						)}
+					</div>
 				</div>
 			</div>
 
 			{/* Result row */}
-			{isFinalized && (
-				<div className="mt-3 flex items-center justify-between text-sm">
-					<span className="text-muted-foreground">
-						Score: <span className="font-medium">{match.finalScore}</span>
-					</span>
-					{userPick && !isRetirement && (
-						<div className="flex items-center gap-2">
-							{userPick.isWinnerCorrect ? (
-								<span className="flex items-center text-green-700">
-									<CheckCircle2 className="mr-1 h-4 w-4" />
-									Correct
-								</span>
-							) : (
-								<span className="flex items-center text-red-700">
-									<XCircle className="mr-1 h-4 w-4" />
-									Wrong
-								</span>
-							)}
-							{userPick.isExactScore && (
-								<Badge className="bg-green-600 text-xs">Exact!</Badge>
-							)}
-						</div>
-					)}
-					{isRetirement && (
-						<span className="text-gray-500 text-xs">Not scored</span>
-					)}
+			{isFinalized && userPick && !isRetirement && (
+				<div className="mt-3 flex items-center justify-end text-sm">
+					<div className="flex items-center gap-2">
+						{userPick.isWinnerCorrect ? (
+							<span className="flex items-center text-green-700">
+								<CheckCircle2 className="mr-1 h-4 w-4" />
+								Correct
+							</span>
+						) : (
+							<span className="flex items-center text-red-700">
+								<XCircle className="mr-1 h-4 w-4" />
+								Wrong
+							</span>
+						)}
+						{userPick.isExactScore && (
+							<Badge className="bg-green-600 text-xs">Exact!</Badge>
+						)}
+					</div>
 				</div>
 			)}
 

@@ -34,11 +34,11 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 	const firstRoundMatchCount = firstRound.matches.length;
 
 	// Match dimensions
-	// Compact card: 2 player rows (28px each) + score row (~22px) + border (2px) = ~80px
-	const matchHeight = 80; // Height of compact match card with score
+	// Compact card: 2 player rows (28px each) + border (2px) = ~56px (score now inline)
+	const matchHeight = 56; // Height of compact match card
 	const playerRowHeight = 28; // Height of one player row (py-1.5 + text-xs)
 	const matchConnectorOffset = playerRowHeight; // Connect at the divider between players
-	const matchGap = 12; // Gap between matches in first round
+	const matchGap = 24; // Gap between matches in first round
 	const columnWidth = 180; // Width of each round column
 	const columnGap = 40; // Gap between columns for connectors
 	const headerHeight = 32; // Height reserved for round headers
@@ -114,7 +114,9 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 									const topInUnits = offsetInUnits + matchIndex * gapInUnits;
 									// Connect at the player divider line, not card center
 									const matchConnectY =
-										headerHeight + topInUnits * unitHeight + matchConnectorOffset;
+										headerHeight +
+										topInUnits * unitHeight +
+										matchConnectorOffset;
 									const isTopOfPair = matchIndex % 2 === 0;
 
 									// Calculate the pair partner's position (for drawing vertical line)
