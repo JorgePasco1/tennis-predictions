@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -106,10 +106,10 @@ export const resultsRouter = createTRPCRouter({
 			}),
 		)
 		.query(async ({ ctx, input }) => {
-			// Get all rounds for the tournament
+			// Get all rounds for the tournament (most recent first)
 			const tournamentRounds = await ctx.db.query.rounds.findMany({
 				where: eq(rounds.tournamentId, input.tournamentId),
-				orderBy: [rounds.roundNumber],
+				orderBy: [desc(rounds.roundNumber)],
 				with: {
 					matches: {
 						where: isNull(matches.deletedAt),
@@ -121,16 +121,18 @@ export const resultsRouter = createTRPCRouter({
 
 			// Get all user picks for this tournament
 			const roundIds = tournamentRounds.map((r) => r.id);
-			const userPicks = await ctx.db.query.userRoundPicks.findMany({
-				where: and(
-					eq(userRoundPicks.userId, ctx.user.id),
-					// @ts-expect-error - inArray type issue
-					eq(userRoundPicks.roundId, roundIds),
-				),
-				with: {
-					matchPicks: true,
-				},
-			});
+			const userPicks =
+				roundIds.length > 0
+					? await ctx.db.query.userRoundPicks.findMany({
+							where: and(
+								eq(userRoundPicks.userId, ctx.user.id),
+								inArray(userRoundPicks.roundId, roundIds),
+							),
+							with: {
+								matchPicks: true,
+							},
+						})
+					: [];
 
 			// Map rounds with matches and user picks
 			const roundsWithPicks = tournamentRounds.map((round) => {
