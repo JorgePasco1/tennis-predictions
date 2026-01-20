@@ -19,8 +19,6 @@ export function BracketConnectors({
 	const playerRowHeight = matchHeight / 2; // Half of match card height
 	const connectorOffset = playerRowHeight; // Connect at player divider (middle of card)
 	const hLineWidth = 20; // Horizontal line from card edge
-	const vLineX = hLineWidth; // Vertical line X position
-	const connectorSpace = 60; // Total space reserved for connectors on the right
 
 	// Calculate if this is top or bottom of a pair
 	const isTopOfPair = matchIndex % 2 === 0;
@@ -53,7 +51,7 @@ export function BracketConnectors({
 			<div
 				className="absolute h-0.5 bg-border"
 				style={{
-					right: `${connectorSpace}px`,
+					right: "56px",
 					top: `${matchConnectY}px`,
 					width: `${hLineWidth}px`,
 				}}
@@ -64,7 +62,7 @@ export function BracketConnectors({
 				<div
 					className="absolute w-0.5 bg-border"
 					style={{
-						right: `${connectorSpace - vLineX}px`,
+						right: "56px",
 						top: `${vLineTop}px`,
 						height: `${vLineHeight}px`,
 					}}
@@ -76,9 +74,9 @@ export function BracketConnectors({
 				<div
 					className="absolute h-0.5 bg-border"
 					style={{
-						right: "0",
+						right: "16px",
 						top: `${nextMatchConnectY}px`,
-						width: `${connectorSpace - hLineWidth}px`,
+						width: "40px",
 					}}
 				/>
 			)}

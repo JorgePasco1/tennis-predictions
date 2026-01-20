@@ -28,6 +28,7 @@ export interface MatchData {
 interface BracketMatchProps {
 	match: MatchData;
 	compact?: boolean;
+	variant?: "compact" | "mobile";
 	onClick?: (matchId: number) => void;
 }
 
@@ -44,6 +45,7 @@ function formatPlayerName(name: string, seed: number | null, maxLength = 20) {
 export function BracketMatch({
 	match,
 	compact = false,
+	variant = "compact",
 	onClick,
 }: BracketMatchProps) {
 	const isClickable = !!onClick;
@@ -55,6 +57,24 @@ export function BracketMatch({
 	const isFinalized = match.status === "finalized";
 	const isRetirement = match.isRetirement;
 	const userPick = match.userPick;
+
+	// Variant configurations
+	const variantConfig = {
+		compact: {
+			width: "w-44",
+			textSize: "text-xs",
+			padding: "px-2 py-1.5",
+			nameMaxLength: 16,
+		},
+		mobile: {
+			width: "w-full",
+			textSize: "text-sm",
+			padding: "px-3 py-2",
+			nameMaxLength: 30,
+		},
+	};
+
+	const config = variantConfig[variant];
 
 	const isPlayer1Winner = match.winnerName === match.player1Name;
 	const isPlayer2Winner = match.winnerName === match.player2Name;
@@ -81,7 +101,9 @@ export function BracketMatch({
 		return (
 			<div
 				className={cn(
-					"w-44 rounded border bg-card text-xs shadow-sm",
+					config.width,
+					config.textSize,
+					"rounded border bg-card shadow-sm",
 					isFinalized &&
 						userPick &&
 						!isRetirement &&
@@ -102,7 +124,8 @@ export function BracketMatch({
 				{/* Player 1 */}
 				<div
 					className={cn(
-						"flex items-center justify-between border-b px-2 py-1.5",
+						"flex items-center justify-between border-b",
+						config.padding,
 						isFinalized && isPlayer1Winner && "bg-green-50 font-semibold",
 					)}
 				>
@@ -113,7 +136,11 @@ export function BracketMatch({
 								isFinalized && !isPlayer1Winner && "text-muted-foreground",
 							)}
 						>
-							{formatPlayerName(match.player1Name, match.player1Seed, 16)}
+							{formatPlayerName(
+								match.player1Name,
+								match.player1Seed,
+								config.nameMaxLength,
+							)}
 						</span>
 						{userPickedPlayer1 && (
 							<span
@@ -145,7 +172,8 @@ export function BracketMatch({
 				{/* Player 2 */}
 				<div
 					className={cn(
-						"flex items-center justify-between px-2 py-1.5",
+						"flex items-center justify-between",
+						config.padding,
 						isFinalized && isPlayer2Winner && "bg-green-50 font-semibold",
 					)}
 				>
@@ -156,7 +184,11 @@ export function BracketMatch({
 								isFinalized && !isPlayer2Winner && "text-muted-foreground",
 							)}
 						>
-							{formatPlayerName(match.player2Name, match.player2Seed, 16)}
+							{formatPlayerName(
+								match.player2Name,
+								match.player2Seed,
+								config.nameMaxLength,
+							)}
 						</span>
 						{userPickedPlayer2 && (
 							<span

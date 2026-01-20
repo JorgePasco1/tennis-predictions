@@ -1,8 +1,8 @@
 "use client";
 
 import { BracketConnectors } from "./BracketConnectors";
+import { BracketMatch } from "./BracketMatch";
 import type { RoundData } from "./MobileBracket";
-import { MobileMatchCard } from "./MobileMatchCard";
 
 interface MobileRoundViewProps {
 	round: RoundData;
@@ -35,9 +35,9 @@ export function MobileRoundView({
 	};
 
 	return (
-		<div className="px-4" style={{ minHeight: `${calculateHeight()}px` }}>
+		<div style={{ minHeight: `${calculateHeight()}px`, width: "100vw" }}>
 			{/* Round header */}
-			<h3 className="sticky top-0 z-10 mb-4 bg-background py-2 text-center font-semibold text-lg">
+			<h3 className="sticky top-0 z-10 mb-4 bg-background px-4 py-2 text-center font-semibold text-lg">
 				{round.name}
 			</h3>
 
@@ -55,11 +55,18 @@ export function MobileRoundView({
 								className="absolute"
 								style={{
 									top: `${topPosition}px`,
-									left: 0,
-									right: hasNextRound ? "60px" : "0", // Space for connectors
+									left: "16px",
+									width: hasNextRound
+										? "calc(100vw - 92px)"
+										: "calc(100vw - 32px)",
 								}}
 							>
-								<MobileMatchCard match={match} onClick={onMatchClick} />
+								<BracketMatch
+									compact
+									match={match}
+									onClick={onMatchClick}
+									variant="mobile"
+								/>
 							</div>
 
 							{/* Connector lines (if not last round) */}
