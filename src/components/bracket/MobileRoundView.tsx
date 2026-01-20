@@ -19,23 +19,23 @@ export function MobileRoundView({
 }: MobileRoundViewProps) {
 	const matchHeight = 80; // Taller than desktop (56px)
 	const matchGap = 24;
-	const unitHeight = matchHeight + matchGap;
+	const topPadding = 16; // Space above first match
+	const bottomPadding = 80; // Space below last match (includes shadows/borders)
 
-	// Calculate spacing for this round (matches double in vertical spacing each round)
-	const spacingMultiplier = 2 ** roundIndex;
-	const offsetInUnits = (spacingMultiplier - 1) / 2;
-
-	// Calculate minimum height needed for this round
+	// Calculate minimum height needed for this round with constant spacing
 	const calculateHeight = () => {
 		if (round.matches.length === 0) return 200;
-		const lastMatchIndex = round.matches.length - 1;
-		const lastMatchTopInUnits =
-			offsetInUnits + lastMatchIndex * spacingMultiplier;
-		return lastMatchTopInUnits * unitHeight + matchHeight + 80; // +80 for bottom padding (includes shadows/borders)
+		const matchCount = round.matches.length;
+
+		// Total height = top padding + all matches + gaps between matches + bottom padding
+		const totalMatchesHeight = matchCount * matchHeight;
+		const totalGapsHeight = (matchCount - 1) * matchGap;
+
+		return topPadding + totalMatchesHeight + totalGapsHeight + bottomPadding;
 	};
 
 	return (
-		<div style={{ minHeight: `${calculateHeight()}px`, width: "100%" }}>
+		<div style={{ height: `${calculateHeight()}px`, width: "100%" }}>
 			{/* Round header */}
 			<h3 className="sticky top-0 z-10 mb-4 bg-background px-4 py-2 text-center font-semibold text-lg">
 				{round.name}
@@ -44,9 +44,8 @@ export function MobileRoundView({
 			{/* Container for matches and connectors */}
 			<div className="relative">
 				{round.matches.map((match, matchIndex) => {
-					// Calculate top position for this match
-					const topInUnits = offsetInUnits + matchIndex * spacingMultiplier;
-					const topPosition = topInUnits * unitHeight;
+					// Simple sequential positioning: top padding + (match index × unit size)
+					const topPosition = topPadding + matchIndex * (matchHeight + matchGap);
 
 					return (
 						<div key={match.id}>

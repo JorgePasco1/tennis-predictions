@@ -19,6 +19,7 @@ export function BracketConnectors({
 	const playerRowHeight = matchHeight / 2; // Half of match card height
 	const connectorOffset = playerRowHeight; // Connect at player divider (middle of card)
 	const hLineWidth = 20; // Horizontal line from card edge
+	const topPadding = 16; // Space above first match (matches MobileRoundView)
 
 	// Calculate if this is top or bottom of a pair
 	const isTopOfPair = matchIndex % 2 === 0;
@@ -27,23 +28,19 @@ export function BracketConnectors({
 	// Y positions for this match
 	const matchConnectY = topPosition + connectorOffset;
 
-	// Y position for pair partner
-	const pairPartnerTopPosition = pairPartnerIndex * (matchHeight + matchGap);
+	// Y position for pair partner using constant spacing formula
+	const pairPartnerTopPosition =
+		topPadding + pairPartnerIndex * (matchHeight + matchGap);
 	const pairPartnerConnectY = pairPartnerTopPosition + connectorOffset;
 
-	// Next round match position (midpoint between pair)
-	const nextMatchIndex = Math.floor(matchIndex / 2);
-	const nextSpacingMultiplier = 2 ** (roundIndex + 1);
-	const unitHeight = matchHeight + matchGap;
-	const nextOffsetInUnits = (nextSpacingMultiplier - 1) / 2;
-	const nextTopInUnits =
-		nextOffsetInUnits + nextMatchIndex * nextSpacingMultiplier;
-	const nextMatchConnectY = nextTopInUnits * unitHeight + connectorOffset;
-
-	// Vertical line height
+	// Vertical line height and position
 	const vLineTop = isTopOfPair ? matchConnectY : pairPartnerConnectY;
 	const vLineBottom = isTopOfPair ? pairPartnerConnectY : matchConnectY;
 	const vLineHeight = Math.abs(vLineBottom - vLineTop);
+
+	// Horizontal line to next round should be at midpoint of vertical line
+	// (this is where the two matches feed into the next round)
+	const nextRoundConnectY = vLineTop + vLineHeight / 2;
 
 	return (
 		<>
@@ -75,7 +72,7 @@ export function BracketConnectors({
 					className="absolute h-0.5 bg-border"
 					style={{
 						right: "16px",
-						top: `${nextMatchConnectY}px`,
+						top: `${nextRoundConnectY}px`,
 						width: "40px",
 					}}
 				/>

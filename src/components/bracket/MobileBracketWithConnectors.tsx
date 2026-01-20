@@ -45,6 +45,23 @@ export function MobileBracketWithConnectors({
 	// Transform calculation for sliding (percentage-based)
 	const translateXPercent = -(selectedRoundIndex * 100); // Each round is 100% of container width
 
+	// Calculate height for currently selected round (same formula as MobileRoundView)
+	const calculateRoundHeight = (round: RoundData): number => {
+		if (round.matches.length === 0) return 200;
+		const matchHeight = 80;
+		const matchGap = 24;
+		const topPadding = 16;
+		const bottomPadding = 80;
+		const matchCount = round.matches.length;
+		const totalMatchesHeight = matchCount * matchHeight;
+		const totalGapsHeight = (matchCount - 1) * matchGap;
+		return topPadding + totalMatchesHeight + totalGapsHeight + bottomPadding;
+	};
+
+	const currentRoundHeight = calculateRoundHeight(
+		sortedRounds[selectedRoundIndex] ?? sortedRounds[0]!,
+	);
+
 	if (sortedRounds.length === 0) {
 		return (
 			<div className="py-8 text-center text-muted-foreground">
@@ -63,7 +80,13 @@ export function MobileBracketWithConnectors({
 			/>
 
 			{/* Sliding viewport - break out of parent padding with negative margins */}
-			<div className="-mx-4 overflow-hidden">
+			<div
+				className="-mx-4 overflow-hidden"
+				style={{
+					height: `${currentRoundHeight}px`,
+					transition: "height 0.3s ease-in-out",
+				}}
+			>
 				<div
 					style={{
 						display: "flex",
