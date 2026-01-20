@@ -97,9 +97,11 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 								className={cn(
 									"size-1.5 shrink-0 rounded-full",
 									isFinalized
-										? userPick?.isWinnerCorrect
-											? "bg-green-500"
-											: "bg-red-500"
+										? isRetirement
+											? "bg-gray-400"
+											: userPick?.isWinnerCorrect
+												? "bg-green-500"
+												: "bg-red-500"
 										: "bg-blue-500",
 								)}
 							/>
@@ -138,9 +140,11 @@ export function BracketMatch({ match, compact = false }: BracketMatchProps) {
 								className={cn(
 									"size-1.5 shrink-0 rounded-full",
 									isFinalized
-										? userPick?.isWinnerCorrect
-											? "bg-green-500"
-											: "bg-red-500"
+										? isRetirement
+											? "bg-gray-400"
+											: userPick?.isWinnerCorrect
+												? "bg-green-500"
+												: "bg-red-500"
 										: "bg-blue-500",
 								)}
 							/>
