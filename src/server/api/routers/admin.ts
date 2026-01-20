@@ -387,7 +387,7 @@ export const adminRouter = createTRPCRouter({
 		}),
 
 	/**
-	 * Finalize a match result
+	 * Finalize a match result and propagate winner to next round if it exists
 	 */
 	finalizeMatch: adminProcedure
 		.input(
@@ -401,9 +401,24 @@ export const adminRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			// Get the match
+			// Get the match with its round and tournament info
 			const match = await ctx.db.query.matches.findFirst({
 				where: and(eq(matches.id, input.matchId), isNull(matches.deletedAt)),
+				with: {
+					round: {
+						with: {
+							tournament: {
+								with: {
+									rounds: {
+										with: {
+											matches: true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			});
 
 			if (!match) {
@@ -461,6 +476,36 @@ export const adminRouter = createTRPCRouter({
 
 			// Calculate scores for all picks on this match
 			await calculateMatchPickScores(ctx.db, input.matchId);
+
+			// Propagate winner to next round if it exists
+			const nextRound = match.round.tournament.rounds.find(
+				(r) => r.roundNumber === match.round.roundNumber + 1,
+			);
+
+			if (nextRound) {
+				// Calculate which match in next round this winner goes to
+				// Match 1 & 2 → Next Match 1, Match 3 & 4 → Next Match 2, etc.
+				const nextMatchNumber = Math.ceil(match.matchNumber / 2);
+
+				// Find the next match
+				const nextMatch = nextRound.matches.find(
+					(m) => m.matchNumber === nextMatchNumber && !m.deletedAt,
+				);
+
+				if (nextMatch) {
+					// Odd match numbers → player1, Even match numbers → player2
+					const isPlayer1 = match.matchNumber % 2 === 1;
+
+					await ctx.db
+						.update(matches)
+						.set(
+							isPlayer1
+								? { player1Name: input.winnerName }
+								: { player2Name: input.winnerName },
+						)
+						.where(eq(matches.id, nextMatch.id));
+				}
+			}
 
 			return updatedMatch;
 		}),
@@ -556,7 +601,134 @@ export const adminRouter = createTRPCRouter({
 		}),
 
 	/**
-	 * Close a round - finalize it and propagate winners to next round
+	 * Update round dates (opens_at and deadline)
+	 */
+	updateRoundDates: adminProcedure
+		.input(
+			z.object({
+				roundId: z.number().int(),
+				opensAt: z.string().datetime().nullable().optional(),
+				deadline: z.string().datetime().nullable().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const round = await ctx.db.query.rounds.findFirst({
+				where: eq(rounds.id, input.roundId),
+			});
+
+			if (!round) {
+				throw new Error("Round not found");
+			}
+
+			const updateData: {
+				opensAt?: Date | null;
+				deadline?: Date | null;
+			} = {};
+
+			if (input.opensAt !== undefined) {
+				updateData.opensAt = input.opensAt ? new Date(input.opensAt) : null;
+			}
+
+			if (input.deadline !== undefined) {
+				updateData.deadline = input.deadline ? new Date(input.deadline) : null;
+			}
+
+			const [updatedRound] = await ctx.db
+				.update(rounds)
+				.set(updateData)
+				.where(eq(rounds.id, input.roundId))
+				.returning();
+
+			return updatedRound;
+		}),
+
+	/**
+	 * Manually create a new round for a tournament
+	 */
+	createRound: adminProcedure
+		.input(
+			z.object({
+				tournamentId: z.number().int(),
+				name: z.string().min(1),
+				matchCount: z.number().int().min(1).max(128),
+				opensAt: z.string().datetime().nullable().optional(),
+				deadline: z.string().datetime().nullable().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get the tournament with its rounds
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(
+					eq(tournaments.id, input.tournamentId),
+					isNull(tournaments.deletedAt),
+				),
+				with: {
+					rounds: true,
+				},
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			// Calculate the next round number
+			const maxRoundNumber = tournament.rounds.reduce(
+				(max, r) => Math.max(max, r.roundNumber),
+				0,
+			);
+			const roundNumber = maxRoundNumber + 1;
+
+			// Create the round and its matches in a transaction
+			return await ctx.db.transaction(async (tx) => {
+				// Create the round
+				const [newRound] = await tx
+					.insert(rounds)
+					.values({
+						tournamentId: input.tournamentId,
+						roundNumber,
+						name: input.name,
+						isActive: false,
+						isFinalized: false,
+						opensAt: input.opensAt ? new Date(input.opensAt) : null,
+						deadline: input.deadline ? new Date(input.deadline) : null,
+					})
+					.returning();
+
+				if (!newRound) {
+					throw new Error("Failed to create round");
+				}
+
+				// Create scoring rules for the round
+				const scoring = getScoringForRound(input.name);
+				await tx.insert(roundScoringRules).values({
+					roundId: newRound.id,
+					pointsPerWinner: scoring.pointsPerWinner,
+					pointsExactScore: scoring.pointsExactScore,
+				});
+
+				// Create matches for the round
+				const matchValues = [];
+				for (let i = 0; i < input.matchCount; i++) {
+					matchValues.push({
+						roundId: newRound.id,
+						matchNumber: i + 1,
+						player1Name: "TBD",
+						player2Name: "TBD",
+						status: "pending" as const,
+					});
+				}
+
+				await tx.insert(matches).values(matchValues);
+
+				return {
+					...newRound,
+					matchCount: input.matchCount,
+				};
+			});
+		}),
+
+	/**
+	 * Close a round - finalize it, create next round if needed, and propagate winners
 	 */
 	closeRound: adminProcedure
 		.input(
@@ -602,8 +774,18 @@ export const adminRouter = createTRPCRouter({
 				);
 			}
 
-			// Find the next round (by round number)
-			const nextRound = round.tournament.rounds.find(
+			// Get winners from current round sorted by match number
+			const currentMatchWinners = round.matches
+				.filter((m) => !m.deletedAt && m.winnerName)
+				.sort((a, b) => a.matchNumber - b.matchNumber)
+				.map((m) => m.winnerName as string);
+
+			// Determine if this is the final round (no next round possible)
+			const nextRoundName = getNextRoundName(round.name);
+			const isFinalRound = nextRoundName === null;
+
+			// Find existing next round (by round number)
+			const existingNextRound = round.tournament.rounds.find(
 				(r) => r.roundNumber === round.roundNumber + 1,
 			);
 
@@ -615,16 +797,80 @@ export const adminRouter = createTRPCRouter({
 					.set({ isFinalized: true })
 					.where(eq(rounds.id, input.roundId));
 
-				// Propagate winners to next round if it exists
-				if (nextRound) {
-					// Get winners from current round sorted by match number
-					const currentMatchWinners = round.matches
-						.filter((m) => !m.deletedAt && m.winnerName)
-						.sort((a, b) => a.matchNumber - b.matchNumber)
-						.map((m) => m.winnerName);
+				// If this is the final round, just return
+				if (isFinalRound) {
+					return {
+						success: true,
+						hasNextRound: false,
+						nextRoundActivated: false,
+						nextRoundCreated: false,
+					};
+				}
 
-					// Get next round matches sorted by match number
-					const nextRoundMatches = nextRound.matches
+				let nextRoundId: number;
+				let nextRoundCreated = false;
+
+				// Create next round if it doesn't exist
+				if (!existingNextRound) {
+					// Calculate number of matches for next round (half of current)
+					const nextRoundMatchCount = Math.floor(
+						currentMatchWinners.length / 2,
+					);
+
+					if (nextRoundMatchCount === 0) {
+						throw new Error(
+							"Cannot create next round: not enough winners from current round",
+						);
+					}
+
+					// Create the next round
+					const [newRound] = await tx
+						.insert(rounds)
+						.values({
+							tournamentId: round.tournament.id,
+							roundNumber: round.roundNumber + 1,
+							name: nextRoundName,
+							isActive: false,
+							isFinalized: false,
+						})
+						.returning();
+
+					if (!newRound) {
+						throw new Error("Failed to create next round");
+					}
+
+					nextRoundId = newRound.id;
+					nextRoundCreated = true;
+
+					// Create scoring rules for the new round
+					const scoring = getScoringForRound(nextRoundName);
+					await tx.insert(roundScoringRules).values({
+						roundId: newRound.id,
+						pointsPerWinner: scoring.pointsPerWinner,
+						pointsExactScore: scoring.pointsExactScore,
+					});
+
+					// Create matches for the next round with player names from winners
+					const matchValues = [];
+					for (let i = 0; i < nextRoundMatchCount; i++) {
+						const player1Index = i * 2;
+						const player2Index = i * 2 + 1;
+
+						matchValues.push({
+							roundId: newRound.id,
+							matchNumber: i + 1,
+							player1Name: currentMatchWinners[player1Index] ?? "TBD",
+							player2Name: currentMatchWinners[player2Index] ?? "TBD",
+							status: "pending" as const,
+						});
+					}
+
+					await tx.insert(matches).values(matchValues);
+				} else {
+					// Next round exists, just update player names
+					nextRoundId = existingNextRound.id;
+
+					const nextRoundMatches = existingNextRound.matches
 						.filter((m) => !m.deletedAt)
 						.sort((a, b) => a.matchNumber - b.matchNumber);
 
@@ -656,37 +902,55 @@ export const adminRouter = createTRPCRouter({
 								.where(eq(matches.id, nextRoundMatches[i]!.id));
 						}
 					}
+				}
 
-					// Optionally activate the next round
-					if (input.activateNextRound) {
-						// Deactivate all rounds first
-						await tx
-							.update(rounds)
-							.set({ isActive: false })
-							.where(eq(rounds.tournamentId, round.tournament.id));
+				// Optionally activate the next round
+				if (input.activateNextRound) {
+					// Deactivate all rounds first
+					await tx
+						.update(rounds)
+						.set({ isActive: false })
+						.where(eq(rounds.tournamentId, round.tournament.id));
 
-						// Activate next round
-						await tx
-							.update(rounds)
-							.set({ isActive: true })
-							.where(eq(rounds.id, nextRound.id));
+					// Activate next round
+					await tx
+						.update(rounds)
+						.set({ isActive: true })
+						.where(eq(rounds.id, nextRoundId));
 
-						// Update tournament's current round number
-						await tx
-							.update(tournaments)
-							.set({ currentRoundNumber: nextRound.roundNumber })
-							.where(eq(tournaments.id, round.tournament.id));
-					}
+					// Update tournament's current round number
+					await tx
+						.update(tournaments)
+						.set({ currentRoundNumber: round.roundNumber + 1 })
+						.where(eq(tournaments.id, round.tournament.id));
 				}
 
 				return {
 					success: true,
-					hasNextRound: !!nextRound,
-					nextRoundActivated: input.activateNextRound && !!nextRound,
+					hasNextRound: true,
+					nextRoundActivated: input.activateNextRound,
+					nextRoundCreated,
 				};
 			});
 		}),
 });
+
+/**
+ * Get the next round name based on the current round name
+ * Returns null if the tournament is over (current round is Final)
+ */
+function getNextRoundName(currentRoundName: string): string | null {
+	const roundProgression: Record<string, string> = {
+		"Round of 128": "Round of 64",
+		"Round of 64": "Round of 32",
+		"Round of 32": "Round of 16",
+		"Round of 16": "Quarter Finals",
+		"Quarter Finals": "Semi Finals",
+		"Semi Finals": "Final",
+	};
+
+	return roundProgression[currentRoundName] ?? null;
+}
 
 /**
  * Generate a URL-friendly slug from tournament name and year

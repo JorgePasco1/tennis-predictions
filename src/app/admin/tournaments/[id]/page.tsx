@@ -73,15 +73,42 @@ export default function AdminTournamentManagePage({
 	const closeRoundMutation = api.admin.closeRound.useMutation({
 		onSuccess: (result) => {
 			refetch();
-			const message = result.nextRoundActivated
-				? "Round closed! Next round has been activated."
-				: result.hasNextRound
-					? "Round closed! Winners have been propagated to the next round."
-					: "Round closed!";
+			let message = "Round closed!";
+			if (result.nextRoundCreated && result.nextRoundActivated) {
+				message = "Round closed! Next round created and activated.";
+			} else if (result.nextRoundCreated) {
+				message = "Round closed! Next round created with winners.";
+			} else if (result.nextRoundActivated) {
+				message = "Round closed! Next round has been activated.";
+			} else if (result.hasNextRound) {
+				message = "Round closed! Winners propagated to next round.";
+			}
 			toast.success(message);
 		},
 		onError: (error) => {
 			toast.error(error.message || "Failed to close round");
+		},
+	});
+
+	const updateRoundDatesMutation = api.admin.updateRoundDates.useMutation({
+		onSuccess: () => {
+			refetch();
+			toast.success("Round dates updated successfully");
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to update round dates");
+		},
+	});
+
+	const createRoundMutation = api.admin.createRound.useMutation({
+		onSuccess: (result) => {
+			refetch();
+			toast.success(`Round "${result.name}" created with ${result.matchCount} matches`);
+			setShowCreateRoundDialog(false);
+			setCreateRoundForm({ name: "", matchCount: 32, opensAt: "", deadline: "" });
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to create round");
 		},
 	});
 
@@ -119,6 +146,18 @@ export default function AdminTournamentManagePage({
 		hasNextRound: boolean;
 	} | null>(null);
 	const [activateNextRound, setActivateNextRound] = useState(false);
+	const [showCreateRoundDialog, setShowCreateRoundDialog] = useState(false);
+	const [createRoundForm, setCreateRoundForm] = useState({
+		name: "",
+		matchCount: 32,
+		opensAt: "",
+		deadline: "",
+	});
+	const [editingRoundDates, setEditingRoundDates] = useState<number | null>(null);
+	const [roundDatesForm, setRoundDatesForm] = useState({
+		opensAt: "",
+		deadline: "",
+	});
 
 	if (!tournament) {
 		return (
@@ -275,6 +314,62 @@ export default function AdminTournamentManagePage({
 			// Error toast is already handled by the mutation's onError
 			console.error("Failed to close round:", error);
 		}
+	};
+
+	const handleCreateRound = async () => {
+		if (!createRoundForm.name || createRoundForm.matchCount < 1) {
+			toast.error("Please enter a round name and match count");
+			return;
+		}
+
+		try {
+			await createRoundMutation.mutateAsync({
+				tournamentId,
+				name: createRoundForm.name,
+				matchCount: createRoundForm.matchCount,
+				opensAt: createRoundForm.opensAt || null,
+				deadline: createRoundForm.deadline || null,
+			});
+		} catch (error) {
+			console.error("Failed to create round:", error);
+		}
+	};
+
+	const handleStartEditRoundDates = (roundId: number) => {
+		const round = tournament.rounds.find((r) => r.id === roundId);
+		if (!round) return;
+
+		setEditingRoundDates(roundId);
+		setRoundDatesForm({
+			opensAt: round.opensAt
+				? new Date(round.opensAt).toISOString().slice(0, 16)
+				: "",
+			deadline: round.deadline
+				? new Date(round.deadline).toISOString().slice(0, 16)
+				: "",
+		});
+	};
+
+	const handleSaveRoundDates = async (roundId: number) => {
+		try {
+			await updateRoundDatesMutation.mutateAsync({
+				roundId,
+				opensAt: roundDatesForm.opensAt
+					? new Date(roundDatesForm.opensAt).toISOString()
+					: null,
+				deadline: roundDatesForm.deadline
+					? new Date(roundDatesForm.deadline).toISOString()
+					: null,
+			});
+			setEditingRoundDates(null);
+		} catch (error) {
+			console.error("Failed to update round dates:", error);
+		}
+	};
+
+	const handleCancelEditRoundDates = () => {
+		setEditingRoundDates(null);
+		setRoundDatesForm({ opensAt: "", deadline: "" });
 	};
 
 	const currentRound = tournament.rounds.find((r) => r.isActive);
@@ -465,9 +560,18 @@ export default function AdminTournamentManagePage({
 
 				{/* Round Management */}
 				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
-						Active Round
-					</h2>
+					<div className="mb-4 flex items-center justify-between">
+						<h2 className="font-semibold text-gray-900 text-xl">
+							Active Round
+						</h2>
+						<button
+							className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700"
+							onClick={() => setShowCreateRoundDialog(true)}
+							type="button"
+						>
+							+ Create Round
+						</button>
+					</div>
 					<p className="mb-4 text-gray-600">
 						Current: {currentRound?.name ?? "None selected"}
 					</p>
@@ -482,9 +586,126 @@ export default function AdminTournamentManagePage({
 								disabled={round.isActive || setActiveRoundMutation.isPending}
 								key={round.id}
 								onClick={() => handleSetActiveRound(round.roundNumber)}
+								type="button"
 							>
 								{round.name}
 							</button>
+						))}
+					</div>
+				</div>
+
+				{/* Round Schedule */}
+				<div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+					<h2 className="mb-4 font-semibold text-gray-900 text-xl">
+						Round Schedule
+					</h2>
+					<p className="mb-4 text-gray-600 text-sm">
+						Set when each round opens for submissions and its deadline.
+					</p>
+					<div className="space-y-4">
+						{tournament.rounds.map((round) => (
+							<div
+								className="rounded border border-gray-200 p-4"
+								key={round.id}
+							>
+								<div className="flex items-center justify-between">
+									<div>
+										<span className="font-medium">{round.name}</span>
+										{editingRoundDates !== round.id && (
+											<div className="mt-1 text-gray-500 text-sm">
+												<span>
+													Opens:{" "}
+													{round.opensAt
+														? new Date(round.opensAt).toLocaleString()
+														: "Not set"}
+												</span>
+												<span className="mx-2">|</span>
+												<span>
+													Deadline:{" "}
+													{round.deadline
+														? new Date(round.deadline).toLocaleString()
+														: "Not set"}
+												</span>
+											</div>
+										)}
+									</div>
+									{editingRoundDates !== round.id && (
+										<button
+											className="rounded bg-gray-100 px-3 py-1 text-gray-700 text-sm hover:bg-gray-200"
+											onClick={() => handleStartEditRoundDates(round.id)}
+											type="button"
+										>
+											Edit Dates
+										</button>
+									)}
+								</div>
+
+								{editingRoundDates === round.id && (
+									<div className="mt-4 space-y-3">
+										<div className="grid gap-4 md:grid-cols-2">
+											<div>
+												<label
+													className="mb-1 block font-medium text-gray-700 text-sm"
+													htmlFor={`opensAt-${round.id}`}
+												>
+													Opens At
+												</label>
+												<input
+													className="w-full rounded border border-gray-300 px-3 py-2"
+													id={`opensAt-${round.id}`}
+													onChange={(e) =>
+														setRoundDatesForm((prev) => ({
+															...prev,
+															opensAt: e.target.value,
+														}))
+													}
+													type="datetime-local"
+													value={roundDatesForm.opensAt}
+												/>
+											</div>
+											<div>
+												<label
+													className="mb-1 block font-medium text-gray-700 text-sm"
+													htmlFor={`deadline-${round.id}`}
+												>
+													Deadline
+												</label>
+												<input
+													className="w-full rounded border border-gray-300 px-3 py-2"
+													id={`deadline-${round.id}`}
+													onChange={(e) =>
+														setRoundDatesForm((prev) => ({
+															...prev,
+															deadline: e.target.value,
+														}))
+													}
+													type="datetime-local"
+													value={roundDatesForm.deadline}
+												/>
+											</div>
+										</div>
+										<div className="flex gap-2">
+											<button
+												className="rounded bg-green-600 px-4 py-2 font-medium text-white text-sm hover:bg-green-700 disabled:opacity-50"
+												disabled={updateRoundDatesMutation.isPending}
+												onClick={() => handleSaveRoundDates(round.id)}
+												type="button"
+											>
+												{updateRoundDatesMutation.isPending
+													? "Saving..."
+													: "Save"}
+											</button>
+											<button
+												className="rounded bg-gray-200 px-4 py-2 font-medium text-gray-700 text-sm hover:bg-gray-300"
+												onClick={handleCancelEditRoundDates}
+												type="button"
+											>
+												Cancel
+											</button>
+										</div>
+									</div>
+								)}
+							</div>
 						))}
 					</div>
 				</div>
@@ -1067,6 +1288,133 @@ export default function AdminTournamentManagePage({
 							onClick={handleConfirmCloseRound}
 						>
 							Close Round
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Create Round Dialog */}
+			<AlertDialog
+				onOpenChange={setShowCreateRoundDialog}
+				open={showCreateRoundDialog}
+			>
+				<AlertDialogContent className="max-w-md">
+					<AlertDialogHeader>
+						<AlertDialogTitle>Create New Round</AlertDialogTitle>
+						<AlertDialogDescription asChild>
+							<div className="space-y-4 pt-4">
+								<div>
+									<label
+										className="mb-1 block font-medium text-gray-700 text-sm"
+										htmlFor="roundName"
+									>
+										Round Name
+									</label>
+									<select
+										className="w-full rounded border border-gray-300 px-3 py-2"
+										id="roundName"
+										onChange={(e) =>
+											setCreateRoundForm((prev) => ({
+												...prev,
+												name: e.target.value,
+											}))
+										}
+										value={createRoundForm.name}
+									>
+										<option value="">Select a round name...</option>
+										<option value="Round of 128">Round of 128</option>
+										<option value="Round of 64">Round of 64</option>
+										<option value="Round of 32">Round of 32</option>
+										<option value="Round of 16">Round of 16</option>
+										<option value="Quarter Finals">Quarter Finals</option>
+										<option value="Semi Finals">Semi Finals</option>
+										<option value="Final">Final</option>
+									</select>
+								</div>
+								<div>
+									<label
+										className="mb-1 block font-medium text-gray-700 text-sm"
+										htmlFor="matchCount"
+									>
+										Number of Matches
+									</label>
+									<input
+										className="w-full rounded border border-gray-300 px-3 py-2"
+										id="matchCount"
+										max={128}
+										min={1}
+										onChange={(e) =>
+											setCreateRoundForm((prev) => ({
+												...prev,
+												matchCount: Number.parseInt(e.target.value, 10) || 1,
+											}))
+										}
+										type="number"
+										value={createRoundForm.matchCount}
+									/>
+								</div>
+								<div>
+									<label
+										className="mb-1 block font-medium text-gray-700 text-sm"
+										htmlFor="createOpensAt"
+									>
+										Opens At (optional)
+									</label>
+									<input
+										className="w-full rounded border border-gray-300 px-3 py-2"
+										id="createOpensAt"
+										onChange={(e) =>
+											setCreateRoundForm((prev) => ({
+												...prev,
+												opensAt: e.target.value,
+											}))
+										}
+										type="datetime-local"
+										value={createRoundForm.opensAt}
+									/>
+								</div>
+								<div>
+									<label
+										className="mb-1 block font-medium text-gray-700 text-sm"
+										htmlFor="createDeadline"
+									>
+										Deadline (optional)
+									</label>
+									<input
+										className="w-full rounded border border-gray-300 px-3 py-2"
+										id="createDeadline"
+										onChange={(e) =>
+											setCreateRoundForm((prev) => ({
+												...prev,
+												deadline: e.target.value,
+											}))
+										}
+										type="datetime-local"
+										value={createRoundForm.deadline}
+									/>
+								</div>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel
+							onClick={() =>
+								setCreateRoundForm({
+									name: "",
+									matchCount: 32,
+									opensAt: "",
+									deadline: "",
+								})
+							}
+						>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-blue-600 hover:bg-blue-700"
+							disabled={!createRoundForm.name || createRoundMutation.isPending}
+							onClick={handleCreateRound}
+						>
+							{createRoundMutation.isPending ? "Creating..." : "Create Round"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
