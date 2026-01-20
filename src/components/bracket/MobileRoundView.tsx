@@ -31,7 +31,7 @@ export function MobileRoundView({
 		const lastMatchIndex = round.matches.length - 1;
 		const lastMatchTopInUnits =
 			offsetInUnits + lastMatchIndex * spacingMultiplier;
-		return lastMatchTopInUnits * unitHeight + matchHeight + 40; // +40 for bottom padding
+		return lastMatchTopInUnits * unitHeight + matchHeight + 80; // +80 for bottom padding (includes shadows/borders)
 	};
 
 	return (
