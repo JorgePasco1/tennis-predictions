@@ -42,8 +42,8 @@ export function MobileBracketWithConnectors({
 	const [selectedRoundIndex, setSelectedRoundIndex] =
 		useState(getDefaultRoundIndex);
 
-	// Transform calculation for sliding
-	const translateX = -(selectedRoundIndex * 100); // Each round is 100vw wide
+	// Transform calculation for sliding (percentage-based)
+	const translateXPercent = -(selectedRoundIndex * 100); // Each round is 100% of container width
 
 	if (sortedRounds.length === 0) {
 		return (
@@ -62,18 +62,21 @@ export function MobileBracketWithConnectors({
 				selectedIndex={selectedRoundIndex}
 			/>
 
-			{/* Sliding viewport */}
-			<div className="overflow-hidden">
+			{/* Sliding viewport - break out of parent padding with negative margins */}
+			<div className="-mx-4 overflow-hidden">
 				<div
 					style={{
 						display: "flex",
-						transform: `translateX(${translateX}vw)`,
+						transform: `translateX(${translateXPercent}%)`,
 						transition: "transform 0.3s ease-in-out",
 						willChange: "transform",
 					}}
 				>
 					{sortedRounds.map((round, index) => (
-						<div key={round.id} style={{ minWidth: "100vw", width: "100vw" }}>
+						<div
+							key={round.id}
+							style={{ minWidth: "100%", width: "100%", flex: "0 0 100%" }}
+						>
 							<MobileRoundView
 								hasNextRound={index < sortedRounds.length - 1}
 								onMatchClick={onMatchClick}

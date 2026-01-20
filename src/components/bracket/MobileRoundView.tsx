@@ -35,7 +35,7 @@ export function MobileRoundView({
 	};
 
 	return (
-		<div style={{ minHeight: `${calculateHeight()}px`, width: "100vw" }}>
+		<div style={{ minHeight: `${calculateHeight()}px`, width: "100%" }}>
 			{/* Round header */}
 			<h3 className="sticky top-0 z-10 mb-4 bg-background px-4 py-2 text-center font-semibold text-lg">
 				{round.name}
@@ -56,9 +56,7 @@ export function MobileRoundView({
 								style={{
 									top: `${topPosition}px`,
 									left: "16px",
-									width: hasNextRound
-										? "calc(100vw - 92px)"
-										: "calc(100vw - 32px)",
+									right: hasNextRound ? "76px" : "16px",
 								}}
 							>
 								<BracketMatch
