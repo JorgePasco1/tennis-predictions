@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "~/components/ui/select";
+import { cn } from "~/lib/utils";
+import { getRoundAbbreviation } from "~/lib/round-utils";
 import { BracketMatch, type MatchData } from "./BracketMatch";
 
 export interface RoundData {
@@ -64,23 +59,28 @@ export function MobileBracket({ rounds, onMatchClick }: MobileBracketProps) {
 
 	return (
 		<div className="space-y-4">
-			{/* Round selector */}
-			<div className="flex items-center gap-2">
-				<span className="font-medium text-sm">Round:</span>
-				<Select onValueChange={setSelectedRoundId} value={selectedRoundId}>
-					<SelectTrigger className="w-48">
-						<SelectValue placeholder="Select round" />
-					</SelectTrigger>
-					<SelectContent>
-						{sortedRounds.map((round) => (
-							<SelectItem key={round.id} value={round.id.toString()}>
-								{round.name}
-								{round.isActive && " (Active)"}
-								{round.isFinalized && " (Done)"}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+			{/* Round selector - ATP style circular buttons */}
+			<div className="mb-4">
+				<div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+					{sortedRounds.map((round) => (
+						<button
+							key={round.id}
+							onClick={() => setSelectedRoundId(round.id.toString())}
+							aria-label={`${round.name}${round.isActive ? " (Active)" : ""}${round.isFinalized ? " (Finalized)" : ""}`}
+							aria-pressed={selectedRoundId === round.id.toString()}
+							className={cn(
+								"flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
+								"border-2 font-semibold text-sm transition-all",
+								selectedRoundId === round.id.toString()
+									? "border-primary bg-primary text-primary-foreground"
+									: "border-border bg-background text-foreground hover:border-primary/50",
+							)}
+							type="button"
+						>
+							{getRoundAbbreviation(round.name, round.roundNumber)}
+						</button>
+					))}
+				</div>
 			</div>
 
 			{/* Match list */}
