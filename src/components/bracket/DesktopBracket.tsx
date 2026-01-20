@@ -34,7 +34,10 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 	const firstRoundMatchCount = firstRound.matches.length;
 
 	// Match dimensions
-	const matchHeight = 76; // Height of compact match card
+	// Compact card: 2 player rows (28px each) + score row (~22px) + border (2px) = ~80px
+	const matchHeight = 80; // Height of compact match card with score
+	const playerRowHeight = 28; // Height of one player row (py-1.5 + text-xs)
+	const matchConnectorOffset = playerRowHeight; // Connect at the divider between players
 	const matchGap = 12; // Gap between matches in first round
 	const columnWidth = 180; // Width of each round column
 	const columnGap = 40; // Gap between columns for connectors
@@ -109,35 +112,48 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 							{roundIndex < sortedRounds.length - 1 &&
 								round.matches.map((match, matchIndex) => {
 									const topInUnits = offsetInUnits + matchIndex * gapInUnits;
-									const matchCenterY =
-										headerHeight + topInUnits * unitHeight + matchHeight / 2;
+									// Connect at the player divider line, not card center
+									const matchConnectY =
+										headerHeight + topInUnits * unitHeight + matchConnectorOffset;
 									const isTopOfPair = matchIndex % 2 === 0;
+
+									// Calculate the pair partner's position (for drawing vertical line)
+									const pairPartnerIndex = isTopOfPair
+										? matchIndex + 1
+										: matchIndex - 1;
+									const pairPartnerTopInUnits =
+										offsetInUnits + pairPartnerIndex * gapInUnits;
+									const pairPartnerConnectY =
+										headerHeight +
+										pairPartnerTopInUnits * unitHeight +
+										matchConnectorOffset;
+
+									// Next match connector position (at player divider)
 									const nextMatchIndex = Math.floor(matchIndex / 2);
 									const nextSpacingMultiplier = 2 ** (roundIndex + 1);
 									const nextOffsetInUnits = (nextSpacingMultiplier - 1) / 2;
 									const nextTopInUnits =
 										nextOffsetInUnits + nextMatchIndex * nextSpacingMultiplier;
-									const nextMatchCenterY =
+									const nextMatchConnectY =
 										headerHeight +
 										nextTopInUnits * unitHeight +
-										matchHeight / 2;
+										matchConnectorOffset;
 
 									// Horizontal line from match
 									const hLineStartX = columnLeft + columnWidth;
 									const hLineWidth = 12;
 
-									// Vertical line
+									// Vertical line X position
 									const vLineX = hLineStartX + hLineWidth;
-									const vLineTop = isTopOfPair
-										? matchCenterY
-										: nextMatchCenterY;
-									const vLineBottom = isTopOfPair
-										? nextMatchCenterY
-										: matchCenterY;
-									const vLineHeight = Math.abs(vLineBottom - vLineTop);
 
-									// Horizontal line to next match
-									const hLine2StartX = vLineX;
+									// Vertical line goes from top match of pair to bottom match of pair
+									const vLineTop = isTopOfPair
+										? matchConnectY
+										: pairPartnerConnectY;
+									const vLineBottom = isTopOfPair
+										? pairPartnerConnectY
+										: matchConnectY;
+									const vLineHeight = Math.abs(vLineBottom - vLineTop);
 
 									return (
 										<div key={`connector-${match.id}`}>
@@ -146,7 +162,7 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 												className="absolute h-0.5 bg-border"
 												style={{
 													left: `${hLineStartX}px`,
-													top: `${matchCenterY}px`,
+													top: `${matchConnectY}px`,
 													width: `${hLineWidth}px`,
 												}}
 											/>
@@ -166,8 +182,8 @@ export function DesktopBracket({ rounds }: DesktopBracketProps) {
 												<div
 													className="absolute h-0.5 bg-border"
 													style={{
-														left: `${hLine2StartX}px`,
-														top: `${nextMatchCenterY}px`,
+														left: `${vLineX}px`,
+														top: `${nextMatchConnectY}px`,
 														width: `${columnGap - hLineWidth * 2}px`,
 													}}
 												/>
