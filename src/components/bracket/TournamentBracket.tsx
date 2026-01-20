@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { DesktopBracket } from "./DesktopBracket";
 import { MatchPicksModal } from "./MatchPicksModal";
-import { MobileBracket, type RoundData } from "./MobileBracket";
+import type { RoundData } from "./MobileBracket";
+import { MobileBracketWithConnectors } from "./MobileBracketWithConnectors";
 
 interface TournamentBracketProps {
 	rounds: RoundData[];
@@ -46,7 +47,10 @@ export function TournamentBracket({ rounds }: TournamentBracketProps) {
 
 			{/* Mobile bracket - hidden on desktop */}
 			<div className="lg:hidden">
-				<MobileBracket onMatchClick={handleMatchClick} rounds={rounds} />
+				<MobileBracketWithConnectors
+					onMatchClick={handleMatchClick}
+					rounds={rounds}
+				/>
 			</div>
 
 			{/* Match picks modal */}

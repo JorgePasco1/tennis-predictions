@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "~/lib/utils";
 import { getRoundAbbreviation } from "~/lib/round-utils";
+import { cn } from "~/lib/utils";
 import { BracketMatch, type MatchData } from "./BracketMatch";
 
 export interface RoundData {
@@ -61,11 +61,9 @@ export function MobileBracket({ rounds, onMatchClick }: MobileBracketProps) {
 		<div className="space-y-4">
 			{/* Round selector - ATP style circular buttons */}
 			<div className="mb-4">
-				<div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+				<div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
 					{sortedRounds.map((round) => (
 						<button
-							key={round.id}
-							onClick={() => setSelectedRoundId(round.id.toString())}
 							aria-label={`${round.name}${round.isActive ? " (Active)" : ""}${round.isFinalized ? " (Finalized)" : ""}`}
 							aria-pressed={selectedRoundId === round.id.toString()}
 							className={cn(
@@ -75,6 +73,8 @@ export function MobileBracket({ rounds, onMatchClick }: MobileBracketProps) {
 									? "border-primary bg-primary text-primary-foreground"
 									: "border-border bg-background text-foreground hover:border-primary/50",
 							)}
+							key={round.id}
+							onClick={() => setSelectedRoundId(round.id.toString())}
 							type="button"
 						>
 							{getRoundAbbreviation(round.name, round.roundNumber)}
