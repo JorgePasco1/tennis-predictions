@@ -2,7 +2,14 @@
 
 import { BracketConnectors } from "./BracketConnectors";
 import { BracketMatch } from "./BracketMatch";
-import type { RoundData } from "./MobileBracket";
+import {
+	BOTTOM_PADDING,
+	CARD_RIGHT_MARGIN,
+	MATCH_GAP,
+	MATCH_HEIGHT,
+	TOP_PADDING,
+} from "./bracket-constants";
+import type { RoundData } from "./bracket-types";
 
 interface MobileRoundViewProps {
 	round: RoundData;
@@ -15,27 +22,22 @@ export function MobileRoundView({
 	hasNextRound,
 	onMatchClick,
 }: MobileRoundViewProps) {
-	const matchHeight = 80; // Taller than desktop (56px)
-	const matchGap = 24;
-	const topPadding = 16; // Space above first match
-	const bottomPadding = 80; // Space below last match (includes shadows/borders)
-
 	// Calculate minimum height needed for this round with constant spacing
 	const calculateHeight = () => {
 		if (round.matches.length === 0) return 200;
 		const matchCount = round.matches.length;
 
 		// Total height = top padding + all matches + gaps between matches + bottom padding
-		const totalMatchesHeight = matchCount * matchHeight;
-		const totalGapsHeight = (matchCount - 1) * matchGap;
+		const totalMatchesHeight = matchCount * MATCH_HEIGHT;
+		const totalGapsHeight = (matchCount - 1) * MATCH_GAP;
 
-		return topPadding + totalMatchesHeight + totalGapsHeight + bottomPadding;
+		return TOP_PADDING + totalMatchesHeight + totalGapsHeight + BOTTOM_PADDING;
 	};
 
 	return (
 		<div style={{ height: `${calculateHeight()}px`, width: "100%" }}>
 			{/* Round header */}
-			<h3 className="sticky top-0 z-10 mb-4 bg-background px-4 py-2 text-center font-semibold text-lg">
+			<h3 className="mb-4 bg-background px-4 py-2 text-center font-semibold text-lg">
 				{round.name}
 			</h3>
 
@@ -43,7 +45,7 @@ export function MobileRoundView({
 			<div className="relative">
 				{round.matches.map((match, matchIndex) => {
 					// Simple sequential positioning: top padding + (match index × unit size)
-					const topPosition = topPadding + matchIndex * (matchHeight + matchGap);
+					const topPosition = TOP_PADDING + matchIndex * (MATCH_HEIGHT + MATCH_GAP);
 
 					return (
 						<div key={match.id}>
@@ -53,7 +55,7 @@ export function MobileRoundView({
 								style={{
 									top: `${topPosition}px`,
 									left: "16px",
-									right: hasNextRound ? "76px" : "16px",
+									right: hasNextRound ? `${CARD_RIGHT_MARGIN}px` : "16px",
 								}}
 							>
 								<BracketMatch
@@ -67,10 +69,11 @@ export function MobileRoundView({
 							{/* Connector lines (if not last round) */}
 							{hasNextRound && (
 								<BracketConnectors
-									matchGap={matchGap}
-									matchHeight={matchHeight}
+									matchGap={MATCH_GAP}
+									matchHeight={MATCH_HEIGHT}
 									matchIndex={matchIndex}
 									topPosition={topPosition}
+									totalMatches={round.matches.length}
 								/>
 							)}
 						</div>

@@ -3,16 +3,8 @@
 import { useState } from "react";
 import { getRoundAbbreviation } from "~/lib/round-utils";
 import { cn } from "~/lib/utils";
-import { BracketMatch, type MatchData } from "./BracketMatch";
-
-export interface RoundData {
-	id: number;
-	name: string;
-	roundNumber: number;
-	matches: MatchData[];
-	isFinalized: boolean;
-	isActive: boolean;
-}
+import { BracketMatch } from "./BracketMatch";
+import type { RoundData } from "./bracket-types";
 
 interface MobileBracketProps {
 	rounds: RoundData[];

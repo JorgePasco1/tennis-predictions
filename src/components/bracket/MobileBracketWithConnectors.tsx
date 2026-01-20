@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { RoundData } from "./MobileBracket";
+import {
+	BOTTOM_PADDING,
+	MATCH_GAP,
+	MATCH_HEIGHT,
+	TOP_PADDING,
+} from "./bracket-constants";
+import type { RoundData } from "./bracket-types";
 import { MobileRoundView } from "./MobileRoundView";
 import { RoundNavigationButtons } from "./RoundNavigationButtons";
 
@@ -57,14 +63,10 @@ export function MobileBracketWithConnectors({
 	// Calculate height for currently selected round (same formula as MobileRoundView)
 	const calculateRoundHeight = (round: RoundData): number => {
 		if (round.matches.length === 0) return 200;
-		const matchHeight = 80;
-		const matchGap = 24;
-		const topPadding = 16;
-		const bottomPadding = 80;
 		const matchCount = round.matches.length;
-		const totalMatchesHeight = matchCount * matchHeight;
-		const totalGapsHeight = (matchCount - 1) * matchGap;
-		return topPadding + totalMatchesHeight + totalGapsHeight + bottomPadding;
+		const totalMatchesHeight = matchCount * MATCH_HEIGHT;
+		const totalGapsHeight = (matchCount - 1) * MATCH_GAP;
+		return TOP_PADDING + totalMatchesHeight + totalGapsHeight + BOTTOM_PADDING;
 	};
 
 	const currentRoundHeight = calculateRoundHeight(

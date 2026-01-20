@@ -1,7 +1,7 @@
 "use client";
 
 import { BracketMatch } from "./BracketMatch";
-import type { RoundData } from "./MobileBracket";
+import type { RoundData } from "./bracket-types";
 
 interface DesktopBracketProps {
 	rounds: RoundData[];

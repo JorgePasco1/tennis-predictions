@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { RoundData } from "./bracket-types";
 import { DesktopBracket } from "./DesktopBracket";
 import { MatchPicksModal } from "./MatchPicksModal";
-import type { RoundData } from "./MobileBracket";
 import { MobileBracketWithConnectors } from "./MobileBracketWithConnectors";
 
 interface TournamentBracketProps {
@@ -63,6 +63,5 @@ export function TournamentBracket({ rounds }: TournamentBracketProps) {
 	);
 }
 
-export type { MatchData } from "./BracketMatch";
 // Re-export types for convenience
-export type { RoundData } from "./MobileBracket";
+export type { MatchData, RoundData } from "./bracket-types";

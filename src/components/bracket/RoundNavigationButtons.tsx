@@ -2,7 +2,7 @@
 
 import { getRoundAbbreviation } from "~/lib/round-utils";
 import { cn } from "~/lib/utils";
-import type { RoundData } from "./MobileBracket";
+import type { RoundData } from "./bracket-types";
 
 interface RoundNavigationButtonsProps {
 	rounds: RoundData[];

@@ -1,10 +1,19 @@
 "use client";
 
+import {
+	CONNECTOR_RIGHT_OFFSET,
+	H_LINE_WIDTH,
+	NEXT_ROUND_CONNECTOR_RIGHT,
+	NEXT_ROUND_CONNECTOR_WIDTH,
+	TOP_PADDING,
+} from "./bracket-constants";
+
 interface BracketConnectorsProps {
 	matchIndex: number;
 	matchHeight: number;
 	matchGap: number;
 	topPosition: number;
+	totalMatches: number;
 }
 
 export function BracketConnectors({
@@ -12,23 +21,38 @@ export function BracketConnectors({
 	matchHeight,
 	matchGap,
 	topPosition,
+	totalMatches,
 }: BracketConnectorsProps) {
-	// Constants
-	const playerRowHeight = matchHeight / 2; // Half of match card height
-	const connectorOffset = playerRowHeight; // Connect at player divider (middle of card)
-	const hLineWidth = 20; // Horizontal line from card edge
-	const topPadding = 16; // Space above first match (matches MobileRoundView)
+	// Calculate connector offset (middle of card where player divider is)
+	const playerRowHeight = matchHeight / 2;
+	const connectorOffset = playerRowHeight;
 
 	// Calculate if this is top or bottom of a pair
 	const isTopOfPair = matchIndex % 2 === 0;
 	const pairPartnerIndex = isTopOfPair ? matchIndex + 1 : matchIndex - 1;
+	const hasPairPartner =
+		pairPartnerIndex >= 0 && pairPartnerIndex < totalMatches;
 
 	// Y positions for this match
 	const matchConnectY = topPosition + connectorOffset;
 
+	// If no pair partner exists (odd number of matches), only draw horizontal line
+	if (!hasPairPartner && isTopOfPair) {
+		return (
+			<div
+				className="absolute h-0.5 bg-border"
+				style={{
+					right: `${CONNECTOR_RIGHT_OFFSET}px`,
+					top: `${matchConnectY}px`,
+					width: `${H_LINE_WIDTH}px`,
+				}}
+			/>
+		);
+	}
+
 	// Y position for pair partner using constant spacing formula
 	const pairPartnerTopPosition =
-		topPadding + pairPartnerIndex * (matchHeight + matchGap);
+		TOP_PADDING + pairPartnerIndex * (matchHeight + matchGap);
 	const pairPartnerConnectY = pairPartnerTopPosition + connectorOffset;
 
 	// Vertical line height and position
@@ -46,9 +70,9 @@ export function BracketConnectors({
 			<div
 				className="absolute h-0.5 bg-border"
 				style={{
-					right: "56px",
+					right: `${CONNECTOR_RIGHT_OFFSET}px`,
 					top: `${matchConnectY}px`,
-					width: `${hLineWidth}px`,
+					width: `${H_LINE_WIDTH}px`,
 				}}
 			/>
 
@@ -57,7 +81,7 @@ export function BracketConnectors({
 				<div
 					className="absolute w-0.5 bg-border"
 					style={{
-						right: "56px",
+						right: `${CONNECTOR_RIGHT_OFFSET}px`,
 						top: `${vLineTop}px`,
 						height: `${vLineHeight}px`,
 					}}
@@ -69,9 +93,9 @@ export function BracketConnectors({
 				<div
 					className="absolute h-0.5 bg-border"
 					style={{
-						right: "16px",
+						right: `${NEXT_ROUND_CONNECTOR_RIGHT}px`,
 						top: `${nextRoundConnectY}px`,
-						width: "40px",
+						width: `${NEXT_ROUND_CONNECTOR_WIDTH}px`,
 					}}
 				/>
 			)}
