@@ -1,21 +1,28 @@
-import { CalendarClock, Trophy } from "lucide-react";
-import Link from "next/link";
 import {
-	CountdownTimer,
-	CountdownTimerCompact,
-} from "~/components/countdown/CountdownTimer";
+	BarChart3,
+	CalendarClock,
+	Home,
+	Target,
+	TrendingUp,
+	Trophy,
+} from "lucide-react";
+import Link from "next/link";
+import { CountdownTimerCompact } from "~/components/countdown/CountdownTimer";
 import { StreakCard } from "~/components/streaks/StreakDisplay";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
 import { api, HydrateClient } from "~/trpc/server";
 
-export default async function SchedulePage() {
-	const [upcomingDeadlines, userStreak, topStreaks] = await Promise.all([
-		api.schedule.getUpcomingDeadlines({ limit: 20 }),
-		api.schedule.getUserStreak(),
-		api.schedule.getTopStreaks({ limit: 5 }),
-	]);
+export default async function HomePage() {
+	const [upcomingDeadlines, userStreak, topStreaks, userStats] =
+		await Promise.all([
+			api.schedule.getUpcomingDeadlines({ limit: 10 }),
+			api.schedule.getUserStreak(),
+			api.schedule.getTopStreaks({ limit: 5 }),
+			api.leaderboards.getUserStats(),
+		]);
 
 	// Group deadlines by tournament
 	const groupedByTournament = upcomingDeadlines.reduce(
@@ -39,6 +46,8 @@ export default async function SchedulePage() {
 		>,
 	);
 
+	const hasNoTournaments = userStats.tournaments.length === 0;
+
 	return (
 		<HydrateClient>
 			<div className="min-h-screen bg-muted/30">
@@ -46,28 +55,108 @@ export default async function SchedulePage() {
 					{/* Header */}
 					<div className="mb-8">
 						<h1 className="mb-2 flex items-center gap-2 font-bold text-4xl">
-							<CalendarClock className="h-10 w-10" />
-							Schedule
+							<Home className="h-10 w-10" />
+							Home
 						</h1>
 						<p className="text-muted-foreground">
-							View all upcoming round deadlines and track your prediction streak
+							Your prediction dashboard - track deadlines, stats, and streaks
 						</p>
+					</div>
+
+					{/* Quick Stats Row */}
+					<div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+						<Card>
+							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+								<CardTitle className="font-medium text-sm">
+									Total Points
+								</CardTitle>
+								<Trophy className="h-4 w-4 text-muted-foreground" />
+							</CardHeader>
+							<CardContent>
+								<div className="font-bold text-2xl">
+									{userStats.overall.totalPoints}
+								</div>
+								<p className="text-muted-foreground text-xs">
+									{userStats.overall.rank
+										? `Rank #${userStats.overall.rank} of ${userStats.overall.totalPlayers}`
+										: "No ranking yet"}
+								</p>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+								<CardTitle className="font-medium text-sm">
+									All-Time Rank
+								</CardTitle>
+								<BarChart3 className="h-4 w-4 text-muted-foreground" />
+							</CardHeader>
+							<CardContent>
+								<div className="font-bold text-2xl">
+									{userStats.overall.rank ? `#${userStats.overall.rank}` : "-"}
+								</div>
+								<p className="text-muted-foreground text-xs">
+									{userStats.overall.totalPlayers > 0
+										? `of ${userStats.overall.totalPlayers} players`
+										: "Start predicting to get ranked"}
+								</p>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+								<CardTitle className="font-medium text-sm">Accuracy</CardTitle>
+								<Target className="h-4 w-4 text-muted-foreground" />
+							</CardHeader>
+							<CardContent>
+								<div className="font-bold text-2xl">
+									{userStats.overall.accuracy.toFixed(1)}%
+								</div>
+								<p className="text-muted-foreground text-xs">
+									{userStats.overall.totalCorrectWinners} correct winners
+								</p>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+								<CardTitle className="font-medium text-sm">
+									Current Streak
+								</CardTitle>
+								<TrendingUp className="h-4 w-4 text-muted-foreground" />
+							</CardHeader>
+							<CardContent>
+								<div className="font-bold text-2xl">
+									{userStreak.currentStreak > 0
+										? `${userStreak.currentStreak >= 10 ? "🔥" : userStreak.currentStreak >= 5 ? "⚡" : "✨"} ${userStreak.currentStreak}`
+										: "0"}
+								</div>
+								<p className="text-muted-foreground text-xs">
+									{userStreak.currentStreak > 0
+										? `Best: ${userStreak.longestStreak}`
+										: "Start predicting to build your streak"}
+								</p>
+							</CardContent>
+						</Card>
 					</div>
 
 					<div className="grid gap-8 lg:grid-cols-3">
 						{/* Main content - upcoming deadlines */}
 						<div className="lg:col-span-2">
-							<h2 className="mb-4 font-semibold text-xl">Upcoming Deadlines</h2>
+							<h2 className="mb-4 flex items-center gap-2 font-semibold text-xl">
+								<CalendarClock className="h-5 w-5" />
+								Upcoming Deadlines
+							</h2>
 
 							{Object.keys(groupedByTournament).length === 0 ? (
 								<Card>
 									<CardContent className="p-12 text-center">
 										<div className="mb-4 text-6xl">-</div>
 										<h3 className="mb-2 font-semibold text-xl">
-											No Active Rounds
+											All Caught Up!
 										</h3>
 										<p className="text-muted-foreground">
-											There are no rounds with upcoming deadlines at the moment.
+											No pending deadlines at the moment.
 										</p>
 									</CardContent>
 								</Card>
@@ -165,8 +254,80 @@ export default async function SchedulePage() {
 							)}
 						</div>
 
-						{/* Sidebar - streaks */}
+						{/* Right sidebar */}
 						<div className="space-y-6">
+							{/* Your Tournaments */}
+							<div>
+								<h2 className="mb-4 flex items-center gap-2 font-semibold text-xl">
+									<Trophy className="h-5 w-5" />
+									Your Tournaments
+								</h2>
+								{hasNoTournaments ? (
+									<Card>
+										<CardContent className="p-6 text-center">
+											<p className="mb-4 text-muted-foreground">
+												Join a tournament to get started!
+											</p>
+											<Button asChild>
+												<Link href="/tournaments">Browse Tournaments</Link>
+											</Button>
+										</CardContent>
+									</Card>
+								) : (
+									<div className="space-y-3">
+										{userStats.tournaments.slice(0, 5).map((tournament) => (
+											<Card key={tournament.tournamentId}>
+												<CardContent className="p-4">
+													<div className="flex items-center justify-between">
+														<div>
+															<div className="font-semibold">
+																{tournament.tournamentName}
+															</div>
+															<div className="text-muted-foreground text-sm">
+																{tournament.tournamentYear}
+															</div>
+														</div>
+														<div className="text-right">
+															<div className="font-bold">
+																{tournament.points} pts
+															</div>
+															<div className="text-muted-foreground text-xs">
+																{tournament.accuracy.toFixed(0)}% accurate
+															</div>
+														</div>
+													</div>
+												</CardContent>
+											</Card>
+										))}
+									</div>
+								)}
+							</div>
+
+							{/* Quick Actions */}
+							<div>
+								<h2 className="mb-4 font-semibold text-xl">Quick Actions</h2>
+								<div className="flex flex-col gap-2">
+									<Button asChild className="justify-start" variant="outline">
+										<Link href="/tournaments">
+											<Trophy className="mr-2 h-4 w-4" />
+											Browse Tournaments
+										</Link>
+									</Button>
+									<Button asChild className="justify-start" variant="outline">
+										<Link href="/leaderboards">
+											<BarChart3 className="mr-2 h-4 w-4" />
+											View Leaderboards
+										</Link>
+									</Button>
+									<Button asChild className="justify-start" variant="outline">
+										<Link href="/stats">
+											<TrendingUp className="mr-2 h-4 w-4" />
+											Your Full Stats
+										</Link>
+									</Button>
+								</div>
+							</div>
+
 							{/* User's streak */}
 							<div>
 								<h2 className="mb-4 font-semibold text-xl">Your Streak</h2>

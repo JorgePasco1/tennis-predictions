@@ -1,7 +1,14 @@
 "use client";
 
 import { UserButton, useUser } from "@clerk/nextjs";
-import { BarChart3, Menu, Settings, TrendingUp, Trophy } from "lucide-react";
+import {
+	BarChart3,
+	Home,
+	Menu,
+	Settings,
+	TrendingUp,
+	Trophy,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -43,6 +50,11 @@ function SidebarContent({
 
 	const navItems = [
 		{
+			href: "/home",
+			label: "Home",
+			icon: Home,
+		},
+		{
 			href: "/tournaments",
 			label: "Tournaments",
 			icon: Trophy,
@@ -65,7 +77,7 @@ function SidebarContent({
 			<div className="p-6">
 				<Link
 					className="flex items-center gap-2"
-					href="/tournaments"
+					href="/home"
 					onClick={onNavigate}
 				>
 					<Trophy className="h-6 w-6 text-primary" />

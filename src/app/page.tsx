@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 export default async function Home() {
 	const user = await currentUser();
 
-	// If logged in, redirect to tournaments page
+	// If logged in, redirect to home dashboard
 	if (user) {
-		redirect("/tournaments");
+		redirect("/home");
 	}
 
 	// Landing page for non-authenticated users
