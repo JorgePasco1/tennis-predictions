@@ -13,7 +13,9 @@ import type { MatchData, RoundData } from "~/components/bracket/bracket-types";
 /**
  * Creates a basic pending match without user picks
  */
-export function createPendingMatch(overrides: Partial<MatchData> = {}): MatchData {
+export function createPendingMatch(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 1,
 		matchNumber: 1,
@@ -33,7 +35,9 @@ export function createPendingMatch(overrides: Partial<MatchData> = {}): MatchDat
 /**
  * Creates a finalized match with a winner
  */
-export function createFinalizedMatch(overrides: Partial<MatchData> = {}): MatchData {
+export function createFinalizedMatch(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 2,
 		matchNumber: 2,
@@ -53,7 +57,9 @@ export function createFinalizedMatch(overrides: Partial<MatchData> = {}): MatchD
 /**
  * Creates a match that ended in retirement
  */
-export function createRetirementMatch(overrides: Partial<MatchData> = {}): MatchData {
+export function createRetirementMatch(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 3,
 		matchNumber: 3,
@@ -73,7 +79,9 @@ export function createRetirementMatch(overrides: Partial<MatchData> = {}): Match
 /**
  * Creates a match with user pick that was correct
  */
-export function createMatchWithCorrectPick(overrides: Partial<MatchData> = {}): MatchData {
+export function createMatchWithCorrectPick(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 4,
 		matchNumber: 4,
@@ -100,7 +108,9 @@ export function createMatchWithCorrectPick(overrides: Partial<MatchData> = {}): 
 /**
  * Creates a match with user pick that was wrong
  */
-export function createMatchWithWrongPick(overrides: Partial<MatchData> = {}): MatchData {
+export function createMatchWithWrongPick(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 5,
 		matchNumber: 5,
@@ -127,7 +137,9 @@ export function createMatchWithWrongPick(overrides: Partial<MatchData> = {}): Ma
 /**
  * Creates a match with pending user pick (not yet finalized)
  */
-export function createMatchWithPendingPick(overrides: Partial<MatchData> = {}): MatchData {
+export function createMatchWithPendingPick(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 6,
 		matchNumber: 6,
@@ -154,7 +166,9 @@ export function createMatchWithPendingPick(overrides: Partial<MatchData> = {}): 
 /**
  * Creates a match with correct winner but wrong score
  */
-export function createMatchWithPartialCorrectPick(overrides: Partial<MatchData> = {}): MatchData {
+export function createMatchWithPartialCorrectPick(
+	overrides: Partial<MatchData> = {},
+): MatchData {
 	return {
 		id: 7,
 		matchNumber: 7,
@@ -185,7 +199,9 @@ export function createMatchWithPartialCorrectPick(overrides: Partial<MatchData> 
 /**
  * Creates an empty round (no matches)
  */
-export function createEmptyRound(overrides: Partial<RoundData> = {}): RoundData {
+export function createEmptyRound(
+	overrides: Partial<RoundData> = {},
+): RoundData {
 	return {
 		id: 1,
 		name: "Round of 128",
@@ -200,7 +216,9 @@ export function createEmptyRound(overrides: Partial<RoundData> = {}): RoundData 
 /**
  * Creates a round with pending matches
  */
-export function createActiveRound(overrides: Partial<RoundData> = {}): RoundData {
+export function createActiveRound(
+	overrides: Partial<RoundData> = {},
+): RoundData {
 	return {
 		id: 2,
 		name: "Round of 64",
@@ -209,9 +227,24 @@ export function createActiveRound(overrides: Partial<RoundData> = {}): RoundData
 		isActive: true,
 		matches: [
 			createPendingMatch({ id: 10, matchNumber: 1 }),
-			createPendingMatch({ id: 11, matchNumber: 2, player1Name: "Player A", player2Name: "Player B" }),
-			createPendingMatch({ id: 12, matchNumber: 3, player1Name: "Player C", player2Name: "Player D" }),
-			createPendingMatch({ id: 13, matchNumber: 4, player1Name: "Player E", player2Name: "Player F" }),
+			createPendingMatch({
+				id: 11,
+				matchNumber: 2,
+				player1Name: "Player A",
+				player2Name: "Player B",
+			}),
+			createPendingMatch({
+				id: 12,
+				matchNumber: 3,
+				player1Name: "Player C",
+				player2Name: "Player D",
+			}),
+			createPendingMatch({
+				id: 13,
+				matchNumber: 4,
+				player1Name: "Player E",
+				player2Name: "Player F",
+			}),
 		],
 		...overrides,
 	};
@@ -220,7 +253,9 @@ export function createActiveRound(overrides: Partial<RoundData> = {}): RoundData
 /**
  * Creates a finalized round
  */
-export function createFinalizedRound(overrides: Partial<RoundData> = {}): RoundData {
+export function createFinalizedRound(
+	overrides: Partial<RoundData> = {},
+): RoundData {
 	return {
 		id: 3,
 		name: "Round of 32",
@@ -229,7 +264,13 @@ export function createFinalizedRound(overrides: Partial<RoundData> = {}): RoundD
 		isActive: false,
 		matches: [
 			createFinalizedMatch({ id: 20, matchNumber: 1 }),
-			createFinalizedMatch({ id: 21, matchNumber: 2, player1Name: "Winner A", player2Name: "Winner B", winnerName: "Winner A" }),
+			createFinalizedMatch({
+				id: 21,
+				matchNumber: 2,
+				player1Name: "Winner A",
+				player2Name: "Winner B",
+				winnerName: "Winner A",
+			}),
 		],
 		...overrides,
 	};
@@ -238,7 +279,9 @@ export function createFinalizedRound(overrides: Partial<RoundData> = {}): RoundD
 /**
  * Creates a round with mixed match states
  */
-export function createMixedRound(overrides: Partial<RoundData> = {}): RoundData {
+export function createMixedRound(
+	overrides: Partial<RoundData> = {},
+): RoundData {
 	return {
 		id: 4,
 		name: "Quarter Finals",
@@ -277,7 +320,7 @@ export function createFullTournamentBracket(): RoundData[] {
 					player1Name: `Player ${i * 2 + 1}`,
 					player2Name: `Player ${i * 2 + 2}`,
 					winnerName: `Player ${i * 2 + 1}`,
-				})
+				}),
 			),
 		},
 		{
@@ -293,7 +336,7 @@ export function createFullTournamentBracket(): RoundData[] {
 					player1Name: `Winner R1-${i * 2 + 1}`,
 					player2Name: `Winner R1-${i * 2 + 2}`,
 					winnerName: `Winner R1-${i * 2 + 1}`,
-				})
+				}),
 			),
 		},
 		{
@@ -306,7 +349,7 @@ export function createFullTournamentBracket(): RoundData[] {
 				createFinalizedMatch({
 					id: 300 + i,
 					matchNumber: i + 1,
-				})
+				}),
 			),
 		},
 		{
@@ -319,7 +362,7 @@ export function createFullTournamentBracket(): RoundData[] {
 				createFinalizedMatch({
 					id: 400 + i,
 					matchNumber: i + 1,
-				})
+				}),
 			),
 		},
 		{
@@ -330,9 +373,24 @@ export function createFullTournamentBracket(): RoundData[] {
 			isActive: true,
 			matches: [
 				createPendingMatch({ id: 501, matchNumber: 1 }),
-				createPendingMatch({ id: 502, matchNumber: 2, player1Name: "QF Player 3", player2Name: "QF Player 4" }),
-				createPendingMatch({ id: 503, matchNumber: 3, player1Name: "QF Player 5", player2Name: "QF Player 6" }),
-				createPendingMatch({ id: 504, matchNumber: 4, player1Name: "QF Player 7", player2Name: "QF Player 8" }),
+				createPendingMatch({
+					id: 502,
+					matchNumber: 2,
+					player1Name: "QF Player 3",
+					player2Name: "QF Player 4",
+				}),
+				createPendingMatch({
+					id: 503,
+					matchNumber: 3,
+					player1Name: "QF Player 5",
+					player2Name: "QF Player 6",
+				}),
+				createPendingMatch({
+					id: 504,
+					matchNumber: 4,
+					player1Name: "QF Player 7",
+					player2Name: "QF Player 8",
+				}),
 			],
 		},
 		{
@@ -342,8 +400,18 @@ export function createFullTournamentBracket(): RoundData[] {
 			isFinalized: false,
 			isActive: false,
 			matches: [
-				createPendingMatch({ id: 601, matchNumber: 1, player1Name: "TBD", player2Name: "TBD" }),
-				createPendingMatch({ id: 602, matchNumber: 2, player1Name: "TBD", player2Name: "TBD" }),
+				createPendingMatch({
+					id: 601,
+					matchNumber: 1,
+					player1Name: "TBD",
+					player2Name: "TBD",
+				}),
+				createPendingMatch({
+					id: 602,
+					matchNumber: 2,
+					player1Name: "TBD",
+					player2Name: "TBD",
+				}),
 			],
 		},
 		{
@@ -353,7 +421,12 @@ export function createFullTournamentBracket(): RoundData[] {
 			isFinalized: false,
 			isActive: false,
 			matches: [
-				createPendingMatch({ id: 701, matchNumber: 1, player1Name: "TBD", player2Name: "TBD" }),
+				createPendingMatch({
+					id: 701,
+					matchNumber: 1,
+					player1Name: "TBD",
+					player2Name: "TBD",
+				}),
 			],
 		},
 	];
@@ -371,8 +444,20 @@ export function createSmallBracket(): RoundData[] {
 			isFinalized: true,
 			isActive: false,
 			matches: [
-				createFinalizedMatch({ id: 1, matchNumber: 1, player1Name: "Player A", player2Name: "Player B", winnerName: "Player A" }),
-				createFinalizedMatch({ id: 2, matchNumber: 2, player1Name: "Player C", player2Name: "Player D", winnerName: "Player D" }),
+				createFinalizedMatch({
+					id: 1,
+					matchNumber: 1,
+					player1Name: "Player A",
+					player2Name: "Player B",
+					winnerName: "Player A",
+				}),
+				createFinalizedMatch({
+					id: 2,
+					matchNumber: 2,
+					player1Name: "Player C",
+					player2Name: "Player D",
+					winnerName: "Player D",
+				}),
 			],
 		},
 		{
@@ -382,7 +467,12 @@ export function createSmallBracket(): RoundData[] {
 			isFinalized: false,
 			isActive: true,
 			matches: [
-				createPendingMatch({ id: 3, matchNumber: 1, player1Name: "Player A", player2Name: "Player D" }),
+				createPendingMatch({
+					id: 3,
+					matchNumber: 1,
+					player1Name: "Player A",
+					player2Name: "Player D",
+				}),
 			],
 		},
 	];
@@ -497,8 +587,18 @@ export function createOddMatchesBracket(): RoundData[] {
 			isActive: true,
 			matches: [
 				createPendingMatch({ id: 1, matchNumber: 1 }),
-				createPendingMatch({ id: 2, matchNumber: 2, player1Name: "Player C", player2Name: "Player D" }),
-				createPendingMatch({ id: 3, matchNumber: 3, player1Name: "Player E", player2Name: "Player F" }),
+				createPendingMatch({
+					id: 2,
+					matchNumber: 2,
+					player1Name: "Player C",
+					player2Name: "Player D",
+				}),
+				createPendingMatch({
+					id: 3,
+					matchNumber: 3,
+					player1Name: "Player E",
+					player2Name: "Player F",
+				}),
 			],
 		},
 	];
@@ -516,10 +616,30 @@ export function createBracketWithSeeds(): RoundData[] {
 			isFinalized: false,
 			isActive: true,
 			matches: [
-				createPendingMatch({ id: 1, matchNumber: 1, player1Seed: 1, player2Seed: null }),
-				createPendingMatch({ id: 2, matchNumber: 2, player1Seed: 8, player2Seed: 9 }),
-				createPendingMatch({ id: 3, matchNumber: 3, player1Seed: null, player2Seed: 5 }),
-				createPendingMatch({ id: 4, matchNumber: 4, player1Seed: null, player2Seed: null }),
+				createPendingMatch({
+					id: 1,
+					matchNumber: 1,
+					player1Seed: 1,
+					player2Seed: null,
+				}),
+				createPendingMatch({
+					id: 2,
+					matchNumber: 2,
+					player1Seed: 8,
+					player2Seed: 9,
+				}),
+				createPendingMatch({
+					id: 3,
+					matchNumber: 3,
+					player1Seed: null,
+					player2Seed: 5,
+				}),
+				createPendingMatch({
+					id: 4,
+					matchNumber: 4,
+					player1Seed: null,
+					player2Seed: null,
+				}),
 			],
 		},
 	];
@@ -531,7 +651,12 @@ export function createBracketWithSeeds(): RoundData[] {
 
 export const playerNameTestCases = {
 	shortNames: [
-		{ name: "Novak Djokovic", seed: 1, maxLength: 20, expected: "(1) Novak Djokovic" },
+		{
+			name: "Novak Djokovic",
+			seed: 1,
+			maxLength: 20,
+			expected: "(1) Novak Djokovic",
+		},
 		{ name: "Sinner", seed: null, maxLength: 20, expected: "Sinner" },
 	],
 	longNames: [
@@ -539,17 +664,22 @@ export const playerNameTestCases = {
 			name: "Alejandro Davidovich Fokina",
 			seed: null,
 			maxLength: 16,
-			expected: "Alejandro David..." // truncated
+			expected: "Alejandro David…", // truncated (uses Unicode ellipsis)
 		},
 		{
 			name: "Botic van de Zandschulp",
 			seed: 15,
 			maxLength: 16,
-			expected: "(15) Botic van..." // truncated with seed
+			expected: "(15) Botic van…", // truncated with seed (uses Unicode ellipsis)
 		},
 	],
 	specialCharacters: [
-		{ name: "Gael Monfils", seed: null, maxLength: 20, expected: "Gael Monfils" },
+		{
+			name: "Gael Monfils",
+			seed: null,
+			maxLength: 20,
+			expected: "Gael Monfils",
+		},
 		{ name: "Joao Sousa", seed: null, maxLength: 20, expected: "Joao Sousa" },
 	],
 };
@@ -572,6 +702,29 @@ export const roundAbbreviationTestCases = [
 // =============================================================================
 // Match Picks Modal Test Data
 // =============================================================================
+
+// =============================================================================
+// Test Helper Functions
+// =============================================================================
+
+/**
+ * Safely gets an element from an array, throwing if undefined.
+ * Use this in tests instead of non-null assertion (!) to satisfy linter.
+ */
+export function getElement<T>(arr: T[], index: number): T {
+	const element = arr[index];
+	if (element === undefined) {
+		throw new Error(`Element at index ${index} is undefined`);
+	}
+	return element;
+}
+
+/**
+ * Gets the first element of an array, throwing if empty.
+ */
+export function first<T>(arr: T[]): T {
+	return getElement(arr, 0);
+}
 
 export const mockMatchPicksModalData = {
 	matchWithPicks: {
