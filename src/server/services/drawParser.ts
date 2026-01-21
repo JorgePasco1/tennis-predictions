@@ -7,6 +7,11 @@ export interface ParsedMatch {
 	player2Name: string;
 	player1Seed: number | null;
 	player2Seed: number | null;
+	// Optional match result fields (only present if match is completed)
+	winnerName?: string;
+	setsWon?: number;
+	setsLost?: number;
+	finalScore?: string;
 }
 
 /**
@@ -118,16 +123,64 @@ export function parseAtpDraw(htmlOrMhtmlContent: string): ParsedDraw {
 				const $player2 = $(playerElements[1]);
 				const player2Info = parsePlayerFromStatsItem($player2);
 
-				// Only add if both players have names
-				if (player1Info.name && player2Info.name) {
-					matches.push({
-						matchNumber: matchIndex + 1,
-						player1Name: player1Info.name,
-						player2Name: player2Info.name,
-						player1Seed: player1Info.seed,
-						player2Seed: player2Info.seed,
-					});
+				// Include all matches - empty player names will be normalized to "TBD" during commit
+				// This ensures complete bracket structure even when players haven't advanced yet
+				// Check for match completion and extract scores
+				const $player1Winner = $player1.find(".player-info .winner");
+				const $player2Winner = $player2.find(".player-info .winner");
+
+				const hasWinner =
+					$player1Winner.length > 0 || $player2Winner.length > 0;
+				let matchResult: {
+					winnerName?: string;
+					setsWon?: number;
+					setsLost?: number;
+					finalScore?: string;
+				} | null = null;
+
+				if (hasWinner) {
+					// Extract scores
+					const scores = extractMatchScores($player1, $player2);
+
+					if (scores) {
+						// Determine winner (player with .winner div)
+						const isPlayer1Winner = $player1Winner.length > 0;
+						const winnerName = isPlayer1Winner
+							? player1Info.name
+							: player2Info.name;
+						const setsWon = isPlayer1Winner
+							? scores.player1SetsWon
+							: scores.player2SetsWon;
+						const setsLost = isPlayer1Winner
+							? scores.player2SetsWon
+							: scores.player1SetsWon;
+						const finalScore = `${setsWon}-${setsLost}`;
+
+						matchResult = {
+							winnerName,
+							setsWon,
+							setsLost,
+							finalScore,
+						};
+					}
 				}
+
+				// Create match object with optional result fields
+				const match: ParsedMatch = {
+					matchNumber: matchIndex + 1,
+					player1Name: player1Info.name,
+					player2Name: player2Info.name,
+					player1Seed: player1Info.seed,
+					player2Seed: player2Info.seed,
+					...(matchResult && {
+						winnerName: matchResult.winnerName,
+						setsWon: matchResult.setsWon,
+						setsLost: matchResult.setsLost,
+						finalScore: matchResult.finalScore,
+					}),
+				};
+
+				matches.push(match);
 			}
 		});
 
@@ -178,6 +231,80 @@ function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio<any>): {
 	}
 
 	return { name, seed };
+}
+
+interface MatchScores {
+	player1Sets: number[];
+	player2Sets: number[];
+	player1SetsWon: number;
+	player2SetsWon: number;
+}
+
+/**
+ * Extract set scores from a match's score divs
+ * Returns set counts and winner information
+ */
+function extractMatchScores(
+	$player1Stat: cheerio.Cheerio<any>,
+	$player2Stat: cheerio.Cheerio<any>,
+): MatchScores | null {
+	const $player1Scores = $player1Stat.find(".scores .score-item");
+	const $player2Scores = $player2Stat.find(".scores .score-item");
+
+	// If no score divs, match hasn't been played
+	if ($player1Scores.length === 0 || $player2Scores.length === 0) {
+		return null;
+	}
+
+	const player1Sets: number[] = [];
+	const player2Sets: number[] = [];
+	let player1SetsWon = 0;
+	let player2SetsWon = 0;
+
+	// Parse each set
+	$player1Scores.each((i, elem) => {
+		const $player1SetDiv = cheerio.load(elem);
+		const $player1Spans = $player1SetDiv("span");
+
+		// First span = main score, second span = tiebreak score (if present)
+		const player1Score = sanitizeText($player1Spans.eq(0).text());
+
+		// Get player 2's corresponding score
+		const $player2SetDiv = $player2Scores.eq(i);
+		const player2Score = sanitizeText($player2SetDiv.find("span").eq(0).text());
+
+		// Empty scores mean match not played yet
+		if (!player1Score || !player2Score) {
+			return; // Skip this set
+		}
+
+		const p1 = Number.parseInt(player1Score, 10);
+		const p2 = Number.parseInt(player2Score, 10);
+
+		if (!Number.isNaN(p1) && !Number.isNaN(p2)) {
+			player1Sets.push(p1);
+			player2Sets.push(p2);
+
+			// Determine who won this set (higher score wins, or 7-6 for tiebreak)
+			if (p1 > p2) {
+				player1SetsWon++;
+			} else if (p2 > p1) {
+				player2SetsWon++;
+			}
+		}
+	});
+
+	// If no valid sets parsed, return null
+	if (player1Sets.length === 0) {
+		return null;
+	}
+
+	return {
+		player1Sets,
+		player2Sets,
+		player1SetsWon,
+		player2SetsWon,
+	};
 }
 
 /**
