@@ -120,6 +120,31 @@ export function DesktopBracket({ rounds, onMatchClick }: DesktopBracketProps) {
 									const pairPartnerIndex = isTopOfPair
 										? matchIndex + 1
 										: matchIndex - 1;
+									const hasPairPartner =
+										pairPartnerIndex >= 0 &&
+										pairPartnerIndex < round.matches.length;
+
+									// Horizontal line from match
+									const hLineStartX = columnLeft + columnWidth;
+									const hLineWidth = 12;
+
+									// If no pair partner exists (odd number of matches), only draw horizontal line
+									if (!hasPairPartner) {
+										return (
+											<div key={`connector-${match.id}`}>
+												{/* Horizontal line from current match */}
+												<div
+													className="absolute h-0.5 bg-border"
+													style={{
+														left: `${hLineStartX}px`,
+														top: `${matchConnectY}px`,
+														width: `${hLineWidth}px`,
+													}}
+												/>
+											</div>
+										);
+									}
+
 									const pairPartnerTopInUnits =
 										offsetInUnits + pairPartnerIndex * gapInUnits;
 									const pairPartnerConnectY =
@@ -137,10 +162,6 @@ export function DesktopBracket({ rounds, onMatchClick }: DesktopBracketProps) {
 										headerHeight +
 										nextTopInUnits * unitHeight +
 										matchConnectorOffset;
-
-									// Horizontal line from match
-									const hLineStartX = columnLeft + columnWidth;
-									const hLineWidth = 12;
 
 									// Vertical line X position
 									const vLineX = hLineStartX + hLineWidth;
