@@ -1,23 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "~/components/ui/select";
-import { BracketMatch, type MatchData } from "./BracketMatch";
-
-export interface RoundData {
-	id: number;
-	name: string;
-	roundNumber: number;
-	matches: MatchData[];
-	isFinalized: boolean;
-	isActive: boolean;
-}
+import { getRoundAbbreviation } from "~/lib/round-utils";
+import { cn } from "~/lib/utils";
+import { BracketMatch } from "./BracketMatch";
+import type { RoundData } from "./bracket-types";
 
 interface MobileBracketProps {
 	rounds: RoundData[];
@@ -64,23 +51,28 @@ export function MobileBracket({ rounds, onMatchClick }: MobileBracketProps) {
 
 	return (
 		<div className="space-y-4">
-			{/* Round selector */}
-			<div className="flex items-center gap-2">
-				<span className="font-medium text-sm">Round:</span>
-				<Select onValueChange={setSelectedRoundId} value={selectedRoundId}>
-					<SelectTrigger className="w-48">
-						<SelectValue placeholder="Select round" />
-					</SelectTrigger>
-					<SelectContent>
-						{sortedRounds.map((round) => (
-							<SelectItem key={round.id} value={round.id.toString()}>
-								{round.name}
-								{round.isActive && " (Active)"}
-								{round.isFinalized && " (Done)"}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+			{/* Round selector - ATP style circular buttons */}
+			<div className="mb-4">
+				<div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
+					{sortedRounds.map((round) => (
+						<button
+							aria-label={`${round.name}${round.isActive ? " (Active)" : ""}${round.isFinalized ? " (Finalized)" : ""}`}
+							aria-pressed={selectedRoundId === round.id.toString()}
+							className={cn(
+								"flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
+								"border-2 font-semibold text-sm transition-all",
+								selectedRoundId === round.id.toString()
+									? "border-primary bg-primary text-primary-foreground"
+									: "border-border bg-background text-foreground hover:border-primary/50",
+							)}
+							key={round.id}
+							onClick={() => setSelectedRoundId(round.id.toString())}
+							type="button"
+						>
+							{getRoundAbbreviation(round.name, round.roundNumber)}
+						</button>
+					))}
+				</div>
 			</div>
 
 			{/* Match list */}
