@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { toast } from "sonner";
+import { formatPlayerName } from "~/lib/utils";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -108,6 +109,19 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
+	const deleteTournamentMutation = api.admin.deleteTournament.useMutation({
+		onSuccess: (result) => {
+			toast.success(
+				`Tournament "${result.tournamentName}" deleted successfully.${result.picksDeleted > 0 ? ` ${result.picksDeleted} user picks removed.` : ""}`,
+			);
+			// Redirect to admin dashboard
+			window.location.href = "/admin";
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to delete tournament");
+		},
+	});
+
 	const [selectedRound, setSelectedRound] = useState<number | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isEditingProperties, setIsEditingProperties] = useState(false);
@@ -144,6 +158,7 @@ export default function AdminTournamentManagePage({
 	} | null>(null);
 	const [activateNextRound, setActivateNextRound] = useState(false);
 	const [showCreateRoundDialog, setShowCreateRoundDialog] = useState(false);
+	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 	const [createRoundForm, setCreateRoundForm] = useState({
 		name: "",
 		matchCount: 32,
@@ -425,6 +440,14 @@ export default function AdminTournamentManagePage({
 							onClick={() => handleStatusChange("archived")}
 						>
 							Archive
+						</button>
+						<button
+							className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={deleteTournamentMutation.isPending}
+							onClick={() => setShowDeleteDialog(true)}
+							type="button"
+						>
+							Delete Tournament
 						</button>
 					</div>
 				</div>
@@ -889,9 +912,9 @@ export default function AdminTournamentManagePage({
 															</div>
 															<div className="text-gray-600">
 																{match.player1Seed && `(${match.player1Seed}) `}
-																{match.player1Name} vs{" "}
+																{formatPlayerName(match.player1Name)} vs{" "}
 																{match.player2Seed && `(${match.player2Seed}) `}
-																{match.player2Name}
+																{formatPlayerName(match.player2Name)}
 															</div>
 														</div>
 														{match.status === "finalized" && (
@@ -1410,6 +1433,48 @@ export default function AdminTournamentManagePage({
 							onClick={handleCreateRound}
 						>
 							{createRoundMutation.isPending ? "Creating..." : "Create Round"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Delete Tournament Confirmation Dialog */}
+			<AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete Tournament?</AlertDialogTitle>
+						<AlertDialogDescription>
+							<div className="space-y-3">
+								<p>
+									Are you sure you want to delete{" "}
+									<span className="font-semibold">{tournament?.name}</span>?
+								</p>
+								<div className="rounded-lg border border-red-200 bg-red-50 p-3">
+									<p className="font-medium text-red-900 text-sm">
+										⚠️ This action will soft delete the tournament
+									</p>
+									<ul className="mt-2 list-inside list-disc space-y-1 text-red-800 text-sm">
+										<li>Tournament will be hidden from all views</li>
+										<li>All matches will be soft deleted</li>
+										<li>User picks will be preserved but hidden</li>
+										<li>Data can be restored from database if needed</li>
+									</ul>
+								</div>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-red-600 hover:bg-red-700"
+							onClick={async () => {
+								setShowDeleteDialog(false);
+								await deleteTournamentMutation.mutateAsync({
+									id: tournamentId,
+								});
+							}}
+						>
+							Delete Tournament
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
