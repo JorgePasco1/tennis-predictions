@@ -134,10 +134,7 @@ describe("pair partner existence", () => {
 	/**
 	 * Checks if a pair partner exists within bounds
 	 */
-	function hasPairPartner(
-		matchIndex: number,
-		totalMatches: number
-	): boolean {
+	function hasPairPartner(matchIndex: number, totalMatches: number): boolean {
 		const isTop = matchIndex % 2 === 0;
 		const pairPartnerIndex = isTop ? matchIndex + 1 : matchIndex - 1;
 		return pairPartnerIndex >= 0 && pairPartnerIndex < totalMatches;
@@ -175,7 +172,7 @@ describe("horizontal line positioning", () => {
 	 */
 	function calculateMatchConnectY(
 		topPosition: number,
-		matchHeight: number
+		matchHeight: number,
 	): number {
 		const connectorOffset = matchHeight / 2;
 		return topPosition + connectorOffset;
@@ -216,7 +213,7 @@ describe("vertical line positioning", () => {
 	function calculateVerticalLine(
 		topMatchIndex: number,
 		matchHeight: number,
-		matchGap: number
+		matchGap: number,
 	): { vLineTop: number; vLineHeight: number } {
 		const topPosition = TOP_PADDING + topMatchIndex * (matchHeight + matchGap);
 		const bottomIndex = topMatchIndex + 1;
@@ -263,7 +260,7 @@ describe("next round connector positioning", () => {
 	 */
 	function calculateNextRoundConnectY(
 		vLineTop: number,
-		vLineHeight: number
+		vLineHeight: number,
 	): number {
 		// Connect at midpoint of vertical line
 		return vLineTop + vLineHeight / 2;
@@ -305,7 +302,7 @@ describe("no pair partner handling", () => {
 	 */
 	function getConnectorType(
 		matchIndex: number,
-		totalMatches: number
+		totalMatches: number,
 	): "full" | "horizontal_only" {
 		const isTop = matchIndex % 2 === 0;
 		const pairPartnerIndex = isTop ? matchIndex + 1 : matchIndex - 1;
@@ -341,13 +338,17 @@ describe("partner position calculation", () => {
 	function calculatePairPartnerTopPosition(
 		pairPartnerIndex: number,
 		matchHeight: number,
-		matchGap: number
+		matchGap: number,
 	): number {
 		return TOP_PADDING + pairPartnerIndex * (matchHeight + matchGap);
 	}
 
 	it("should calculate partner position using same formula", () => {
-		const partner1Top = calculatePairPartnerTopPosition(1, MATCH_HEIGHT, MATCH_GAP);
+		const partner1Top = calculatePairPartnerTopPosition(
+			1,
+			MATCH_HEIGHT,
+			MATCH_GAP,
+		);
 		const expectedTop = TOP_PADDING + 1 * (MATCH_HEIGHT + MATCH_GAP);
 
 		expect(partner1Top).toBe(expectedTop);
@@ -355,7 +356,11 @@ describe("partner position calculation", () => {
 	});
 
 	it("should calculate connect Y for partner", () => {
-		const partnerTop = calculatePairPartnerTopPosition(1, MATCH_HEIGHT, MATCH_GAP);
+		const partnerTop = calculatePairPartnerTopPosition(
+			1,
+			MATCH_HEIGHT,
+			MATCH_GAP,
+		);
 		const partnerConnectY = partnerTop + MATCH_HEIGHT / 2;
 
 		expect(partnerConnectY).toBe(160); // 120 + 40
@@ -409,7 +414,8 @@ describe("full connector render logic", () => {
 		verticalLine?: { top: number; right: number; height: number };
 		nextRoundLine?: { top: number; right: number; width: number };
 	} {
-		const { matchIndex, matchHeight, matchGap, topPosition, totalMatches } = props;
+		const { matchIndex, matchHeight, matchGap, topPosition, totalMatches } =
+			props;
 
 		const connectorOffset = matchHeight / 2;
 		const matchConnectY = topPosition + connectorOffset;

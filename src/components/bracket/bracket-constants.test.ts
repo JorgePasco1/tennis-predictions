@@ -146,7 +146,9 @@ describe("bracket-constants", () => {
 			// - Horizontal line
 			// - Vertical connector space
 			// - Next round line
-			expect(CARD_RIGHT_MARGIN).toBeGreaterThan(H_LINE_WIDTH + NEXT_ROUND_CONNECTOR_WIDTH);
+			expect(CARD_RIGHT_MARGIN).toBeGreaterThan(
+				H_LINE_WIDTH + NEXT_ROUND_CONNECTOR_WIDTH,
+			);
 		});
 	});
 

@@ -11,19 +11,21 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-	BOTTOM_PADDING,
-	MATCH_GAP,
-	MATCH_HEIGHT,
-	TOP_PADDING,
-} from "./bracket-constants";
-import {
 	createActiveRound,
 	createBracketWithPicks,
 	createEmptyRound,
 	createFinalizedRound,
 	createFullTournamentBracket,
 	createSmallBracket,
+	first,
+	getElement,
 } from "~/test/bracket-fixtures";
+import {
+	BOTTOM_PADDING,
+	MATCH_GAP,
+	MATCH_HEIGHT,
+	TOP_PADDING,
+} from "./bracket-constants";
 import type { RoundData } from "./bracket-types";
 
 // =============================================================================
@@ -61,7 +63,7 @@ describe("default round index selection", () => {
 
 		// Second priority: latest round with finalized matches
 		const roundsWithFinalizedMatches = sortedRounds.filter((r) =>
-			r.matches.some((m) => m.status === "finalized")
+			r.matches.some((m) => m.status === "finalized"),
 		);
 		if (roundsWithFinalizedMatches.length > 0) {
 			const latestFinalized =
@@ -187,12 +189,12 @@ describe("height calculations", () => {
 
 	it("should calculate height for single match", () => {
 		const round = createActiveRound({
-			matches: [createActiveRound().matches[0]!],
+			matches: [first(createActiveRound().matches)],
 		});
 
 		// 16 + 80 + 0 + 80 = 176
 		expect(calculateRoundHeight(round)).toBe(
-			TOP_PADDING + MATCH_HEIGHT + BOTTOM_PADDING
+			TOP_PADDING + MATCH_HEIGHT + BOTTOM_PADDING,
 		);
 	});
 
@@ -201,18 +203,18 @@ describe("height calculations", () => {
 
 		// 16 + (4 * 80) + (3 * 24) + 80 = 16 + 320 + 72 + 80 = 488
 		const expected =
-			TOP_PADDING +
-			4 * MATCH_HEIGHT +
-			3 * MATCH_GAP +
-			BOTTOM_PADDING;
+			TOP_PADDING + 4 * MATCH_HEIGHT + 3 * MATCH_GAP + BOTTOM_PADDING;
 
 		expect(calculateRoundHeight(round)).toBe(expected);
 	});
 
 	it("should increase height linearly with match count", () => {
-		const height1 = TOP_PADDING + 1 * MATCH_HEIGHT + 0 * MATCH_GAP + BOTTOM_PADDING;
-		const height2 = TOP_PADDING + 2 * MATCH_HEIGHT + 1 * MATCH_GAP + BOTTOM_PADDING;
-		const height4 = TOP_PADDING + 4 * MATCH_HEIGHT + 3 * MATCH_GAP + BOTTOM_PADDING;
+		const height1 =
+			TOP_PADDING + 1 * MATCH_HEIGHT + 0 * MATCH_GAP + BOTTOM_PADDING;
+		const height2 =
+			TOP_PADDING + 2 * MATCH_HEIGHT + 1 * MATCH_GAP + BOTTOM_PADDING;
+		const height4 =
+			TOP_PADDING + 4 * MATCH_HEIGHT + 3 * MATCH_GAP + BOTTOM_PADDING;
 
 		// Difference between 1 and 2 matches
 		const diff1to2 = height2 - height1;
@@ -293,7 +295,7 @@ describe("child component props", () => {
 		it("should pass hasNextRound for all but last round", () => {
 			const rounds = createSmallBracket();
 
-			rounds.forEach((round, index) => {
+			rounds.forEach((_round, index) => {
 				const hasNextRound = index < rounds.length - 1;
 
 				if (index === 0) {
@@ -393,8 +395,8 @@ describe("height transition when switching rounds", () => {
 		};
 
 		// R128 (64 matches) should be taller than F (1 match)
-		const r128Height = calculateRoundHeight(sorted[0]!);
-		const finalHeight = calculateRoundHeight(sorted[6]!);
+		const r128Height = calculateRoundHeight(first(sorted));
+		const finalHeight = calculateRoundHeight(getElement(sorted, 6));
 
 		expect(r128Height).toBeGreaterThan(finalHeight);
 	});
@@ -403,7 +405,7 @@ describe("height transition when switching rounds", () => {
 		const rounds = createSmallBracket();
 		const selectedRoundIndex = 10; // Out of bounds
 
-		const currentRound = rounds[selectedRoundIndex] ?? rounds[0]!;
+		const currentRound = rounds[selectedRoundIndex] ?? first(rounds);
 
 		expect(currentRound).toBeDefined();
 	});
@@ -474,7 +476,7 @@ describe("edge cases", () => {
 	it("should handle bracket with user picks", () => {
 		const rounds = createBracketWithPicks();
 		const hasUserPicks = rounds.some((r) =>
-			r.matches.some((m) => m.userPick !== null)
+			r.matches.some((m) => m.userPick !== null),
 		);
 
 		expect(hasUserPicks).toBe(true);

@@ -267,7 +267,7 @@ describe("round data passing", () => {
 
 		const totalMatches = rounds.reduce(
 			(sum, round) => sum + round.matches.length,
-			0
+			0,
 		);
 		// 64 + 32 + 16 + 8 + 4 + 2 + 1 = 127
 		expect(totalMatches).toBe(127);
@@ -390,7 +390,7 @@ describe("edge cases", () => {
 	it("should handle bracket with user picks", () => {
 		const rounds = createBracketWithPicks();
 		const hasUserPicks = rounds.some((r) =>
-			r.matches.some((m) => m.userPick !== null)
+			r.matches.some((m) => m.userPick !== null),
 		);
 
 		expect(hasUserPicks).toBe(true);

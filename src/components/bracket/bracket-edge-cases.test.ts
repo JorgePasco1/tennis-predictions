@@ -12,7 +12,7 @@
  * - Concurrent state changes
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
 	createBracketWithPicks,
 	createBracketWithSeeds,
@@ -27,6 +27,8 @@ import {
 	createRetirementMatch,
 	createSingleRoundBracket,
 	createSmallBracket,
+	first,
+	getElement,
 } from "~/test/bracket-fixtures";
 import type { MatchData, RoundData } from "./bracket-types";
 
@@ -51,10 +53,7 @@ describe("empty bracket edge cases", () => {
 			createEmptyRound({ id: 2, roundNumber: 2 }),
 		];
 
-		const totalMatches = rounds.reduce(
-			(sum, r) => sum + r.matches.length,
-			0
-		);
+		const totalMatches = rounds.reduce((sum, r) => sum + r.matches.length, 0);
 
 		expect(totalMatches).toBe(0);
 	});
@@ -62,7 +61,7 @@ describe("empty bracket edge cases", () => {
 	it("should handle mix of empty and non-empty rounds", () => {
 		const rounds = [
 			createEmptyRound({ id: 1, roundNumber: 1 }),
-			createSmallBracket()[0]!,
+			first(createSmallBracket()),
 		];
 
 		expect(rounds[0]?.matches.length).toBe(0);
@@ -150,7 +149,8 @@ describe("retirement match edge cases", () => {
 
 	it("should void scoring for retirement picks", () => {
 		const match = createRetirementMatch();
-		const shouldShowResult = match.status === "finalized" && !match.isRetirement;
+		const shouldShowResult =
+			match.status === "finalized" && !match.isRetirement;
 
 		expect(shouldShowResult).toBe(false);
 	});
@@ -179,7 +179,7 @@ describe("special character edge cases", () => {
 	it("should handle multi-word surnames", () => {
 		const rounds = createBracketWithSpecialNames();
 		const match = rounds[0]?.matches.find(
-			(m) => m.player2Name === "Botic van de Zandschulp"
+			(m) => m.player2Name === "Botic van de Zandschulp",
 		);
 
 		expect(match?.player2Name).toBe("Botic van de Zandschulp");
@@ -245,10 +245,7 @@ describe("tournament format edge cases", () => {
 	describe("large bracket", () => {
 		it("should handle Grand Slam size (127 matches)", () => {
 			const rounds = createFullTournamentBracket();
-			const totalMatches = rounds.reduce(
-				(sum, r) => sum + r.matches.length,
-				0
-			);
+			const totalMatches = rounds.reduce((sum, r) => sum + r.matches.length, 0);
 
 			expect(totalMatches).toBe(127);
 		});
@@ -258,8 +255,8 @@ describe("tournament format edge cases", () => {
 
 			// Each round should have half the matches of the previous
 			for (let i = 0; i < rounds.length - 1; i++) {
-				const currentMatches = rounds[i]!.matches.length;
-				const nextMatches = rounds[i + 1]!.matches.length;
+				const currentMatches = rounds[i]?.matches.length;
+				const nextMatches = rounds[i + 1]?.matches.length;
 
 				expect(nextMatches).toBe(Math.ceil(currentMatches / 2));
 			}
@@ -278,25 +275,25 @@ describe("seed edge cases", () => {
 
 		// Both seeded
 		const bothSeeded = matches.find(
-			(m) => m.player1Seed !== null && m.player2Seed !== null
+			(m) => m.player1Seed !== null && m.player2Seed !== null,
 		);
 		expect(bothSeeded).toBeDefined();
 
 		// Only player 1 seeded
 		const onlyP1Seeded = matches.find(
-			(m) => m.player1Seed !== null && m.player2Seed === null
+			(m) => m.player1Seed !== null && m.player2Seed === null,
 		);
 		expect(onlyP1Seeded).toBeDefined();
 
 		// Only player 2 seeded
 		const onlyP2Seeded = matches.find(
-			(m) => m.player1Seed === null && m.player2Seed !== null
+			(m) => m.player1Seed === null && m.player2Seed !== null,
 		);
 		expect(onlyP2Seeded).toBeDefined();
 
 		// Neither seeded
 		const neitherSeeded = matches.find(
-			(m) => m.player1Seed === null && m.player2Seed === null
+			(m) => m.player1Seed === null && m.player2Seed === null,
 		);
 		expect(neitherSeeded).toBeDefined();
 	});
@@ -320,9 +317,13 @@ describe("score parsing edge cases", () => {
 	/**
 	 * Parses score string into winner/loser sets
 	 */
-	function parseScore(score: string | null): [number | undefined, number | undefined] {
+	function parseScore(
+		score: string | null,
+	): [number | undefined, number | undefined] {
 		const scoreParts = score?.split("-").map(Number) ?? [];
-		return scoreParts.length === 2 ? scoreParts as [number, number] : [undefined, undefined];
+		return scoreParts.length === 2
+			? (scoreParts as [number, number])
+			: [undefined, undefined];
 	}
 
 	describe("valid scores", () => {
@@ -381,7 +382,7 @@ describe("state transition edge cases", () => {
 
 		it("should handle round becoming finalized", () => {
 			const rounds = createSmallBracket();
-			const round = rounds[0]!;
+			const round = first(rounds);
 			round.isFinalized = true;
 
 			expect(round.isFinalized).toBe(true);
@@ -389,8 +390,8 @@ describe("state transition edge cases", () => {
 
 		it("should handle multiple active rounds (edge case)", () => {
 			const rounds = createSmallBracket();
-			rounds[0]!.isActive = true;
-			rounds[1]!.isActive = true;
+			first(rounds).isActive = true;
+			getElement(rounds, 1).isActive = true;
 
 			const activeRounds = rounds.filter((r) => r.isActive);
 			expect(activeRounds.length).toBe(2);
@@ -590,7 +591,7 @@ describe("performance edge cases", () => {
 				roundIndex,
 				matchIndex,
 				matchId: match.id,
-			}))
+			})),
 		);
 
 		expect(positions.length).toBe(127);
@@ -599,7 +600,7 @@ describe("performance edge cases", () => {
 	it("should handle many user picks", () => {
 		const rounds = createBracketWithPicks();
 		const allPicks = rounds.flatMap((r) =>
-			r.matches.filter((m) => m.userPick !== null)
+			r.matches.filter((m) => m.userPick !== null),
 		);
 
 		expect(allPicks.length).toBeGreaterThan(0);

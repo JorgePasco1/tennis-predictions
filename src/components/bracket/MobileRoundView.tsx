@@ -45,7 +45,8 @@ export function MobileRoundView({
 			<div className="relative">
 				{round.matches.map((match, matchIndex) => {
 					// Simple sequential positioning: top padding + (match index × unit size)
-					const topPosition = TOP_PADDING + matchIndex * (MATCH_HEIGHT + MATCH_GAP);
+					const topPosition =
+						TOP_PADDING + matchIndex * (MATCH_HEIGHT + MATCH_GAP);
 
 					return (
 						<div key={match.id}>

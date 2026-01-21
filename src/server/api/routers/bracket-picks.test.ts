@@ -9,8 +9,8 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mockMatchPicks, mockMatches, mockUsers } from "~/test/fixtures";
+import { beforeEach, describe, expect, it } from "vitest";
+import { mockMatches, mockMatchPicks, mockUsers } from "~/test/fixtures";
 import { createMockDb, type MockDb } from "~/test/mock-db";
 
 // =============================================================================
@@ -27,7 +27,7 @@ describe("getAllPicksForMatch - match not found", () => {
 	it("should throw NOT_FOUND when match does not exist", async () => {
 		mockDb.query.matches.findFirst.mockResolvedValue(null);
 
-		const validateMatch = async (matchId: number) => {
+		const validateMatch = async (_matchId: number) => {
 			const match = await mockDb.query.matches.findFirst({});
 			if (!match) {
 				throw new TRPCError({
@@ -64,20 +64,23 @@ describe("getAllPicksForMatch - authorization", () => {
 	it("should throw FORBIDDEN when user has not submitted picks", async () => {
 		mockDb.query.userRoundPicks.findFirst.mockResolvedValue(null);
 
-		const checkUserSubmission = async (userId: string, roundId: number) => {
-			const currentUserRoundPicks = await mockDb.query.userRoundPicks.findFirst({});
+		const checkUserSubmission = async (_userId: string, _roundId: number) => {
+			const currentUserRoundPicks = await mockDb.query.userRoundPicks.findFirst(
+				{},
+			);
 			if (!currentUserRoundPicks) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You must submit your picks before viewing other players' picks",
+					message:
+						"You must submit your picks before viewing other players' picks",
 				});
 			}
 			return currentUserRoundPicks;
 		};
 
-		await expect(
-			checkUserSubmission("user-1", 1)
-		).rejects.toThrow("You must submit your picks");
+		await expect(checkUserSubmission("user-1", 1)).rejects.toThrow(
+			"You must submit your picks",
+		);
 	});
 
 	it("should throw FORBIDDEN when user has only draft picks", async () => {
@@ -95,13 +98,16 @@ describe("getAllPicksForMatch - authorization", () => {
 			if (!picks || picks.isDraft) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You must submit your picks before viewing other players' picks",
+					message:
+						"You must submit your picks before viewing other players' picks",
 				});
 			}
 			return picks;
 		};
 
-		await expect(checkUserSubmission()).rejects.toThrow("You must submit your picks");
+		await expect(checkUserSubmission()).rejects.toThrow(
+			"You must submit your picks",
+		);
 	});
 
 	it("should allow access when user has submitted final picks", async () => {
@@ -117,7 +123,8 @@ describe("getAllPicksForMatch - authorization", () => {
 			if (!picks || picks.isDraft) {
 				throw new TRPCError({
 					code: "FORBIDDEN",
-					message: "You must submit your picks before viewing other players' picks",
+					message:
+						"You must submit your picks before viewing other players' picks",
 				});
 			}
 			return picks;

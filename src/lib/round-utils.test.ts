@@ -10,12 +10,15 @@ import { getRoundAbbreviation } from "./round-utils";
 
 describe("getRoundAbbreviation", () => {
 	describe("standard round names", () => {
-		it.each(roundAbbreviationTestCases)(
-			'should return "$expected" for "$roundName"',
-			({ roundName, roundNumber, expected }) => {
-				expect(getRoundAbbreviation(roundName, roundNumber)).toBe(expected);
-			}
-		);
+		it.each(
+			roundAbbreviationTestCases,
+		)('should return "$expected" for "$roundName"', ({
+			roundName,
+			roundNumber,
+			expected,
+		}) => {
+			expect(getRoundAbbreviation(roundName, roundNumber)).toBe(expected);
+		});
 	});
 
 	describe("Round of 128", () => {

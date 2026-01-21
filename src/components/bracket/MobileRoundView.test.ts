@@ -11,18 +11,19 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+	createActiveRound,
+	createEmptyRound,
+	createFinalizedRound,
+	createSmallBracket,
+	first,
+} from "~/test/bracket-fixtures";
+import {
 	BOTTOM_PADDING,
 	CARD_RIGHT_MARGIN,
 	MATCH_GAP,
 	MATCH_HEIGHT,
 	TOP_PADDING,
 } from "./bracket-constants";
-import {
-	createActiveRound,
-	createEmptyRound,
-	createFinalizedRound,
-	createSmallBracket,
-} from "~/test/bracket-fixtures";
 import type { RoundData } from "./bracket-types";
 
 // =============================================================================
@@ -50,7 +51,7 @@ describe("height calculation", () => {
 
 	it("should calculate height for single match", () => {
 		const round = createActiveRound({
-			matches: [createActiveRound().matches[0]!],
+			matches: [first(createActiveRound().matches)],
 		});
 
 		const expected = TOP_PADDING + MATCH_HEIGHT + BOTTOM_PADDING;
@@ -62,10 +63,7 @@ describe("height calculation", () => {
 		const round = createActiveRound(); // Has 4 matches
 
 		const expected =
-			TOP_PADDING +
-			4 * MATCH_HEIGHT +
-			3 * MATCH_GAP +
-			BOTTOM_PADDING;
+			TOP_PADDING + 4 * MATCH_HEIGHT + 3 * MATCH_GAP + BOTTOM_PADDING;
 
 		expect(calculateHeight(round)).toBe(expected);
 		expect(expected).toBe(488); // 16 + 320 + 72 + 80
@@ -73,7 +71,7 @@ describe("height calculation", () => {
 
 	it("should increase height with more matches", () => {
 		const round1 = createActiveRound({
-			matches: [createActiveRound().matches[0]!],
+			matches: [first(createActiveRound().matches)],
 		});
 		const round4 = createActiveRound();
 
@@ -248,7 +246,7 @@ describe("BracketMatch props", () => {
 
 	it("should pass match data", () => {
 		const round = createActiveRound();
-		const match = round.matches[0]!;
+		const match = first(round.matches);
 
 		expect(match).toHaveProperty("id");
 		expect(match).toHaveProperty("matchNumber");
@@ -365,7 +363,7 @@ describe("key prop", () => {
 describe("component integration", () => {
 	it("should work with MobileBracketWithConnectors", () => {
 		const rounds = createSmallBracket();
-		const round = rounds[0]!;
+		const round = first(rounds);
 		const hasNextRound = 0 < rounds.length - 1;
 
 		const props = {
@@ -405,29 +403,25 @@ describe("component integration", () => {
 describe("edge cases", () => {
 	it("should handle single match round", () => {
 		const round = createActiveRound({
-			matches: [createActiveRound().matches[0]!],
+			matches: [first(createActiveRound().matches)],
 		});
 
 		expect(round.matches.length).toBe(1);
 
-		const height =
-			TOP_PADDING + MATCH_HEIGHT + BOTTOM_PADDING;
+		const height = TOP_PADDING + MATCH_HEIGHT + BOTTOM_PADDING;
 		expect(height).toBe(176);
 	});
 
 	it("should handle round with many matches", () => {
-		const round = {
+		const _round = {
 			...createActiveRound(),
-			matches: Array.from({ length: 64 }, (_, i) =>
-				createActiveRound().matches[0]!
+			matches: Array.from({ length: 64 }, (_, _i) =>
+				first(createActiveRound().matches),
 			),
 		};
 
 		const height =
-			TOP_PADDING +
-			64 * MATCH_HEIGHT +
-			63 * MATCH_GAP +
-			BOTTOM_PADDING;
+			TOP_PADDING + 64 * MATCH_HEIGHT + 63 * MATCH_GAP + BOTTOM_PADDING;
 
 		expect(height).toBe(TOP_PADDING + 5120 + 1512 + BOTTOM_PADDING);
 	});

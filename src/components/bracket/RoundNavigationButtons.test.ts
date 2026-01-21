@@ -34,7 +34,7 @@ describe("button rendering", () => {
 
 		// Verify rounds are provided in order (component receives sorted rounds)
 		for (let i = 0; i < rounds.length - 1; i++) {
-			expect(rounds[i]!.roundNumber).toBeLessThan(rounds[i + 1]!.roundNumber);
+			expect(rounds[i]?.roundNumber).toBeLessThan(rounds[i + 1]?.roundNumber);
 		}
 	});
 });
@@ -61,7 +61,7 @@ describe("selection state", () => {
 		const selectedIndex = 0;
 
 		const selectedCount = rounds.filter(
-			(_, index) => index === selectedIndex
+			(_, index) => index === selectedIndex,
 		).length;
 
 		expect(selectedCount).toBe(1);
@@ -69,7 +69,8 @@ describe("selection state", () => {
 
 	describe("selected styling", () => {
 		it("should apply primary colors when selected", () => {
-			const selectedClasses = "border-primary bg-primary text-primary-foreground";
+			const selectedClasses =
+				"border-primary bg-primary text-primary-foreground";
 
 			expect(selectedClasses).toContain("border-primary");
 			expect(selectedClasses).toContain("bg-primary");
@@ -217,7 +218,10 @@ describe("round abbreviation display", () => {
 	/**
 	 * Gets abbreviation for round name
 	 */
-	function getRoundAbbreviation(roundName: string, roundNumber: number): string {
+	function getRoundAbbreviation(
+		roundName: string,
+		roundNumber: number,
+	): string {
 		const roundMap: Record<string, string> = {
 			"Round of 128": "R128",
 			"Round of 64": "R64",
@@ -231,12 +235,15 @@ describe("round abbreviation display", () => {
 		return roundMap[roundName] ?? `R${roundNumber}`;
 	}
 
-	it.each(roundAbbreviationTestCases)(
-		'should display "$expected" for "$roundName"',
-		({ roundName, roundNumber, expected }) => {
-			expect(getRoundAbbreviation(roundName, roundNumber)).toBe(expected);
-		}
-	);
+	it.each(
+		roundAbbreviationTestCases,
+	)('should display "$expected" for "$roundName"', ({
+		roundName,
+		roundNumber,
+		expected,
+	}) => {
+		expect(getRoundAbbreviation(roundName, roundNumber)).toBe(expected);
+	});
 
 	it("should display abbreviation within circular button", () => {
 		// Abbreviations should be short enough for circular button

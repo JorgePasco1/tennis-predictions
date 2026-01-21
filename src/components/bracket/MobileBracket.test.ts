@@ -16,6 +16,7 @@ import {
 	createEmptyRound,
 	createFinalizedRound,
 	createSmallBracket,
+	first,
 	roundAbbreviationTestCases,
 } from "~/test/bracket-fixtures";
 import type { RoundData } from "./bracket-types";
@@ -68,7 +69,7 @@ describe("default round selection", () => {
 
 		// Second priority: latest round with finalized matches
 		const roundsWithFinalizedMatches = sortedRounds.filter((r) =>
-			r.matches.some((m) => m.status === "finalized")
+			r.matches.some((m) => m.status === "finalized"),
 		);
 		if (roundsWithFinalizedMatches.length > 0) {
 			const latestFinalized =
@@ -119,7 +120,7 @@ describe("default round selection", () => {
 			const sorted = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
 
 			const roundsWithFinalized = sorted.filter((r) =>
-				r.matches.some((m) => m.status === "finalized")
+				r.matches.some((m) => m.status === "finalized"),
 			);
 
 			expect(roundsWithFinalized.length).toBeGreaterThan(0);
@@ -173,8 +174,8 @@ describe("round selector buttons", () => {
 			const isSelected = (roundId: number) =>
 				selectedRoundId === roundId.toString();
 
-			expect(isSelected(rounds[0]!.id)).toBe(true);
-			expect(isSelected(rounds[1]!.id)).toBe(false);
+			expect(isSelected(rounds[0]?.id)).toBe(true);
+			expect(isSelected(rounds[1]?.id)).toBe(false);
 		});
 
 		it("should apply correct class for selected state", () => {
@@ -199,7 +200,10 @@ describe("round selector buttons", () => {
 
 	describe("accessibility", () => {
 		it("should generate correct aria-label", () => {
-			const round = createActiveRound({ name: "Quarter Finals", isActive: true });
+			const round = createActiveRound({
+				name: "Quarter Finals",
+				isActive: true,
+			});
 
 			const ariaLabel = `${round.name}${round.isActive ? " (Active)" : ""}${round.isFinalized ? " (Finalized)" : ""}`;
 
@@ -207,7 +211,10 @@ describe("round selector buttons", () => {
 		});
 
 		it("should include finalized status in aria-label", () => {
-			const round = createFinalizedRound({ name: "Semi Finals", isFinalized: true });
+			const round = createFinalizedRound({
+				name: "Semi Finals",
+				isFinalized: true,
+			});
 
 			const ariaLabel = `${round.name}${round.isActive ? " (Active)" : ""}${round.isFinalized ? " (Finalized)" : ""}`;
 
@@ -232,7 +239,10 @@ describe("round abbreviation display", () => {
 	/**
 	 * Simple abbreviation function matching round-utils behavior
 	 */
-	function getRoundAbbreviation(roundName: string, roundNumber: number): string {
+	function getRoundAbbreviation(
+		roundName: string,
+		roundNumber: number,
+	): string {
 		const roundMap: Record<string, string> = {
 			"Round of 128": "R128",
 			"Round of 64": "R64",
@@ -246,12 +256,15 @@ describe("round abbreviation display", () => {
 		return roundMap[roundName] ?? `R${roundNumber}`;
 	}
 
-	it.each(roundAbbreviationTestCases)(
-		'should display "$expected" for "$roundName"',
-		({ roundName, roundNumber, expected }) => {
-			expect(getRoundAbbreviation(roundName, roundNumber)).toBe(expected);
-		}
-	);
+	it.each(
+		roundAbbreviationTestCases,
+	)('should display "$expected" for "$roundName"', ({
+		roundName,
+		roundNumber,
+		expected,
+	}) => {
+		expect(getRoundAbbreviation(roundName, roundNumber)).toBe(expected);
+	});
 });
 
 // =============================================================================
@@ -300,7 +313,7 @@ describe("round selection change", () => {
 		const selectedRoundId = "2";
 
 		const selectedRound = sorted.find(
-			(r) => r.id.toString() === selectedRoundId
+			(r) => r.id.toString() === selectedRoundId,
 		);
 
 		expect(selectedRound).toBeDefined();
@@ -378,7 +391,7 @@ describe("edge cases", () => {
 
 	it("should handle round with single match", () => {
 		const round = createActiveRound({
-			matches: [createActiveRound().matches[0]!],
+			matches: [first(createActiveRound().matches)],
 		});
 
 		expect(round.matches.length).toBe(1);
@@ -404,7 +417,7 @@ describe("edge cases", () => {
 
 		const sorted = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
 		const roundsWithFinalized = sorted.filter((r) =>
-			r.matches.some((m) => m.status === "finalized")
+			r.matches.some((m) => m.status === "finalized"),
 		);
 
 		expect(roundsWithFinalized.length).toBe(0);
@@ -426,10 +439,10 @@ describe("state consistency", () => {
 
 	it("should match round by string comparison", () => {
 		const rounds = createSmallBracket();
-		const selectedRoundId = rounds[0]!.id.toString();
+		const selectedRoundId = rounds[0]?.id.toString();
 
 		const selectedRound = rounds.find(
-			(r) => r.id.toString() === selectedRoundId
+			(r) => r.id.toString() === selectedRoundId,
 		);
 
 		expect(selectedRound).toBeDefined();

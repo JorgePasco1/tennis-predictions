@@ -12,7 +12,11 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { mockMatchPicksModalData } from "~/test/bracket-fixtures";
+import {
+	first,
+	getElement,
+	mockMatchPicksModalData,
+} from "~/test/bracket-fixtures";
 
 // =============================================================================
 // Modal State Tests
@@ -282,12 +286,12 @@ describe("picks list display", () => {
 
 	describe("pick item display", () => {
 		it("should show user display name", () => {
-			const pick = mockMatchPicksModalData.matchWithPicks.picks[0]!;
+			const pick = first(mockMatchPicksModalData.matchWithPicks.picks);
 			expect(pick.user.displayName).toBe("John Doe");
 		});
 
 		it("should show prediction details", () => {
-			const pick = mockMatchPicksModalData.matchWithPicks.picks[0]!;
+			const pick = first(mockMatchPicksModalData.matchWithPicks.picks);
 
 			expect(pick.pick.predictedWinner).toBe("Carlos Alcaraz");
 			expect(pick.pick.predictedSetsWon).toBe(3);
@@ -295,17 +299,17 @@ describe("picks list display", () => {
 		});
 
 		it("should show correct indicator for correct prediction", () => {
-			const pick = mockMatchPicksModalData.matchWithPicks.picks[0]!;
+			const pick = first(mockMatchPicksModalData.matchWithPicks.picks);
 			expect(pick.pick.isWinnerCorrect).toBe(true);
 		});
 
 		it("should show exact score badge when applicable", () => {
-			const pick = mockMatchPicksModalData.matchWithPicks.picks[0]!;
+			const pick = first(mockMatchPicksModalData.matchWithPicks.picks);
 			expect(pick.pick.isExactScore).toBe(true);
 		});
 
 		it("should show wrong indicator for incorrect prediction", () => {
-			const pick = mockMatchPicksModalData.matchWithPicks.picks[1]!;
+			const pick = getElement(mockMatchPicksModalData.matchWithPicks.picks, 1);
 			expect(pick.pick.isWinnerCorrect).toBe(false);
 		});
 	});
@@ -355,14 +359,14 @@ describe("retirement handling", () => {
 
 describe("avatar display", () => {
 	it("should show image when imageUrl exists", () => {
-		const pick = mockMatchPicksModalData.matchWithPicks.picks[0]!;
+		const pick = first(mockMatchPicksModalData.matchWithPicks.picks);
 		const hasImage = !!pick.user.imageUrl;
 
 		expect(hasImage).toBe(true);
 	});
 
 	it("should show fallback initials when no image", () => {
-		const pick = mockMatchPicksModalData.matchWithPicks.picks[1]!;
+		const pick = getElement(mockMatchPicksModalData.matchWithPicks.picks, 1);
 		const hasImage = !!pick.user.imageUrl;
 		const initials = pick.user.displayName
 			.split(" ")
@@ -388,7 +392,7 @@ describe("pick row styling", () => {
 	function getPickRowClasses(
 		isFinalized: boolean,
 		isRetirement: boolean,
-		isWinnerCorrect: boolean | null
+		isWinnerCorrect: boolean | null,
 	): string {
 		if (isFinalized && !isRetirement) {
 			return isWinnerCorrect

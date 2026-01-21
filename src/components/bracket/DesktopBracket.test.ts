@@ -16,9 +16,9 @@ import {
 	createEmptyRound,
 	createFinalizedRound,
 	createFullTournamentBracket,
-	createMixedRound,
 	createOddMatchesBracket,
 	createSmallBracket,
+	first,
 } from "~/test/bracket-fixtures";
 import type { RoundData } from "./bracket-types";
 
@@ -89,7 +89,9 @@ describe("empty state handling", () => {
 
 	it("should detect when first round has no matches", () => {
 		const rounds = [createEmptyRound()];
-		const sortedRounds = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
+		const sortedRounds = [...rounds].sort(
+			(a, b) => a.roundNumber - b.roundNumber,
+		);
 		const firstRound = sortedRounds[0];
 
 		expect(firstRound?.matches.length).toBe(0);
@@ -97,7 +99,9 @@ describe("empty state handling", () => {
 
 	it("should handle rounds with no data gracefully", () => {
 		const rounds: RoundData[] = [];
-		const sortedRounds = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
+		const sortedRounds = [...rounds].sort(
+			(a, b) => a.roundNumber - b.roundNumber,
+		);
 		const firstRound = sortedRounds[0];
 
 		expect(firstRound).toBeUndefined();
@@ -182,10 +186,7 @@ describe("match positioning", () => {
 	/**
 	 * Calculates the top position for a match in a given round
 	 */
-	function calculateMatchTop(
-		roundIndex: number,
-		matchIndex: number
-	): number {
+	function calculateMatchTop(roundIndex: number, matchIndex: number): number {
 		const spacingMultiplier = 2 ** roundIndex;
 		const unitHeight = MATCH_HEIGHT + MATCH_GAP;
 		const offsetInUnits = (spacingMultiplier - 1) / 2;
@@ -298,7 +299,7 @@ describe("connector positioning", () => {
 	function calculateConnectorPositions(
 		roundIndex: number,
 		matchIndex: number,
-		columnLeft: number
+		columnLeft: number,
 	): {
 		hLineStartX: number;
 		matchConnectY: number;
@@ -389,7 +390,7 @@ describe("next match connector positioning", () => {
 	 */
 	function calculateNextMatchConnectY(
 		roundIndex: number,
-		matchIndex: number
+		matchIndex: number,
 	): number {
 		const nextMatchIndex = Math.floor(matchIndex / 2);
 		const nextSpacingMultiplier = 2 ** (roundIndex + 1);
@@ -554,7 +555,9 @@ describe("round data validation", () => {
 		const sorted = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
 
 		for (let i = 0; i < sorted.length - 1; i++) {
-			expect(sorted[i + 1]!.roundNumber).toBeGreaterThan(sorted[i]!.roundNumber);
+			expect(sorted[i + 1]?.roundNumber).toBeGreaterThan(
+				sorted[i]?.roundNumber,
+			);
 		}
 	});
 
@@ -575,7 +578,7 @@ describe("edge cases", () => {
 	it("should handle round with single match", () => {
 		const rounds = [
 			createActiveRound({
-				matches: [createFinalizedRound().matches[0]!],
+				matches: [first(createFinalizedRound().matches)],
 			}),
 		];
 

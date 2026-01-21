@@ -20,7 +20,6 @@ import {
 	createMatchWithWrongPick,
 	createPendingMatch,
 	createRetirementMatch,
-	playerNameTestCases,
 } from "~/test/bracket-fixtures";
 import type { MatchData } from "./bracket-types";
 
@@ -34,7 +33,11 @@ describe("formatPlayerName logic", () => {
 	 * Note: The actual component uses ellipsis character, but for testing
 	 * we use "..." to validate the truncation logic
 	 */
-	function formatPlayerName(name: string, seed: number | null, maxLength = 20): string {
+	function formatPlayerName(
+		name: string,
+		seed: number | null,
+		maxLength = 20,
+	): string {
 		const seedPrefix = seed ? `(${seed}) ` : "";
 		const availableLength = maxLength - seedPrefix.length;
 		const truncatedName =
@@ -50,7 +53,9 @@ describe("formatPlayerName logic", () => {
 		});
 
 		it("should display full name when it fits", () => {
-			expect(formatPlayerName("Novak Djokovic", null, 20)).toBe("Novak Djokovic");
+			expect(formatPlayerName("Novak Djokovic", null, 20)).toBe(
+				"Novak Djokovic",
+			);
 		});
 
 		it("should truncate long names", () => {
@@ -114,7 +119,7 @@ describe("score parsing logic", () => {
 	function parseScore(
 		finalScore: string | null,
 		isPlayer1Winner: boolean,
-		isPlayer2Winner: boolean
+		isPlayer2Winner: boolean,
 	): { player1Sets: number | undefined; player2Sets: number | undefined } {
 		const scoreParts = finalScore?.split("-").map(Number) ?? [];
 		const [winnerSets, loserSets] =
@@ -317,8 +322,10 @@ describe("user pick display logic", () => {
 	describe("user pick identification", () => {
 		it("should identify which player user picked", () => {
 			const match = createMatchWithCorrectPick();
-			const userPickedPlayer1 = match.userPick?.predictedWinner === match.player1Name;
-			const userPickedPlayer2 = match.userPick?.predictedWinner === match.player2Name;
+			const userPickedPlayer1 =
+				match.userPick?.predictedWinner === match.player1Name;
+			const userPickedPlayer2 =
+				match.userPick?.predictedWinner === match.player2Name;
 
 			expect(userPickedPlayer1 || userPickedPlayer2).toBe(true);
 		});
@@ -543,7 +550,7 @@ describe("player row styling logic", () => {
 	function getPlayerRowClasses(
 		isFinalized: boolean,
 		isThisPlayerWinner: boolean,
-		isCompact: boolean
+		isCompact: boolean,
 	): string {
 		if (!isFinalized) return "";
 
@@ -551,9 +558,7 @@ describe("player row styling logic", () => {
 			return isThisPlayerWinner ? "bg-green-50 font-semibold" : "";
 		}
 
-		return isThisPlayerWinner
-			? "bg-green-100 font-semibold"
-			: "bg-muted/50";
+		return isThisPlayerWinner ? "bg-green-100 font-semibold" : "bg-muted/50";
 	}
 
 	describe("pending match", () => {
@@ -565,7 +570,9 @@ describe("player row styling logic", () => {
 
 	describe("finalized match - compact", () => {
 		it("should highlight winner row", () => {
-			expect(getPlayerRowClasses(true, true, true)).toBe("bg-green-50 font-semibold");
+			expect(getPlayerRowClasses(true, true, true)).toBe(
+				"bg-green-50 font-semibold",
+			);
 		});
 
 		it("should not highlight loser row", () => {
@@ -575,7 +582,9 @@ describe("player row styling logic", () => {
 
 	describe("finalized match - mobile", () => {
 		it("should highlight winner row", () => {
-			expect(getPlayerRowClasses(true, true, false)).toBe("bg-green-100 font-semibold");
+			expect(getPlayerRowClasses(true, true, false)).toBe(
+				"bg-green-100 font-semibold",
+			);
 		});
 
 		it("should mute loser row", () => {
@@ -636,7 +645,8 @@ describe("retirement display logic", () => {
 	it("should void picks for retirement matches", () => {
 		const match = createRetirementMatch();
 		// Retirement matches should not count for scoring
-		const shouldShowResult = match.status === "finalized" && !match.isRetirement;
+		const shouldShowResult =
+			match.status === "finalized" && !match.isRetirement;
 		expect(shouldShowResult).toBe(false);
 	});
 });
