@@ -96,6 +96,11 @@ export const adminRouter = createTRPCRouter({
 									player2Name: z.string(),
 									player1Seed: z.number().int().nullable(),
 									player2Seed: z.number().int().nullable(),
+									// Optional result fields from parser
+									winnerName: z.string().optional(),
+									setsWon: z.number().int().min(0).max(3).optional(),
+									setsLost: z.number().int().min(0).max(3).optional(),
+									finalScore: z.string().optional(),
 								}),
 							),
 						}),
@@ -263,7 +268,35 @@ export const adminRouter = createTRPCRouter({
 							};
 						}
 
-						// Normal match (with real names or TBD placeholders)
+						// Check if match has result from parser
+						const hasResult =
+							match.winnerName &&
+							match.setsWon != null &&
+							match.setsLost != null &&
+							match.finalScore;
+
+						if (hasResult) {
+							// Match is completed - mark as finalized with results
+							return {
+								roundId: round.id,
+								matchNumber: match.matchNumber,
+								player1Name,
+								player2Name,
+								player1Seed: match.player1Seed,
+								player2Seed: match.player2Seed,
+								winnerName: match.winnerName,
+								finalScore: match.finalScore,
+								setsWon: match.setsWon,
+								setsLost: match.setsLost,
+								status: "finalized" as const,
+								isBye: false,
+								isRetirement: false, // We can't detect retirement from HTML currently
+								finalizedAt: new Date(),
+								finalizedBy: ctx.user.id, // Imported from parser
+							};
+						}
+
+						// Normal pending match (with real names or TBD placeholders)
 						return {
 							roundId: round.id,
 							matchNumber: match.matchNumber,
@@ -281,21 +314,21 @@ export const adminRouter = createTRPCRouter({
 					}
 				}
 
-				// After all rounds and matches are created, propagate BYE winners
-				// This handles BYE matches in any round, not just Round 1
+				// After all rounds and matches are created, propagate winners from finalized matches
+				// This handles both BYE matches and completed matches from the parser
 				const allRounds = await tx.query.rounds.findMany({
 					where: eq(rounds.tournamentId, tournament.id),
 					with: { matches: true },
 					orderBy: [asc(rounds.roundNumber)],
 				});
 
-				// Process each round to find BYE matches and propagate winners
+				// Process each round to find finalized matches and propagate winners
 				for (const currentRound of allRounds) {
-					const byeMatches = currentRound.matches.filter(
-						(m) => m.isBye && m.winnerName,
+					const finalizedMatches = currentRound.matches.filter(
+						(m) => m.status === "finalized" && m.winnerName,
 					);
 
-					if (byeMatches.length === 0) continue;
+					if (finalizedMatches.length === 0) continue;
 
 					// Find next round
 					const nextRound = allRounds.find(
@@ -304,32 +337,35 @@ export const adminRouter = createTRPCRouter({
 
 					if (!nextRound) continue; // Final round, no next round to propagate to
 
-					// Propagate each BYE winner to next round
-					for (const byeMatch of byeMatches) {
+					// Propagate each finalized match winner to next round
+					for (const finalizedMatch of finalizedMatches) {
+						// Skip if no winner name (defensive check)
+						if (!finalizedMatch.winnerName) continue;
+
 						// Calculate which match in next round this winner goes to
-						const nextMatchNumber = Math.ceil(byeMatch.matchNumber / 2);
+						const nextMatchNumber = Math.ceil(finalizedMatch.matchNumber / 2);
 						const nextMatch = nextRound.matches.find(
 							(m) => m.matchNumber === nextMatchNumber && !m.deletedAt,
 						);
 
 						if (nextMatch) {
 							// Odd match → player1, Even match → player2
-							const isPlayer1 = byeMatch.matchNumber % 2 === 1;
+							const isPlayer1 = finalizedMatch.matchNumber % 2 === 1;
 
 							// Determine the winner's seed
 							const winnerSeed =
-								byeMatch.winnerName === byeMatch.player1Name
-									? byeMatch.player1Seed
-									: byeMatch.player2Seed;
+								finalizedMatch.winnerName === finalizedMatch.player1Name
+									? finalizedMatch.player1Seed
+									: finalizedMatch.player2Seed;
 
 							// Build update object, only including seed if it's not null
 							const updateData = isPlayer1
 								? {
-										player1Name: byeMatch.winnerName!,
+										player1Name: finalizedMatch.winnerName,
 										...(winnerSeed !== null && { player1Seed: winnerSeed }),
 									}
 								: {
-										player2Name: byeMatch.winnerName!,
+										player2Name: finalizedMatch.winnerName,
 										...(winnerSeed !== null && { player2Seed: winnerSeed }),
 									};
 
@@ -338,6 +374,38 @@ export const adminRouter = createTRPCRouter({
 								.set(updateData)
 								.where(eq(matches.id, nextMatch.id));
 						}
+					}
+				}
+
+				// Auto-finalize rounds where all matches are completed
+				// This handles cases where the parser imports fully completed rounds
+				for (const round of allRounds) {
+					const roundMatches = round.matches.filter((m) => !m.deletedAt);
+					const allMatchesFinalized = roundMatches.every(
+						(m) => m.status === "finalized",
+					);
+
+					if (
+						allMatchesFinalized &&
+						roundMatches.length > 0 &&
+						!round.isFinalized
+					) {
+						await tx
+							.update(rounds)
+							.set({ isFinalized: true })
+							.where(eq(rounds.id, round.id));
+					}
+				}
+				// After winner propagation, calculate scores for all finalized matches
+				// Only calculate for non-BYE matches that have actual scores
+				const allFinalizedMatches = allRounds.flatMap((round) =>
+					round.matches.filter((m) => m.status === "finalized" && !m.isBye),
+				);
+
+				for (const match of allFinalizedMatches) {
+					// Only calculate scores if match has actual scores (not BYE)
+					if (match.setsWon != null && match.setsLost != null) {
+						await calculateMatchPickScores(tx, match.id);
 					}
 				}
 
@@ -761,6 +829,64 @@ export const adminRouter = createTRPCRouter({
 				.returning();
 
 			return updatedRound;
+		}),
+
+	/**
+	 * Soft delete a tournament
+	 * This will also soft delete all associated matches
+	 */
+	deleteTournament: adminProcedure
+		.input(
+			z.object({
+				id: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get tournament with rounds and matches to check for user picks
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(eq(tournaments.id, input.id), isNull(tournaments.deletedAt)),
+				with: {
+					rounds: {
+						with: {
+							userRoundPicks: true,
+							matches: true,
+						},
+					},
+				},
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			// Count total picks to return for user feedback
+			const totalPicks = tournament.rounds.reduce(
+				(sum, round) => sum + round.userRoundPicks.length,
+				0,
+			);
+
+			// Soft delete the tournament
+			await ctx.db
+				.update(tournaments)
+				.set({ deletedAt: new Date() })
+				.where(eq(tournaments.id, input.id));
+
+			// Soft delete all associated matches
+			const roundIds = tournament.rounds.map((r) => r.id);
+			if (roundIds.length > 0) {
+				await ctx.db
+					.update(matches)
+					.set({ deletedAt: new Date() })
+					.where(
+						sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					);
+			}
+
+			return {
+				success: true,
+				tournamentName: tournament.name,
+				picksDeleted: totalPicks,
+			};
 		}),
 
 	/**
