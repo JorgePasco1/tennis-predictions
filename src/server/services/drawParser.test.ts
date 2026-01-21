@@ -309,10 +309,9 @@ describe("validateParsedDraw", () => {
 
 			const result = validateParsedDraw(draw);
 
-			expect(result.valid).toBe(false);
-			expect(
-				result.errors.some((e) => e.includes("missing player names")),
-			).toBe(true);
+			// After changes: validator now allows missing player names (they become "TBD")
+			expect(result.valid).toBe(true);
+			expect(result.errors.length).toBe(0);
 		});
 
 		it("should collect multiple errors", () => {
@@ -352,5 +351,352 @@ describe("parseAtpDraw + validateParsedDraw integration", () => {
 		const validation = validateParsedDraw(parsed);
 
 		expect(validation.valid).toBe(false);
+	});
+});
+
+// =============================================================================
+// Empty Player Name Validation Tests (Updated Behavior)
+// =============================================================================
+
+describe("validateParsedDraw empty player name handling", () => {
+	describe("allows empty player names (TBD handling)", () => {
+		it("should allow empty player1Name", () => {
+			const draw = {
+				tournamentName: "Test Tournament",
+				rounds: [
+					{
+						roundNumber: 1,
+						name: "Round of 128",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "", // Empty - will become TBD
+								player2Name: "Novak Djokovic",
+								player1Seed: null,
+								player2Seed: 1,
+							},
+						],
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(true);
+			expect(result.errors).toEqual([]);
+		});
+
+		it("should allow empty player2Name", () => {
+			const draw = {
+				tournamentName: "Test Tournament",
+				rounds: [
+					{
+						roundNumber: 1,
+						name: "Round of 128",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "Jannik Sinner",
+								player2Name: "", // Empty - will become TBD
+								player1Seed: 1,
+								player2Seed: null,
+							},
+						],
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(true);
+			expect(result.errors).toEqual([]);
+		});
+
+		it("should allow both player names empty", () => {
+			const draw = {
+				tournamentName: "Test Tournament",
+				rounds: [
+					{
+						roundNumber: 2, // Round 2 - later rounds often have empty names
+						name: "Round of 64",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "", // Empty - will become TBD
+								player2Name: "", // Empty - will become TBD
+								player1Seed: null,
+								player2Seed: null,
+							},
+						],
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(true);
+			expect(result.errors).toEqual([]);
+		});
+
+		it("should allow mixed empty and filled player names in same round", () => {
+			const draw = {
+				tournamentName: "Test Tournament",
+				rounds: [
+					{
+						roundNumber: 1,
+						name: "Round of 128",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "Novak Djokovic",
+								player2Name: "Dino Prizmic",
+								player1Seed: 1,
+								player2Seed: null,
+							},
+							{
+								matchNumber: 2,
+								player1Name: "", // Empty
+								player2Name: "Carlos Alcaraz",
+								player1Seed: null,
+								player2Seed: 2,
+							},
+							{
+								matchNumber: 3,
+								player1Name: "", // Empty
+								player2Name: "", // Empty
+								player1Seed: null,
+								player2Seed: null,
+							},
+						],
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(true);
+			expect(result.errors).toEqual([]);
+		});
+
+		it("should allow empty player names in later rounds", () => {
+			const draw = {
+				tournamentName: "Test Tournament",
+				rounds: [
+					{
+						roundNumber: 1,
+						name: "Round of 128",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "Novak Djokovic",
+								player2Name: "Qualifier",
+								player1Seed: 1,
+								player2Seed: null,
+							},
+						],
+					},
+					{
+						roundNumber: 2,
+						name: "Round of 64",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "", // Empty - waiting for Round 1 results
+								player2Name: "", // Empty - waiting for Round 1 results
+								player1Seed: null,
+								player2Seed: null,
+							},
+						],
+					},
+					{
+						roundNumber: 3,
+						name: "Round of 32",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "", // Empty
+								player2Name: "", // Empty
+								player1Seed: null,
+								player2Seed: null,
+							},
+						],
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(true);
+			expect(result.errors).toEqual([]);
+		});
+	});
+
+	describe("still validates required fields", () => {
+		it("should still reject Unknown Tournament name", () => {
+			const draw = {
+				tournamentName: "Unknown Tournament",
+				rounds: [
+					{
+						roundNumber: 1,
+						name: "Round 1",
+						matches: [
+							{
+								matchNumber: 1,
+								player1Name: "", // Empty is now OK
+								player2Name: "", // Empty is now OK
+								player1Seed: null,
+								player2Seed: null,
+							},
+						],
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors).toContain("Tournament name could not be extracted");
+		});
+
+		it("should still reject empty rounds array", () => {
+			const draw = {
+				tournamentName: "Valid Tournament",
+				rounds: [],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors).toContain("No rounds found in the draw");
+		});
+
+		it("should still reject rounds with no matches", () => {
+			const draw = {
+				tournamentName: "Valid Tournament",
+				rounds: [
+					{
+						roundNumber: 1,
+						name: "Round 1",
+						matches: [], // Empty matches array
+					},
+				],
+			};
+
+			const result = validateParsedDraw(draw);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors).toContain("Round 1 has no matches");
+		});
+	});
+});
+
+// =============================================================================
+// BYE Player Name Detection Tests
+// =============================================================================
+
+describe("BYE player name in parsed draws", () => {
+	it("should preserve BYE as player name when parsed", () => {
+		const htmlWithBye = `
+			<html>
+			<head><title>Test Tournament</title></head>
+			<body>
+				<div class="draw draw-round-1">
+					<div class="draw-header">Round of 128</div>
+					<div class="draw-item">
+						<div class="stats-item">
+							<div class="player-info">
+								<div class="name"><a href="/player">BYE</a></div>
+							</div>
+						</div>
+						<div class="stats-item">
+							<div class="player-info">
+								<div class="name"><a href="/player">Novak Djokovic</a><span>(1)</span></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</body>
+			</html>
+		`;
+
+		const result = parseAtpDraw(htmlWithBye);
+
+		expect(result.rounds.length).toBe(1);
+		expect(result.rounds[0]?.matches.length).toBe(1);
+		expect(result.rounds[0]?.matches[0]?.player1Name).toBe("BYE");
+		expect(result.rounds[0]?.matches[0]?.player2Name).toBe("Novak Djokovic");
+	});
+
+	it("should validate draw with BYE player name", () => {
+		const drawWithBye = {
+			tournamentName: "Test Tournament",
+			rounds: [
+				{
+					roundNumber: 1,
+					name: "Round of 128",
+					matches: [
+						{
+							matchNumber: 1,
+							player1Name: "BYE",
+							player2Name: "Novak Djokovic",
+							player1Seed: null,
+							player2Seed: 1,
+						},
+					],
+				},
+			],
+		};
+
+		const result = validateParsedDraw(drawWithBye);
+
+		expect(result.valid).toBe(true);
+		expect(result.errors).toEqual([]);
+	});
+
+	it("should validate draw with multiple BYE matches", () => {
+		const drawWithMultipleByes = {
+			tournamentName: "Test Tournament",
+			rounds: [
+				{
+					roundNumber: 1,
+					name: "Round of 128",
+					matches: [
+						{
+							matchNumber: 1,
+							player1Name: "BYE",
+							player2Name: "Novak Djokovic",
+							player1Seed: null,
+							player2Seed: 1,
+						},
+						{
+							matchNumber: 2,
+							player1Name: "Carlos Alcaraz",
+							player2Name: "BYE",
+							player1Seed: 2,
+							player2Seed: null,
+						},
+						{
+							matchNumber: 3,
+							player1Name: "Jannik Sinner",
+							player2Name: "Qualifier",
+							player1Seed: 3,
+							player2Seed: null,
+						},
+						{
+							matchNumber: 4,
+							player1Name: "bye", // lowercase
+							player2Name: "Daniil Medvedev",
+							player1Seed: null,
+							player2Seed: 4,
+						},
+					],
+				},
+			],
+		};
+
+		const result = validateParsedDraw(drawWithMultipleByes);
+
+		expect(result.valid).toBe(true);
+		expect(result.errors).toEqual([]);
 	});
 });

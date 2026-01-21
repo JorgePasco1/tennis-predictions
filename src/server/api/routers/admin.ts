@@ -1,10 +1,9 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { adminProcedure, createTRPCRouter } from "~/server/api/trpc";
 import {
 	matches,
-	matchPicks,
 	roundScoringRules,
 	rounds,
 	tournamentFormatEnum,
@@ -12,11 +11,7 @@ import {
 	userRoundPicks,
 	users,
 } from "~/server/db/schema";
-import {
-	type ParsedDraw,
-	parseAtpDraw,
-	validateParsedDraw,
-} from "~/server/services/drawParser";
+import { parseAtpDraw, validateParsedDraw } from "~/server/services/drawParser";
 import {
 	calculateMatchPickScores,
 	unfinalizeMatchScores,
@@ -232,18 +227,117 @@ export const adminRouter = createTRPCRouter({
 					});
 
 					// Insert matches for this round
-					const matchValues = roundData.matches.map((match) => ({
-						roundId: round.id,
-						matchNumber: match.matchNumber,
-						player1Name: match.player1Name,
-						player2Name: match.player2Name,
-						player1Seed: match.player1Seed,
-						player2Seed: match.player2Seed,
-						status: "pending" as const,
-					}));
+					const matchValues = roundData.matches.map((match) => {
+						// Normalize player names - use "TBD" for empty/missing names
+						const player1Name = match.player1Name?.trim() || "TBD";
+						const player2Name = match.player2Name?.trim() || "TBD";
+
+						// Detect BYE matches (case-insensitive, only if name is provided)
+						const player1IsBye = player1Name.toUpperCase() === "BYE";
+						const player2IsBye = player2Name.toUpperCase() === "BYE";
+						const isBye = player1IsBye || player2IsBye;
+
+						if (isBye) {
+							// Validate that exactly one player is BYE (not both)
+							if (player1IsBye && player2IsBye) {
+								throw new Error(
+									`Invalid BYE match in round ${roundData.roundNumber}, match ${match.matchNumber}: both players cannot be BYE`,
+								);
+							}
+
+							// BYE match: auto-finalize with non-BYE player as winner
+							const winnerName = player1IsBye ? player2Name : player1Name;
+
+							return {
+								roundId: round.id,
+								matchNumber: match.matchNumber,
+								player1Name,
+								player2Name,
+								player1Seed: match.player1Seed,
+								player2Seed: match.player2Seed,
+								winnerName,
+								status: "finalized" as const,
+								isBye: true,
+								finalizedAt: new Date(),
+								finalizedBy: ctx.user.id,
+							};
+						}
+
+						// Normal match (with real names or TBD placeholders)
+						return {
+							roundId: round.id,
+							matchNumber: match.matchNumber,
+							player1Name,
+							player2Name,
+							player1Seed: player1Name === "TBD" ? null : match.player1Seed,
+							player2Seed: player2Name === "TBD" ? null : match.player2Seed,
+							status: "pending" as const,
+							isBye: false,
+						};
+					});
 
 					if (matchValues.length > 0) {
 						await tx.insert(matches).values(matchValues);
+					}
+				}
+
+				// After all rounds and matches are created, propagate BYE winners
+				// This handles BYE matches in any round, not just Round 1
+				const allRounds = await tx.query.rounds.findMany({
+					where: eq(rounds.tournamentId, tournament.id),
+					with: { matches: true },
+					orderBy: [asc(rounds.roundNumber)],
+				});
+
+				// Process each round to find BYE matches and propagate winners
+				for (const currentRound of allRounds) {
+					const byeMatches = currentRound.matches.filter(
+						(m) => m.isBye && m.winnerName,
+					);
+
+					if (byeMatches.length === 0) continue;
+
+					// Find next round
+					const nextRound = allRounds.find(
+						(r) => r.roundNumber === currentRound.roundNumber + 1,
+					);
+
+					if (!nextRound) continue; // Final round, no next round to propagate to
+
+					// Propagate each BYE winner to next round
+					for (const byeMatch of byeMatches) {
+						// Calculate which match in next round this winner goes to
+						const nextMatchNumber = Math.ceil(byeMatch.matchNumber / 2);
+						const nextMatch = nextRound.matches.find(
+							(m) => m.matchNumber === nextMatchNumber && !m.deletedAt,
+						);
+
+						if (nextMatch) {
+							// Odd match → player1, Even match → player2
+							const isPlayer1 = byeMatch.matchNumber % 2 === 1;
+
+							// Determine the winner's seed
+							const winnerSeed =
+								byeMatch.winnerName === byeMatch.player1Name
+									? byeMatch.player1Seed
+									: byeMatch.player2Seed;
+
+							// Build update object, only including seed if it's not null
+							const updateData = isPlayer1
+								? {
+										player1Name: byeMatch.winnerName!,
+										...(winnerSeed !== null && { player1Seed: winnerSeed }),
+									}
+								: {
+										player2Name: byeMatch.winnerName!,
+										...(winnerSeed !== null && { player2Seed: winnerSeed }),
+									};
+
+							await tx
+								.update(matches)
+								.set(updateData)
+								.where(eq(matches.id, nextMatch.id));
+						}
 					}
 				}
 
@@ -425,6 +519,13 @@ export const adminRouter = createTRPCRouter({
 				throw new Error("Match not found");
 			}
 
+			// Prevent manual finalization of BYE matches
+			if (match.isBye) {
+				throw new Error(
+					"BYE matches are automatically finalized during tournament creation and cannot be manually updated",
+				);
+			}
+
 			// Verify winner is one of the players
 			if (
 				input.winnerName !== match.player1Name &&
@@ -505,6 +606,26 @@ export const adminRouter = createTRPCRouter({
 						)
 						.where(eq(matches.id, nextMatch.id));
 				}
+			}
+
+			// After winner propagation, check if all matches in the round are finalized
+			// If so, automatically mark the round as finalized
+			const roundMatches = await ctx.db.query.matches.findMany({
+				where: and(
+					eq(matches.roundId, match.roundId),
+					isNull(matches.deletedAt),
+				),
+			});
+
+			const allMatchesFinalized = roundMatches.every(
+				(m) => m.status === "finalized",
+			);
+
+			if (allMatchesFinalized && !match.round.isFinalized) {
+				await ctx.db
+					.update(rounds)
+					.set({ isFinalized: true })
+					.where(eq(rounds.id, match.roundId));
 			}
 
 			return updatedMatch;
@@ -726,220 +847,13 @@ export const adminRouter = createTRPCRouter({
 				};
 			});
 		}),
-
-	/**
-	 * Close a round - finalize it, create next round if needed, and propagate winners
-	 */
-	closeRound: adminProcedure
-		.input(
-			z.object({
-				roundId: z.number().int(),
-				activateNextRound: z.boolean().default(false),
-			}),
-		)
-		.mutation(async ({ ctx, input }) => {
-			// Get the round with its matches and tournament
-			const round = await ctx.db.query.rounds.findFirst({
-				where: eq(rounds.id, input.roundId),
-				with: {
-					tournament: {
-						with: {
-							rounds: {
-								with: {
-									matches: true,
-								},
-							},
-						},
-					},
-					matches: true,
-				},
-			});
-
-			if (!round) {
-				throw new Error("Round not found");
-			}
-
-			// Check if round is already finalized
-			if (round.isFinalized) {
-				throw new Error("Round is already closed");
-			}
-
-			// Check if all matches are finalized
-			const pendingMatches = round.matches.filter(
-				(m) => m.status === "pending" && !m.deletedAt,
-			);
-			if (pendingMatches.length > 0) {
-				throw new Error(
-					`Cannot close round: ${pendingMatches.length} match(es) are not finalized`,
-				);
-			}
-
-			// Get winners from current round sorted by match number
-			const currentMatchWinners = round.matches
-				.filter((m) => !m.deletedAt && m.winnerName)
-				.sort((a, b) => a.matchNumber - b.matchNumber)
-				.map((m) => m.winnerName as string);
-
-			// Determine if this is the final round (no next round possible)
-			const nextRoundName = getNextRoundName(round.name);
-			const isFinalRound = nextRoundName === null;
-
-			// Find existing next round (by round number)
-			const existingNextRound = round.tournament.rounds.find(
-				(r) => r.roundNumber === round.roundNumber + 1,
-			);
-
-			// Use transaction for atomic updates
-			return await ctx.db.transaction(async (tx) => {
-				// Mark round as finalized
-				await tx
-					.update(rounds)
-					.set({ isFinalized: true })
-					.where(eq(rounds.id, input.roundId));
-
-				// If this is the final round, just return
-				if (isFinalRound) {
-					return {
-						success: true,
-						hasNextRound: false,
-						nextRoundActivated: false,
-						nextRoundCreated: false,
-					};
-				}
-
-				let nextRoundId: number;
-				let nextRoundCreated = false;
-
-				// Create next round if it doesn't exist
-				if (!existingNextRound) {
-					// Calculate number of matches for next round (half of current)
-					const nextRoundMatchCount = Math.floor(
-						currentMatchWinners.length / 2,
-					);
-
-					if (nextRoundMatchCount === 0) {
-						throw new Error(
-							"Cannot create next round: not enough winners from current round",
-						);
-					}
-
-					// Create the next round
-					const [newRound] = await tx
-						.insert(rounds)
-						.values({
-							tournamentId: round.tournament.id,
-							roundNumber: round.roundNumber + 1,
-							name: nextRoundName,
-							isActive: false,
-							isFinalized: false,
-						})
-						.returning();
-
-					if (!newRound) {
-						throw new Error("Failed to create next round");
-					}
-
-					nextRoundId = newRound.id;
-					nextRoundCreated = true;
-
-					// Create scoring rules for the new round
-					const scoring = getScoringForRound(nextRoundName);
-					await tx.insert(roundScoringRules).values({
-						roundId: newRound.id,
-						pointsPerWinner: scoring.pointsPerWinner,
-						pointsExactScore: scoring.pointsExactScore,
-					});
-
-					// Create matches for the next round with player names from winners
-					const matchValues = [];
-					for (let i = 0; i < nextRoundMatchCount; i++) {
-						const player1Index = i * 2;
-						const player2Index = i * 2 + 1;
-
-						matchValues.push({
-							roundId: newRound.id,
-							matchNumber: i + 1,
-							player1Name: currentMatchWinners[player1Index] ?? "TBD",
-							player2Name: currentMatchWinners[player2Index] ?? "TBD",
-							status: "pending" as const,
-						});
-					}
-
-					await tx.insert(matches).values(matchValues);
-				} else {
-					// Next round exists, just update player names
-					nextRoundId = existingNextRound.id;
-
-					const nextRoundMatches = existingNextRound.matches
-						.filter((m) => !m.deletedAt)
-						.sort((a, b) => a.matchNumber - b.matchNumber);
-
-					// Match winners to next round:
-					// Match 1 & 2 winners → Next Match 1
-					// Match 3 & 4 winners → Next Match 2
-					// etc.
-					for (let i = 0; i < nextRoundMatches.length; i++) {
-						const player1Index = i * 2;
-						const player2Index = i * 2 + 1;
-
-						const player1Name = currentMatchWinners[player1Index];
-						const player2Name = currentMatchWinners[player2Index];
-
-						const updateData: { player1Name?: string; player2Name?: string } =
-							{};
-
-						if (player1Name) {
-							updateData.player1Name = player1Name;
-						}
-						if (player2Name) {
-							updateData.player2Name = player2Name;
-						}
-
-						if (Object.keys(updateData).length > 0) {
-							await tx
-								.update(matches)
-								.set(updateData)
-								.where(eq(matches.id, nextRoundMatches[i]!.id));
-						}
-					}
-				}
-
-				// Optionally activate the next round
-				if (input.activateNextRound) {
-					// Deactivate all rounds first
-					await tx
-						.update(rounds)
-						.set({ isActive: false })
-						.where(eq(rounds.tournamentId, round.tournament.id));
-
-					// Activate next round
-					await tx
-						.update(rounds)
-						.set({ isActive: true })
-						.where(eq(rounds.id, nextRoundId));
-
-					// Update tournament's current round number
-					await tx
-						.update(tournaments)
-						.set({ currentRoundNumber: round.roundNumber + 1 })
-						.where(eq(tournaments.id, round.tournament.id));
-				}
-
-				return {
-					success: true,
-					hasNextRound: true,
-					nextRoundActivated: input.activateNextRound,
-					nextRoundCreated,
-				};
-			});
-		}),
 });
 
 /**
  * Get the next round name based on the current round name
  * Returns null if the tournament is over (current round is Final)
  */
-function getNextRoundName(currentRoundName: string): string | null {
+function _getNextRoundName(currentRoundName: string): string | null {
 	const roundProgression: Record<string, string> = {
 		"Round of 128": "Round of 64",
 		"Round of 64": "Round of 32",

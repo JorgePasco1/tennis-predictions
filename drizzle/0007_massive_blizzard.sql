@@ -1,0 +1,1 @@
+ALTER TABLE "match" ADD COLUMN "is_bye" boolean DEFAULT false NOT NULL;

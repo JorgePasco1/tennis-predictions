@@ -26,7 +26,7 @@ export default function AdminTournamentManagePage({
 	params: Promise<{ id: string }>;
 }) {
 	const { id } = use(params);
-	const tournamentId = Number.parseInt(id);
+	const tournamentId = Number.parseInt(id, 10);
 
 	const { data: tournament, refetch } = api.tournaments.getById.useQuery({
 		id: tournamentId,
@@ -70,25 +70,14 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
-	const closeRoundMutation = api.admin.closeRound.useMutation({
-		onSuccess: (result) => {
-			refetch();
-			let message = "Round closed!";
-			if (result.nextRoundCreated && result.nextRoundActivated) {
-				message = "Round closed! Next round created and activated.";
-			} else if (result.nextRoundCreated) {
-				message = "Round closed! Next round created with winners.";
-			} else if (result.nextRoundActivated) {
-				message = "Round closed! Next round has been activated.";
-			} else if (result.hasNextRound) {
-				message = "Round closed! Winners propagated to next round.";
-			}
-			toast.success(message);
+	// TODO: Remove closeRound UI - rounds now auto-finalize when all matches complete
+	// Stub mutation to prevent TypeScript errors - does not actually call API
+	const closeRoundMutation = {
+		isPending: false,
+		mutateAsync: async () => {
+			toast.info("Rounds now auto-finalize when all matches are complete");
 		},
-		onError: (error) => {
-			toast.error(error.message || "Failed to close round");
-		},
-	});
+	};
 
 	const updateRoundDatesMutation = api.admin.updateRoundDates.useMutation({
 		onSuccess: () => {
@@ -147,6 +136,7 @@ export default function AdminTournamentManagePage({
 		null,
 	);
 	const [showCloseRoundDialog, setShowCloseRoundDialog] = useState(false);
+	// TODO: Remove closeRound UI - rounds now auto-finalize when all matches complete
 	const [closeRoundDialogData, setCloseRoundDialogData] = useState<{
 		roundId: number;
 		roundName: string;
@@ -299,6 +289,7 @@ export default function AdminTournamentManagePage({
 		}
 	};
 
+	// TODO: Remove closeRound UI
 	const handleOpenCloseRoundDialog = (
 		roundId: number,
 		roundName: string,
@@ -311,16 +302,11 @@ export default function AdminTournamentManagePage({
 
 	const handleConfirmCloseRound = async () => {
 		if (!closeRoundDialogData) return;
-
 		setShowCloseRoundDialog(false);
 
 		try {
-			await closeRoundMutation.mutateAsync({
-				roundId: closeRoundDialogData.roundId,
-				activateNextRound,
-			});
+			await closeRoundMutation.mutateAsync();
 		} catch (error) {
-			// Error toast is already handled by the mutation's onError
 			console.error("Failed to close round:", error);
 		}
 	};
@@ -843,7 +829,7 @@ export default function AdminTournamentManagePage({
 							className="w-full rounded-lg border border-gray-300 px-4 py-2"
 							onChange={(e) =>
 								setSelectedRound(
-									e.target.value ? Number.parseInt(e.target.value) : null,
+									e.target.value ? Number.parseInt(e.target.value, 10) : null,
 								)
 							}
 							value={selectedRound ?? ""}

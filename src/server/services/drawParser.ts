@@ -172,7 +172,7 @@ function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio<any>): {
 		const seedText = sanitizeText($seedSpan.text());
 		// Seed is in format "(1)" or "(32)"
 		const seedMatch = seedText.match(/\((\d+)\)/);
-		if (seedMatch && seedMatch[1]) {
+		if (seedMatch?.[1]) {
 			seed = Number.parseInt(seedMatch[1], 10);
 		}
 	}
@@ -202,13 +202,7 @@ export function validateParsedDraw(draw: ParsedDraw): {
 			errors.push(`Round ${round.roundNumber} has no matches`);
 		}
 
-		for (const match of round.matches) {
-			if (!match.player1Name || !match.player2Name) {
-				errors.push(
-					`Match ${match.matchNumber} in round ${round.roundNumber} is missing player names`,
-				);
-			}
-		}
+		// Empty player names are allowed - they will be filled with "TBD" during commit
 	}
 
 	return {

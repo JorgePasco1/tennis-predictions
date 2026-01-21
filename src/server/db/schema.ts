@@ -152,6 +152,7 @@ export const matches = createTable(
 			() => users.id,
 		),
 		isRetirement: boolean("is_retirement").notNull().default(false),
+		isBye: boolean("is_bye").notNull().default(false),
 		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
