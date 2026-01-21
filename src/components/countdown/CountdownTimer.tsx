@@ -20,7 +20,7 @@ interface CountdownTimerProps {
 }
 
 function calculateTimeRemaining(deadline: Date): TimeRemaining {
-	const now = new Date().getTime();
+	const now = Date.now();
 	const target = new Date(deadline).getTime();
 	const total = target - now;
 
@@ -84,7 +84,7 @@ export function CountdownTimer({
 		setHasExpired(false);
 		setTimeRemaining(null);
 		setIsOpen(false);
-	}, [deadline, opensAt]);
+	}, []);
 
 	useEffect(() => {
 		if (!deadline) return;
@@ -254,7 +254,7 @@ export function CountdownTimerCompact({
 		setHasExpired(false);
 		setTimeRemaining(null);
 		setIsOpen(false);
-	}, [deadline, opensAt]);
+	}, []);
 
 	useEffect(() => {
 		if (!deadline) return;

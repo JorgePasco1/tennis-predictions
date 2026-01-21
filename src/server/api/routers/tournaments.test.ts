@@ -4,7 +4,6 @@
  * Tests for tournament listing, retrieval, and status management.
  */
 
-import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	mockMatches,
@@ -203,7 +202,7 @@ describe("tournaments router", () => {
 		it("should throw error when slug not found", async () => {
 			mockDb.query.tournaments.findFirst.mockResolvedValue(null);
 
-			const getTournamentBySlug = async (slug: string) => {
+			const getTournamentBySlug = async (_slug: string) => {
 				const tournament = await mockDb.query.tournaments.findFirst({});
 				if (!tournament) {
 					throw new Error("Tournament not found");

@@ -142,7 +142,7 @@ export default function NewTournamentPage() {
 								id="year"
 								max={2100}
 								min={2000}
-								onChange={(e) => setYear(Number.parseInt(e.target.value))}
+								onChange={(e) => setYear(Number.parseInt(e.target.value, 10))}
 								type="number"
 								value={year}
 							/>

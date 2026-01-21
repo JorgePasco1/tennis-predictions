@@ -6,13 +6,11 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
 	mockMatches,
 	mockRounds,
-	mockTournaments,
 	mockUserRoundPicks,
-	mockUsers,
 	scoreTestCases,
 } from "~/test/fixtures";
 import { createMockDb, type MockDb } from "~/test/mock-db";
@@ -29,7 +27,7 @@ describe("picks router", () => {
 			it("should reject picks when round is not found", async () => {
 				mockDb.query.rounds.findFirst.mockResolvedValue(null);
 
-				const validateRound = async (roundId: number) => {
+				const validateRound = async (_roundId: number) => {
 					const round = await mockDb.query.rounds.findFirst({});
 					if (!round) {
 						throw new TRPCError({
@@ -507,7 +505,7 @@ describe("user data isolation", () => {
 	it("should enforce unique constraint on user + round combination", () => {
 		const existingPicks = new Set(["user-1:round-1", "user-2:round-1"]);
 
-		const canSubmit = (userId: string, roundId: string, isDraft: boolean) => {
+		const canSubmit = (userId: string, roundId: string, _isDraft: boolean) => {
 			const key = `${userId}:${roundId}`;
 			// If exists and is not draft, cannot submit
 			return !existingPicks.has(key);

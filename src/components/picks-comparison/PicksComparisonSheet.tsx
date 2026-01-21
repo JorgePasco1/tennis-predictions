@@ -68,7 +68,7 @@ export function PicksComparisonSheet({
 			)
 		: [];
 
-	const isLoading = isLoadingRounds || isLoadingComparison;
+	const _isLoading = isLoadingRounds || isLoadingComparison;
 
 	return (
 		<Sheet onOpenChange={onOpenChange} open={open}>
