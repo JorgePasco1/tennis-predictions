@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { formatPlayerName } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
 type ParsedDraw = {
@@ -17,6 +18,11 @@ type ParsedDraw = {
 			player2Name: string;
 			player1Seed: number | null;
 			player2Seed: number | null;
+			// Optional score fields for completed matches
+			winnerName?: string;
+			setsWon?: number;
+			setsLost?: number;
+			finalScore?: string;
 		}>;
 	}>;
 };
@@ -274,6 +280,32 @@ export default function NewTournamentPage() {
 									0,
 								)}
 							</p>
+							{(() => {
+								const allMatches = parsedDraw.rounds.flatMap((r) => r.matches);
+								const completedMatches = allMatches.filter(
+									(m) => m.winnerName,
+								).length;
+								const pendingMatches = allMatches.length - completedMatches;
+
+								if (completedMatches > 0) {
+									return (
+										<div className="mt-3 rounded-md border border-green-300 bg-green-50 p-3">
+											<p className="font-semibold text-green-900 text-sm">
+												Match Results Detected:
+											</p>
+											<p className="text-green-800 text-sm">
+												✓ {completedMatches} completed match
+												{completedMatches !== 1 ? "es" : ""} with scores
+											</p>
+											<p className="text-green-800 text-sm">
+												○ {pendingMatches} pending match
+												{pendingMatches !== 1 ? "es" : ""}
+											</p>
+										</div>
+									);
+								}
+								return null;
+							})()}
 						</div>
 
 						{/* Rounds Preview */}
@@ -307,15 +339,74 @@ export default function NewTournamentPage() {
 											)}
 										</div>
 										<div className="grid gap-2 text-sm">
-											{matchesToShow.map((match) => (
-												<div className="text-gray-600" key={match.matchNumber}>
-													Match {match.matchNumber}:{" "}
-													{match.player1Seed && `(${match.player1Seed}) `}
-													{match.player1Name} vs{" "}
-													{match.player2Seed && `(${match.player2Seed}) `}
-													{match.player2Name}
-												</div>
-											))}
+											{matchesToShow.map((match) => {
+												const isCompleted = Boolean(match.winnerName);
+												const isBye =
+													match.player1Name.toUpperCase() === "BYE" ||
+													match.player2Name.toUpperCase() === "BYE";
+
+												return (
+													<div
+														className={`rounded-md p-2 ${
+															isCompleted
+																? "border border-green-200 bg-green-50"
+																: "bg-gray-50"
+														}`}
+														key={match.matchNumber}
+													>
+														<div className="flex items-start justify-between">
+															<div className="flex-1">
+																<span className="font-medium text-gray-700">
+																	Match {match.matchNumber}:
+																</span>{" "}
+																<span
+																	className={
+																		match.winnerName === match.player1Name
+																			? "font-semibold text-green-700"
+																			: "text-gray-600"
+																	}
+																>
+																	{match.player1Seed &&
+																		`(${match.player1Seed}) `}
+																	{formatPlayerName(match.player1Name)}
+																</span>
+																<span className="text-gray-500"> vs </span>
+																<span
+																	className={
+																		match.winnerName === match.player2Name
+																			? "font-semibold text-green-700"
+																			: "text-gray-600"
+																	}
+																>
+																	{match.player2Seed &&
+																		`(${match.player2Seed}) `}
+																	{formatPlayerName(match.player2Name)}
+																</span>
+															</div>
+															{isCompleted && (
+																<div className="ml-4 flex items-center gap-2">
+																	{isBye ? (
+																		<span className="rounded bg-yellow-100 px-2 py-1 font-medium text-xs text-yellow-800">
+																			BYE
+																		</span>
+																	) : (
+																		<>
+																			<span className="rounded bg-green-100 px-2 py-1 font-medium text-green-800 text-xs">
+																				Winner: {match.winnerName}
+																			</span>
+																			{match.finalScore && (
+																				<span className="rounded bg-blue-100 px-2 py-1 font-mono text-blue-800 text-xs">
+																					{match.finalScore}
+																				</span>
+																			)}
+																		</>
+																	)}
+																</div>
+															)}
+														</div>
+													</div>
+												);
+											})}
 											{!isExpanded && hiddenCount > 0 && (
 												<button
 													className="text-left text-blue-600 hover:text-blue-800"

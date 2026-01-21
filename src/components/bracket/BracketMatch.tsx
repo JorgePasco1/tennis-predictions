@@ -2,7 +2,7 @@
 
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
-import { cn } from "~/lib/utils";
+import { cn, formatPlayerName as getPlayerName } from "~/lib/utils";
 import type { MatchData } from "./bracket-types";
 
 interface BracketMatchProps {
@@ -12,13 +12,19 @@ interface BracketMatchProps {
 	onClick?: (matchId: number) => void;
 }
 
-function formatPlayerName(name: string, seed: number | null, maxLength = 20) {
+function formatPlayerName(
+	name: string | null,
+	seed: number | null,
+	maxLength = 20,
+) {
+	// Handle empty/null names with TBD
+	const playerName = name?.trim() || "TBD";
 	const seedPrefix = seed ? `(${seed}) ` : "";
 	const availableLength = maxLength - seedPrefix.length;
 	const truncatedName =
-		name.length > availableLength
-			? `${name.substring(0, availableLength - 1)}…`
-			: name;
+		playerName.length > availableLength
+			? `${playerName.substring(0, availableLength - 1)}…`
+			: playerName;
 	return `${seedPrefix}${truncatedName}`;
 }
 
@@ -254,7 +260,7 @@ export function BracketMatch({
 								({match.player1Seed}){" "}
 							</span>
 						)}
-						{match.player1Name}
+						{getPlayerName(match.player1Name)}
 					</span>
 					<div className="flex items-center gap-2">
 						{isFinalized && player1Sets !== undefined && (
@@ -289,7 +295,7 @@ export function BracketMatch({
 								({match.player2Seed}){" "}
 							</span>
 						)}
-						{match.player2Name}
+						{getPlayerName(match.player2Name)}
 					</span>
 					<div className="flex items-center gap-2">
 						{isFinalized && player2Sets !== undefined && (
