@@ -207,7 +207,7 @@ describe("click handler", () => {
 	});
 
 	it("should handle undefined onMatchClick", () => {
-		const onMatchClick: ((id: number) => void) | undefined = undefined;
+		const onMatchClick = undefined as ((id: number) => void) | undefined;
 
 		expect(() => {
 			if (onMatchClick) {

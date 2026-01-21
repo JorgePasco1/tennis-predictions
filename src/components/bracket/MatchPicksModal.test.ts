@@ -213,7 +213,7 @@ describe("data display", () => {
 		});
 
 		it("should show default title when loading", () => {
-			const data = null;
+			const data = null as typeof mockMatchPicksModalData.matchWithPicks | null;
 			const title = data
 				? `Match ${data.match.matchNumber}: ${data.round.name}`
 				: "Match Predictions";

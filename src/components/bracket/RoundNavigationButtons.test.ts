@@ -34,7 +34,7 @@ describe("button rendering", () => {
 
 		// Verify rounds are provided in order (component receives sorted rounds)
 		for (let i = 0; i < rounds.length - 1; i++) {
-			expect(rounds[i]?.roundNumber).toBeLessThan(rounds[i + 1]?.roundNumber);
+			expect(rounds[i]?.roundNumber ?? 0).toBeLessThan(rounds[i + 1]?.roundNumber ?? 0);
 		}
 	});
 });
@@ -194,8 +194,8 @@ describe("accessibility", () => {
 		});
 
 		it("should be false when not selected", () => {
-			const selectedIndex = 0;
-			const buttonIndex = 1;
+			const selectedIndex: number = 0;
+			const buttonIndex: number = 1;
 			const ariaPressed = selectedIndex === buttonIndex;
 
 			expect(ariaPressed).toBe(false);

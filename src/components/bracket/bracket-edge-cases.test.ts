@@ -255,8 +255,8 @@ describe("tournament format edge cases", () => {
 
 			// Each round should have half the matches of the previous
 			for (let i = 0; i < rounds.length - 1; i++) {
-				const currentMatches = rounds[i]?.matches.length;
-				const nextMatches = rounds[i + 1]?.matches.length;
+				const currentMatches = rounds[i]?.matches.length ?? 0;
+				const nextMatches = rounds[i + 1]?.matches.length ?? 0;
 
 				expect(nextMatches).toBe(Math.ceil(currentMatches / 2));
 			}

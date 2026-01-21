@@ -444,7 +444,7 @@ describe("click handler propagation", () => {
 	});
 
 	it("should handle undefined click handler", () => {
-		const onClick: ((id: number) => void) | undefined = undefined;
+		const onClick = undefined as ((id: number) => void) | undefined;
 
 		// Should not throw when onClick is undefined
 		expect(() => {
@@ -555,8 +555,8 @@ describe("round data validation", () => {
 		const sorted = [...rounds].sort((a, b) => a.roundNumber - b.roundNumber);
 
 		for (let i = 0; i < sorted.length - 1; i++) {
-			expect(sorted[i + 1]?.roundNumber).toBeGreaterThan(
-				sorted[i]?.roundNumber,
+			expect(sorted[i + 1]?.roundNumber ?? 0).toBeGreaterThan(
+				sorted[i]?.roundNumber ?? 0,
 			);
 		}
 	});

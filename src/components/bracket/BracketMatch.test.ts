@@ -599,7 +599,7 @@ describe("player row styling logic", () => {
 
 describe("accessibility attributes", () => {
 	it("should have button role when clickable", () => {
-		const onClick = vi.fn();
+		const onClick = vi.fn() as (() => void) | undefined;
 		const role = onClick ? "button" : undefined;
 		expect(role).toBe("button");
 	});
@@ -611,7 +611,7 @@ describe("accessibility attributes", () => {
 	});
 
 	it("should have tabIndex when clickable", () => {
-		const onClick = vi.fn();
+		const onClick = vi.fn() as (() => void) | undefined;
 		const tabIndex = onClick ? 0 : undefined;
 		expect(tabIndex).toBe(0);
 	});

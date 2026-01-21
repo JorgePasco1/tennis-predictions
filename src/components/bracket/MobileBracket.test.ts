@@ -174,8 +174,8 @@ describe("round selector buttons", () => {
 			const isSelected = (roundId: number) =>
 				selectedRoundId === roundId.toString();
 
-			expect(isSelected(rounds[0]?.id)).toBe(true);
-			expect(isSelected(rounds[1]?.id)).toBe(false);
+			expect(isSelected(rounds[0]?.id ?? 0)).toBe(true);
+			expect(isSelected(rounds[1]?.id ?? 0)).toBe(false);
 		});
 
 		it("should apply correct class for selected state", () => {
@@ -337,7 +337,7 @@ describe("click handler", () => {
 	});
 
 	it("should handle undefined click handler", () => {
-		const onMatchClick: ((id: number) => void) | undefined = undefined;
+		const onMatchClick = undefined as ((id: number) => void) | undefined;
 
 		expect(() => {
 			if (onMatchClick) {
