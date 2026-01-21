@@ -3,27 +3,7 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
-
-export interface MatchData {
-	id: number;
-	matchNumber: number;
-	player1Name: string;
-	player2Name: string;
-	player1Seed: number | null;
-	player2Seed: number | null;
-	status: string;
-	winnerName: string | null;
-	finalScore: string | null;
-	isRetirement: boolean;
-	userPick: {
-		predictedWinner: string;
-		predictedSetsWon: number;
-		predictedSetsLost: number;
-		isWinnerCorrect: boolean | null;
-		isExactScore: boolean | null;
-		pointsEarned: number;
-	} | null;
-}
+import type { MatchData } from "./bracket-types";
 
 interface BracketMatchProps {
 	match: MatchData;

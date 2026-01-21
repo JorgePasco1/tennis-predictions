@@ -37,7 +37,7 @@ export function BracketConnectors({
 	const matchConnectY = topPosition + connectorOffset;
 
 	// If no pair partner exists (odd number of matches), only draw horizontal line
-	if (!hasPairPartner && isTopOfPair) {
+	if (!hasPairPartner) {
 		return (
 			<div
 				className="absolute h-0.5 bg-border"
