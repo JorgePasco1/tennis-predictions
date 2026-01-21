@@ -206,33 +206,56 @@ export const adminRouter = createTRPCRouter({
 					throw new Error("Failed to create tournament");
 				}
 
-				// Insert rounds and matches
-				for (const roundData of parsedDraw.rounds) {
-					const [round] = await tx
-						.insert(rounds)
-						.values({
+				// PHASE 1 OPTIMIZATION: Batch insert all rounds at once (1 query instead of N)
+				const insertedRounds = await tx
+					.insert(rounds)
+					.values(
+						parsedDraw.rounds.map((roundData) => ({
 							tournamentId: tournament.id,
 							roundNumber: roundData.roundNumber,
 							name: roundData.name,
 							isActive: false,
 							isFinalized: false,
-						})
-						.returning();
+						})),
+					)
+					.returning();
 
-					if (!round) {
-						throw new Error(`Failed to create round ${roundData.roundNumber}`);
+				if (insertedRounds.length !== parsedDraw.rounds.length) {
+					throw new Error("Failed to create all rounds");
+				}
+
+				// Create mapping from round number to round ID for later use
+				const roundNumberToId = new Map(
+					insertedRounds.map((r) => [r.roundNumber, r.id]),
+				);
+
+				// PHASE 1 OPTIMIZATION: Batch insert all scoring rules at once (1 query instead of N)
+				await tx.insert(roundScoringRules).values(
+					insertedRounds.map((round) => {
+						const roundData = parsedDraw.rounds.find(
+							(r) => r.roundNumber === round.roundNumber,
+						);
+						if (!roundData) {
+							throw new Error(`Round data not found for ${round.roundNumber}`);
+						}
+						const scoring = getScoringForRound(roundData.name);
+						return {
+							roundId: round.id,
+							pointsPerWinner: scoring.pointsPerWinner,
+							pointsExactScore: scoring.pointsExactScore,
+						};
+					}),
+				);
+
+				// PHASE 2 OPTIMIZATION: Batch insert ALL matches at once (1 query instead of N)
+				// Flatten all matches from all rounds into a single array
+				const allMatchValues = parsedDraw.rounds.flatMap((roundData) => {
+					const roundId = roundNumberToId.get(roundData.roundNumber);
+					if (!roundId) {
+						throw new Error(`Round ID not found for ${roundData.roundNumber}`);
 					}
 
-					// Create scoring rule for this round using progressive scoring
-					const scoring = getScoringForRound(roundData.name);
-					await tx.insert(roundScoringRules).values({
-						roundId: round.id,
-						pointsPerWinner: scoring.pointsPerWinner,
-						pointsExactScore: scoring.pointsExactScore,
-					});
-
-					// Insert matches for this round
-					const matchValues = roundData.matches.map((match) => {
+					return roundData.matches.map((match) => {
 						// Normalize player names - use "TBD" for empty/missing names
 						const player1Name = match.player1Name?.trim() || "TBD";
 						const player2Name = match.player2Name?.trim() || "TBD";
@@ -254,7 +277,7 @@ export const adminRouter = createTRPCRouter({
 							const winnerName = player1IsBye ? player2Name : player1Name;
 
 							return {
-								roundId: round.id,
+								roundId,
 								matchNumber: match.matchNumber,
 								player1Name,
 								player2Name,
@@ -278,7 +301,7 @@ export const adminRouter = createTRPCRouter({
 						if (hasResult) {
 							// Match is completed - mark as finalized with results
 							return {
-								roundId: round.id,
+								roundId,
 								matchNumber: match.matchNumber,
 								player1Name,
 								player2Name,
@@ -298,7 +321,7 @@ export const adminRouter = createTRPCRouter({
 
 						// Normal pending match (with real names or TBD placeholders)
 						return {
-							roundId: round.id,
+							roundId,
 							matchNumber: match.matchNumber,
 							player1Name,
 							player2Name,
@@ -308,12 +331,14 @@ export const adminRouter = createTRPCRouter({
 							isBye: false,
 						};
 					});
+				});
 
-					if (matchValues.length > 0) {
-						await tx.insert(matches).values(matchValues);
-					}
+				// Insert all matches in a single batch operation
+				if (allMatchValues.length > 0) {
+					await tx.insert(matches).values(allMatchValues);
 				}
 
+				// PHASE 3 OPTIMIZATION: Bulk winner propagation
 				// After all rounds and matches are created, propagate winners from finalized matches
 				// This handles both BYE matches and completed matches from the parser
 				const allRounds = await tx.query.rounds.findMany({
@@ -322,7 +347,18 @@ export const adminRouter = createTRPCRouter({
 					orderBy: [asc(rounds.roundNumber)],
 				});
 
-				// Process each round to find finalized matches and propagate winners
+				// Collect all winner propagation updates grouped by target round
+				type WinnerUpdate = {
+					targetRoundNumber: number;
+					targetMatchNumber: number;
+					playerSlot: "player1" | "player2";
+					winnerName: string;
+					winnerSeed: number | null;
+				};
+
+				const winnerUpdates: WinnerUpdate[] = [];
+
+				// Process each round to find finalized matches and collect updates
 				for (const currentRound of allRounds) {
 					const finalizedMatches = currentRound.matches.filter(
 						(m) => m.status === "finalized" && m.winnerName,
@@ -337,75 +373,163 @@ export const adminRouter = createTRPCRouter({
 
 					if (!nextRound) continue; // Final round, no next round to propagate to
 
-					// Propagate each finalized match winner to next round
+					// Collect updates for each finalized match
 					for (const finalizedMatch of finalizedMatches) {
 						// Skip if no winner name (defensive check)
 						if (!finalizedMatch.winnerName) continue;
 
 						// Calculate which match in next round this winner goes to
 						const nextMatchNumber = Math.ceil(finalizedMatch.matchNumber / 2);
-						const nextMatch = nextRound.matches.find(
-							(m) => m.matchNumber === nextMatchNumber && !m.deletedAt,
-						);
 
-						if (nextMatch) {
-							// Odd match → player1, Even match → player2
-							const isPlayer1 = finalizedMatch.matchNumber % 2 === 1;
+						// Odd match → player1, Even match → player2
+						const playerSlot =
+							finalizedMatch.matchNumber % 2 === 1 ? "player1" : "player2";
 
-							// Determine the winner's seed
-							const winnerSeed =
-								finalizedMatch.winnerName === finalizedMatch.player1Name
-									? finalizedMatch.player1Seed
-									: finalizedMatch.player2Seed;
+						// Determine the winner's seed
+						const winnerSeed =
+							finalizedMatch.winnerName === finalizedMatch.player1Name
+								? finalizedMatch.player1Seed
+								: finalizedMatch.player2Seed;
 
-							// Build update object, only including seed if it's not null
-							const updateData = isPlayer1
-								? {
-										player1Name: finalizedMatch.winnerName,
-										...(winnerSeed !== null && { player1Seed: winnerSeed }),
-									}
-								: {
-										player2Name: finalizedMatch.winnerName,
-										...(winnerSeed !== null && { player2Seed: winnerSeed }),
-									};
+						winnerUpdates.push({
+							targetRoundNumber: nextRound.roundNumber,
+							targetMatchNumber: nextMatchNumber,
+							playerSlot,
+							winnerName: finalizedMatch.winnerName,
+							winnerSeed,
+						});
+					}
+				}
 
+				// Group updates by target round for bulk updates
+				const updatesByRound = new Map<number, WinnerUpdate[]>();
+				for (const update of winnerUpdates) {
+					const roundUpdates = updatesByRound.get(update.targetRoundNumber);
+					if (roundUpdates) {
+						roundUpdates.push(update);
+					} else {
+						updatesByRound.set(update.targetRoundNumber, [update]);
+					}
+				}
+
+				// Execute bulk updates for each round using SQL CASE statements
+				for (const [roundNumber, updates] of updatesByRound) {
+					const targetRound = allRounds.find(
+						(r) => r.roundNumber === roundNumber,
+					);
+					if (!targetRound) continue;
+
+					// Separate updates by player slot
+					const player1Updates = updates.filter(
+						(u) => u.playerSlot === "player1",
+					);
+					const player2Updates = updates.filter(
+						(u) => u.playerSlot === "player2",
+					);
+
+					// Build CASE statements for player1 updates
+					const player1NameCases = player1Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerName}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					const player1SeedCases = player1Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerSeed}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					// Build CASE statements for player2 updates
+					const player2NameCases = player2Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerName}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					const player2SeedCases = player2Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerSeed}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					// Execute single update query for this round
+					if (updates.length > 0) {
+						// Build update object dynamically to only include fields with updates
+						const updateFields: Record<string, unknown> = {};
+
+						if (player1Updates.length > 0) {
+							updateFields.player1Name = sql`CASE ${player1NameCases} ELSE ${matches.player1Name} END`;
+							updateFields.player1Seed = sql`CASE ${player1SeedCases} ELSE ${matches.player1Seed} END`;
+						}
+
+						if (player2Updates.length > 0) {
+							updateFields.player2Name = sql`CASE ${player2NameCases} ELSE ${matches.player2Name} END`;
+							updateFields.player2Seed = sql`CASE ${player2SeedCases} ELSE ${matches.player2Seed} END`;
+						}
+
+						if (Object.keys(updateFields).length > 0) {
 							await tx
 								.update(matches)
-								.set(updateData)
-								.where(eq(matches.id, nextMatch.id));
+								.set(updateFields)
+								.where(eq(matches.roundId, targetRound.id));
 						}
 					}
 				}
 
 				// Auto-finalize rounds where all matches are completed
 				// This handles cases where the parser imports fully completed rounds
-				for (const round of allRounds) {
+				const roundsToFinalize = allRounds.filter((round) => {
 					const roundMatches = round.matches.filter((m) => !m.deletedAt);
 					const allMatchesFinalized = roundMatches.every(
 						(m) => m.status === "finalized",
 					);
+					return (
+						allMatchesFinalized && roundMatches.length > 0 && !round.isFinalized
+					);
+				});
 
-					if (
-						allMatchesFinalized &&
-						roundMatches.length > 0 &&
-						!round.isFinalized
-					) {
-						await tx
-							.update(rounds)
-							.set({ isFinalized: true })
-							.where(eq(rounds.id, round.id));
-					}
+				// Batch update all rounds to finalize in one query
+				if (roundsToFinalize.length > 0) {
+					const roundIdsToFinalize = roundsToFinalize.map((r) => r.id);
+					await tx
+						.update(rounds)
+						.set({ isFinalized: true })
+						.where(
+							sql`${rounds.id} IN (${sql.join(
+								roundIdsToFinalize.map((id) => sql`${id}`),
+								sql`, `,
+							)})`,
+						);
 				}
-				// After winner propagation, calculate scores for all finalized matches
-				// Only calculate for non-BYE matches that have actual scores
-				const allFinalizedMatches = allRounds.flatMap((round) =>
-					round.matches.filter((m) => m.status === "finalized" && !m.isBye),
-				);
 
-				for (const match of allFinalizedMatches) {
-					// Only calculate scores if match has actual scores (not BYE)
-					if (match.setsWon != null && match.setsLost != null) {
-						await calculateMatchPickScores(tx, match.id);
+				// PHASE 4 OPTIMIZATION: Skip score calculation for new tournaments
+				// Check if there are any picks for this tournament before calculating scores
+				const existingPicks = await tx.query.userRoundPicks.findMany({
+					where: sql`${userRoundPicks.roundId} IN (${sql.join(
+						allRounds.map((r) => sql`${r.id}`),
+						sql`, `,
+					)})`,
+					limit: 1, // We only need to know if ANY picks exist
+				});
+
+				// Only calculate scores if there are picks to score
+				if (existingPicks.length > 0) {
+					// After winner propagation, calculate scores for all finalized matches
+					// Only calculate for non-BYE matches that have actual scores
+					const allFinalizedMatches = allRounds.flatMap((round) =>
+						round.matches.filter((m) => m.status === "finalized" && !m.isBye),
+					);
+
+					for (const match of allFinalizedMatches) {
+						// Only calculate scores if match has actual scores (not BYE)
+						if (match.setsWon != null && match.setsLost != null) {
+							await calculateMatchPickScores(tx, match.id);
+						}
 					}
 				}
 
@@ -665,13 +789,26 @@ export const adminRouter = createTRPCRouter({
 					// Odd match numbers → player1, Even match numbers → player2
 					const isPlayer1 = match.matchNumber % 2 === 1;
 
+					// Determine the winner's seed
+					const winnerSeed =
+						input.winnerName === match.player1Name
+							? match.player1Seed
+							: match.player2Seed;
+
+					// Build update object, only including seed if it's not null
+					const updateData = isPlayer1
+						? {
+								player1Name: input.winnerName,
+								...(winnerSeed !== null && { player1Seed: winnerSeed }),
+							}
+						: {
+								player2Name: input.winnerName,
+								...(winnerSeed !== null && { player2Seed: winnerSeed }),
+							};
+
 					await ctx.db
 						.update(matches)
-						.set(
-							isPlayer1
-								? { player1Name: input.winnerName }
-								: { player2Name: input.winnerName },
-						)
+						.set(updateData)
 						.where(eq(matches.id, nextMatch.id));
 				}
 			}
