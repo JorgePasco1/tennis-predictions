@@ -72,8 +72,12 @@ When the user runs this command with a PR number:
      - Whether it's outdated or collapsed
 
 6. Evaluate the comments and give a justified decision on whether we should fix each one or not.
+
 7. Ask the user to confirm which ones they want to fix.
-8. Once finished fixing, reply to each comment individually with a meaningful message, explaining how we fixed or why we decided not to fix. Then resolve each comment.
+
+8. Once finished fixing, reply to each comment individually in the conversation with a meaningful message (NEVER MAKE A DIRECT COMMENT TO THE PR), explaining how we fixed or why we decided not to fix. Then resolve each comment.
+
+9. Commit and push the code.
 
 ## Example Output
 
