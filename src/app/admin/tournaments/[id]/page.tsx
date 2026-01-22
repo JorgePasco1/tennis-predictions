@@ -812,26 +812,12 @@ export default function AdminTournamentManagePage({
 										</span>
 									</div>
 									<button
-										className={`rounded px-4 py-2 font-medium text-sm transition ${
-											canClose
-												? "bg-purple-600 text-white hover:bg-purple-700"
-												: "cursor-not-allowed bg-gray-200 text-gray-500"
-										}`}
-										disabled={!canClose || closeRoundMutation.isPending}
-										onClick={() =>
-											handleOpenCloseRoundDialog(
-												round.id,
-												round.name,
-												!!nextRound,
-											)
-										}
+										className="cursor-not-allowed rounded bg-gray-200 px-4 py-2 font-medium text-gray-500 text-sm transition"
+										disabled={true}
+										title="Rounds auto-finalize when all matches are complete"
 										type="button"
 									>
-										{isClosed
-											? "Closed"
-											: closeRoundMutation.isPending
-												? "Closing..."
-												: "Close Round"}
+										{isClosed ? "Closed" : "Auto-finalizes"}
 									</button>
 								</div>
 							);
@@ -1258,54 +1244,40 @@ export default function AdminTournamentManagePage({
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{/* Close Round Confirmation Dialog */}
+			{/* Auto-finalize Information Dialog (kept for compatibility) */}
 			<AlertDialog
 				onOpenChange={setShowCloseRoundDialog}
 				open={showCloseRoundDialog}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Close Round?</AlertDialogTitle>
+						<AlertDialogTitle>Rounds Auto-Finalize</AlertDialogTitle>
 						<AlertDialogDescription asChild>
 							<div className="text-muted-foreground text-sm">
-								<p>Close {closeRoundDialogData?.roundName}?</p>
+								<p className="mb-3">
+									{closeRoundDialogData?.roundName} will automatically finalize
+									when all matches are complete.
+								</p>
 								<div className="mt-3 space-y-2 text-left">
-									<p className="font-medium text-foreground">This will:</p>
+									<p className="font-medium text-foreground">
+										Automatic finalization will:
+									</p>
 									<ul className="list-inside list-disc space-y-1">
 										<li>Mark the round as finalized</li>
 										{closeRoundDialogData?.hasNextRound && (
 											<li>Propagate winners to the next round</li>
 										)}
 									</ul>
-									<p className="mt-3 font-medium text-yellow-700">
-										This action cannot be easily undone.
+									<p className="mt-3 text-blue-700">
+										No manual action required.
 									</p>
 								</div>
-								{closeRoundDialogData?.hasNextRound && (
-									<div className="mt-4">
-										<label className="flex cursor-pointer items-center gap-2">
-											<input
-												checked={activateNextRound}
-												className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-												onChange={(e) => setActivateNextRound(e.target.checked)}
-												type="checkbox"
-											/>
-											<span className="text-gray-700">
-												Activate next round automatically
-											</span>
-										</label>
-									</div>
-								)}
 							</div>
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-purple-600 hover:bg-purple-700"
-							onClick={handleConfirmCloseRound}
-						>
-							Close Round
+						<AlertDialogAction onClick={() => setShowCloseRoundDialog(false)}>
+							Got it
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

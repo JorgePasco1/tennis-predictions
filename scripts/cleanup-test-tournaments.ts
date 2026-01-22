@@ -132,7 +132,10 @@ async function softDeleteTestTournaments() {
 				.update(matches)
 				.set({ deletedAt: new Date() })
 				.where(
-					sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					sql`${matches.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -200,7 +203,10 @@ async function hardDeleteTestTournaments() {
 			await db
 				.delete(matchPicks)
 				.where(
-					sql`${matchPicks.matchId} IN ${sql.raw(`(${matchIds.join(",")})`)}`,
+					sql`${matchPicks.matchId} IN (${sql.join(
+						matchIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -209,7 +215,10 @@ async function hardDeleteTestTournaments() {
 			await db
 				.delete(userStreaks)
 				.where(
-					sql`${userStreaks.lastMatchId} IN ${sql.raw(`(${matchIds.join(",")})`)}`,
+					sql`${userStreaks.lastMatchId} IN (${sql.join(
+						matchIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -218,7 +227,10 @@ async function hardDeleteTestTournaments() {
 			await db
 				.delete(matches)
 				.where(
-					sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					sql`${matches.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -227,7 +239,10 @@ async function hardDeleteTestTournaments() {
 			await db
 				.delete(userRoundPicks)
 				.where(
-					sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					sql`${userRoundPicks.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -236,7 +251,10 @@ async function hardDeleteTestTournaments() {
 			await db
 				.delete(roundScoringRules)
 				.where(
-					sql`${roundScoringRules.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					sql`${roundScoringRules.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -245,7 +263,10 @@ async function hardDeleteTestTournaments() {
 			await db
 				.delete(userAchievements)
 				.where(
-					sql`${userAchievements.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+					sql`${userAchievements.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
 				);
 		}
 
@@ -253,7 +274,12 @@ async function hardDeleteTestTournaments() {
 		if (roundIds.length > 0) {
 			await db
 				.delete(rounds)
-				.where(sql`${rounds.id} IN ${sql.raw(`(${roundIds.join(",")})`)}`);
+				.where(
+					sql`${rounds.id} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 		}
 
 		// 8. Tournament
@@ -368,7 +394,12 @@ async function deleteByIdConfirm(tournamentId: number) {
 		console.log("    Deleting match picks...");
 		await db
 			.delete(matchPicks)
-			.where(sql`${matchPicks.matchId} IN ${sql.raw(`(${matchIds.join(",")})`)}`);
+			.where(
+				sql`${matchPicks.matchId} IN (${sql.join(
+					matchIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 	}
 
 	// 2. Delete user streaks (references matches via lastMatchId)
@@ -376,7 +407,12 @@ async function deleteByIdConfirm(tournamentId: number) {
 		console.log("    Deleting user streaks...");
 		await db
 			.delete(userStreaks)
-			.where(sql`${userStreaks.lastMatchId} IN ${sql.raw(`(${matchIds.join(",")})`)}`);
+			.where(
+				sql`${userStreaks.lastMatchId} IN (${sql.join(
+					matchIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 	}
 
 	// 3. Delete matches (references rounds)
@@ -384,7 +420,12 @@ async function deleteByIdConfirm(tournamentId: number) {
 		console.log("    Deleting matches...");
 		await db
 			.delete(matches)
-			.where(sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`);
+			.where(
+				sql`${matches.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 	}
 
 	// 4. Delete user round picks (references rounds)
@@ -392,7 +433,12 @@ async function deleteByIdConfirm(tournamentId: number) {
 		console.log("    Deleting user round picks...");
 		await db
 			.delete(userRoundPicks)
-			.where(sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`);
+			.where(
+				sql`${userRoundPicks.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 	}
 
 	// 5. Delete round scoring rules (references rounds)
@@ -401,7 +447,10 @@ async function deleteByIdConfirm(tournamentId: number) {
 		await db
 			.delete(roundScoringRules)
 			.where(
-				sql`${roundScoringRules.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+				sql`${roundScoringRules.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
 			);
 	}
 
@@ -411,7 +460,10 @@ async function deleteByIdConfirm(tournamentId: number) {
 		await db
 			.delete(userAchievements)
 			.where(
-				sql`${userAchievements.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+				sql`${userAchievements.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
 			);
 	}
 
@@ -420,7 +472,12 @@ async function deleteByIdConfirm(tournamentId: number) {
 		console.log("    Deleting rounds...");
 		await db
 			.delete(rounds)
-			.where(sql`${rounds.id} IN ${sql.raw(`(${roundIds.join(",")})`)}`);
+			.where(
+				sql`${rounds.id} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 	}
 
 	// 8. Delete tournament
