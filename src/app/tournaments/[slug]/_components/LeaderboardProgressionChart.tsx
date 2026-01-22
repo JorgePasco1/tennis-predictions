@@ -4,8 +4,6 @@ import { Area, AreaChart, CartesianGrid, Label, XAxis, YAxis } from "recharts";
 import {
 	type ChartConfig,
 	ChartContainer,
-	ChartLegend,
-	ChartLegendContent,
 	ChartTooltip,
 } from "~/components/ui/chart";
 
@@ -250,7 +248,6 @@ export function LeaderboardProgressionChart({
 						<CustomTooltip {...props} pointsData={pointsData} />
 					)}
 				/>
-				<ChartLegend content={<ChartLegendContent />} />
 				{topUsers.map((user, index) => (
 					<Area
 						connectNulls={false}
