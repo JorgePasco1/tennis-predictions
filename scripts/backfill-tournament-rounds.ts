@@ -12,7 +12,7 @@
 import "dotenv/config";
 import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { matches, rounds, roundScoringRules } from "~/server/db/schema";
+import { matches, roundScoringRules, rounds } from "~/server/db/schema";
 import { getScoringForRound } from "~/server/utils/scoring-config";
 
 const TOURNAMENT_ID = 2;
@@ -57,7 +57,9 @@ async function validateCurrentState() {
 	console.log(`Tournament: ${tournament.name} (ID: ${tournament.id})`);
 	console.log(`Status: ${tournament.status}`);
 	console.log(`Format: ${tournament.format}`);
-	console.log(`Current Round Number: ${tournament.currentRoundNumber ?? "N/A"}`);
+	console.log(
+		`Current Round Number: ${tournament.currentRoundNumber ?? "N/A"}`,
+	);
 	console.log("");
 
 	// Verify we have exactly 2 rounds

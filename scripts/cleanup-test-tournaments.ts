@@ -24,8 +24,8 @@ import "dotenv/config";
 import { and, ilike, isNull, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
-	matchPicks,
 	matches,
+	matchPicks,
 	roundScoringRules,
 	rounds,
 	tournaments,
@@ -204,74 +204,62 @@ async function hardDeleteTestTournaments() {
 			// Delete in order respecting foreign key constraints:
 			// 1. Match picks
 			if (matchIds.length > 0) {
-				await tx
-					.delete(matchPicks)
-					.where(
-						sql`${matchPicks.matchId} IN (${sql.join(
-							matchIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})`,
-					);
+				await tx.delete(matchPicks).where(
+					sql`${matchPicks.matchId} IN (${sql.join(
+						matchIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 			}
 
 			// 2. User streaks
 			if (matchIds.length > 0) {
-				await tx
-					.delete(userStreaks)
-					.where(
-						sql`${userStreaks.lastMatchId} IN (${sql.join(
-							matchIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})`,
-					);
+				await tx.delete(userStreaks).where(
+					sql`${userStreaks.lastMatchId} IN (${sql.join(
+						matchIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 			}
 
 			// 3. Matches
 			if (roundIds.length > 0) {
-				await tx
-					.delete(matches)
-					.where(
-						sql`${matches.roundId} IN (${sql.join(
-							roundIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})`,
-					);
+				await tx.delete(matches).where(
+					sql`${matches.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 			}
 
 			// 4. User round picks
 			if (roundIds.length > 0) {
-				await tx
-					.delete(userRoundPicks)
-					.where(
-						sql`${userRoundPicks.roundId} IN (${sql.join(
-							roundIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})`,
-					);
+				await tx.delete(userRoundPicks).where(
+					sql`${userRoundPicks.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 			}
 
 			// 5. Round scoring rules
 			if (roundIds.length > 0) {
-				await tx
-					.delete(roundScoringRules)
-					.where(
-						sql`${roundScoringRules.roundId} IN (${sql.join(
-							roundIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})`,
-					);
+				await tx.delete(roundScoringRules).where(
+					sql`${roundScoringRules.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 			}
 
 			// 6. User achievements (both round-level and tournament-level)
 			if (roundIds.length > 0) {
-				await tx
-					.delete(userAchievements)
-					.where(
-						sql`(${userAchievements.roundId} IN (${sql.join(
-							roundIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})) OR ${userAchievements.tournamentId} = ${tournament.id}`,
-					);
+				await tx.delete(userAchievements).where(
+					sql`(${userAchievements.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})) OR ${userAchievements.tournamentId} = ${tournament.id}`,
+				);
 			} else {
 				await tx
 					.delete(userAchievements)
@@ -280,14 +268,12 @@ async function hardDeleteTestTournaments() {
 
 			// 7. Rounds
 			if (roundIds.length > 0) {
-				await tx
-					.delete(rounds)
-					.where(
-						sql`${rounds.id} IN (${sql.join(
-							roundIds.map((id) => sql`${id}`),
-							sql`, `,
-						)})`,
-					);
+				await tx.delete(rounds).where(
+					sql`${rounds.id} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
 			}
 
 			// 8. Tournament
@@ -340,7 +326,9 @@ async function deleteById(tournamentId: number) {
 	console.log("📋 Tournament Details:\n");
 	console.log(`  ID: ${tournament.id}`);
 	console.log(`  Name: ${tournament.name}`);
-	console.log(`  Status: ${tournament.status}${isDeleted ? " (SOFT DELETED)" : ""}`);
+	console.log(
+		`  Status: ${tournament.status}${isDeleted ? " (SOFT DELETED)" : ""}`,
+	);
 	console.log(`  Rounds: ${tournament.rounds.length}`);
 	console.log(`  Matches: ${totalMatches}`);
 	console.log(`  User Picks: ${totalPicks}`);
@@ -403,79 +391,67 @@ async function deleteByIdConfirm(tournamentId: number) {
 		// 1. Delete match picks (references matches)
 		if (matchIds.length > 0) {
 			console.log("    Deleting match picks...");
-			await tx
-				.delete(matchPicks)
-				.where(
-					sql`${matchPicks.matchId} IN (${sql.join(
-						matchIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
+			await tx.delete(matchPicks).where(
+				sql`${matchPicks.matchId} IN (${sql.join(
+					matchIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 		}
 
 		// 2. Delete user streaks (references matches via lastMatchId)
 		if (matchIds.length > 0) {
 			console.log("    Deleting user streaks...");
-			await tx
-				.delete(userStreaks)
-				.where(
-					sql`${userStreaks.lastMatchId} IN (${sql.join(
-						matchIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
+			await tx.delete(userStreaks).where(
+				sql`${userStreaks.lastMatchId} IN (${sql.join(
+					matchIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 		}
 
 		// 3. Delete matches (references rounds)
 		if (roundIds.length > 0) {
 			console.log("    Deleting matches...");
-			await tx
-				.delete(matches)
-				.where(
-					sql`${matches.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
+			await tx.delete(matches).where(
+				sql`${matches.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 		}
 
 		// 4. Delete user round picks (references rounds)
 		if (roundIds.length > 0) {
 			console.log("    Deleting user round picks...");
-			await tx
-				.delete(userRoundPicks)
-				.where(
-					sql`${userRoundPicks.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
+			await tx.delete(userRoundPicks).where(
+				sql`${userRoundPicks.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 		}
 
 		// 5. Delete round scoring rules (references rounds)
 		if (roundIds.length > 0) {
 			console.log("    Deleting round scoring rules...");
-			await tx
-				.delete(roundScoringRules)
-				.where(
-					sql`${roundScoringRules.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
+			await tx.delete(roundScoringRules).where(
+				sql`${roundScoringRules.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 		}
 
 		// 6. Delete user achievements (both round-level and tournament-level)
 		if (roundIds.length > 0) {
 			console.log("    Deleting user achievements...");
-			await tx
-				.delete(userAchievements)
-				.where(
-					sql`(${userAchievements.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})) OR ${userAchievements.tournamentId} = ${tournament.id}`,
-				);
+			await tx.delete(userAchievements).where(
+				sql`(${userAchievements.roundId} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})) OR ${userAchievements.tournamentId} = ${tournament.id}`,
+			);
 		} else {
 			console.log("    Deleting user achievements...");
 			await tx
@@ -486,23 +462,25 @@ async function deleteByIdConfirm(tournamentId: number) {
 		// 7. Delete rounds (references tournaments)
 		if (roundIds.length > 0) {
 			console.log("    Deleting rounds...");
-			await tx
-				.delete(rounds)
-				.where(
-					sql`${rounds.id} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
+			await tx.delete(rounds).where(
+				sql`${rounds.id} IN (${sql.join(
+					roundIds.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
 		}
 
 		// 8. Delete tournament
 		console.log("    Deleting tournament...");
-		await tx.delete(tournaments).where(sql`${tournaments.id} = ${tournament.id}`);
+		await tx
+			.delete(tournaments)
+			.where(sql`${tournaments.id} = ${tournament.id}`);
 	});
 
 	console.log(`    ✅ Permanently deleted\n`);
-	console.log(`\n✅ Tournament "${tournament.name}" has been permanently deleted!`);
+	console.log(
+		`\n✅ Tournament "${tournament.name}" has been permanently deleted!`,
+	);
 	console.log("⚠️  This action cannot be undone.\n");
 }
 
