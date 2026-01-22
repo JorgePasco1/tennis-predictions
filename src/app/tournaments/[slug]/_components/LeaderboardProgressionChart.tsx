@@ -1,97 +1,171 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, Label, XAxis, YAxis } from "recharts";
 import {
 	type ChartConfig,
 	ChartContainer,
 	ChartLegend,
 	ChartLegendContent,
 	ChartTooltip,
-	ChartTooltipContent,
 } from "~/components/ui/chart";
 
-interface RoundData {
-	roundId: number;
-	roundNumber: number;
-	roundName: string;
-	totalPoints: number;
-	correctWinners: number;
-	exactScores: number;
-	submittedAt: Date | null;
-	cumulativePoints: number;
-	hasSubmitted: boolean;
-	rank: number | null;
-	cumulativeRank: number | null;
-}
-
-interface UserRoundData {
-	userId: string;
-	displayName: string;
-	imageUrl: string | null;
-	rounds: RoundData[];
-	totalPoints: number;
-	finalRank: number;
+interface ProgressionDataPoint {
+	matchIndex: number;
+	label: string;
+	rankings: Array<{
+		userId: string;
+		displayName: string;
+		imageUrl: string | null;
+		cumulativePoints: number;
+		rank: number;
+	}>;
 }
 
 interface LeaderboardProgressionChartProps {
-	userRoundData: UserRoundData[];
-	rounds: Array<{
-		roundId: number;
-		roundName: string;
-		roundNumber: number;
-	}>;
+	progressionData: ProgressionDataPoint[];
 	topN?: number;
 }
 
-// Color palette for users
+// Custom dot component to render user avatars
+interface CustomDotProps {
+	cx?: number;
+	cy?: number;
+	payload?: Record<string, unknown>;
+	dataKey?: string;
+	userImages: Map<string, string | null>;
+}
+
+function CustomDot({ cx, cy, dataKey, userImages }: CustomDotProps) {
+	if (cx === undefined || cy === undefined || !dataKey) return null;
+
+	const imageUrl = userImages.get(dataKey);
+	const size = 28;
+
+	return (
+		<foreignObject
+			height={size + 4}
+			width={size + 4}
+			x={cx - size / 2 - 2}
+			y={cy - size / 2 - 2}
+		>
+			<div
+				style={{
+					width: size + 4,
+					height: size + 4,
+					borderRadius: "50%",
+					backgroundColor: "white",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
+					boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+				}}
+			>
+				{imageUrl ? (
+					// biome-ignore lint/performance/noImgElement: Using img inside SVG foreignObject where Next.js Image doesn't work
+					<img
+						alt={dataKey}
+						src={imageUrl}
+						style={{
+							width: size,
+							height: size,
+							borderRadius: "50%",
+							objectFit: "cover",
+						}}
+					/>
+				) : (
+					<div
+						style={{
+							width: size,
+							height: size,
+							borderRadius: "50%",
+							backgroundColor: "#9ca3af",
+						}}
+					/>
+				)}
+			</div>
+		</foreignObject>
+	);
+}
+
+// Color palette for users - distinct, vibrant colors
 const CHART_COLORS = [
-	"hsl(var(--chart-1))",
-	"hsl(var(--chart-2))",
-	"hsl(var(--chart-3))",
-	"hsl(var(--chart-4))",
-	"hsl(var(--chart-5))",
-	"hsl(220, 70%, 50%)",
-	"hsl(340, 75%, 50%)",
-	"hsl(160, 60%, 45%)",
-	"hsl(280, 65%, 55%)",
-	"hsl(30, 80%, 50%)",
+	"#2563eb", // Blue
+	"#dc2626", // Red
+	"#16a34a", // Green
+	"#9333ea", // Purple
+	"#ea580c", // Orange
+	"#0891b2", // Cyan
+	"#c026d3", // Fuchsia
+	"#ca8a04", // Yellow
+	"#4f46e5", // Indigo
+	"#059669", // Emerald
 ];
 
+// Custom tooltip that shows players sorted by rank with their points
+interface TooltipPayloadEntry {
+	dataKey?: string | number;
+	value?: unknown;
+	color?: string;
+}
+
+interface CustomTooltipProps {
+	active?: boolean;
+	payload?: TooltipPayloadEntry[];
+	label?: string;
+	pointsData: Map<string, Map<string, number>>; // label -> displayName -> points
+}
+
+function CustomTooltip({
+	active,
+	payload,
+	label,
+	pointsData,
+}: CustomTooltipProps) {
+	if (!active || !payload || !label) return null;
+
+	// Get points for this label and sort by rank (which is the value)
+	const validPayload = payload.filter(
+		(
+			p,
+		): p is TooltipPayloadEntry & { dataKey: string | number; value: number } =>
+			p.dataKey !== undefined && typeof p.value === "number",
+	);
+	const sortedPayload = [...validPayload].sort((a, b) => a.value - b.value);
+	const labelPoints = pointsData.get(String(label));
+
+	return (
+		<div className="rounded-lg border bg-background p-2 shadow-sm">
+			<div className="mb-2 font-medium text-sm">{label} matches</div>
+			<div className="space-y-1">
+				{sortedPayload.map((entry) => {
+					const dataKey = String(entry.dataKey);
+					const points = labelPoints?.get(dataKey) ?? 0;
+					return (
+						<div
+							className="flex items-center justify-between gap-4 text-sm"
+							key={dataKey}
+						>
+							<div className="flex items-center gap-2">
+								<div
+									className="h-3 w-3 rounded-full"
+									style={{ backgroundColor: entry.color }}
+								/>
+								<span>{dataKey}</span>
+							</div>
+							<span className="font-medium">{points} pts</span>
+						</div>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
 export function LeaderboardProgressionChart({
-	userRoundData,
-	rounds,
+	progressionData,
 	topN = 10,
 }: LeaderboardProgressionChartProps) {
-	// Take top N users by final rank
-	const topUsers = userRoundData.slice(0, topN);
-
-	// Prepare chart data: each round is a data point
-	const chartData = rounds.map((round) => {
-		const dataPoint: Record<string, string | number> = {
-			roundName: round.roundName,
-		};
-
-		for (const user of topUsers) {
-			const roundData = user.rounds.find((r) => r.roundId === round.roundId);
-			dataPoint[user.displayName] = roundData?.cumulativePoints ?? 0;
-		}
-
-		return dataPoint;
-	});
-
-	// Build chart config for colors
-	const chartConfig: ChartConfig = {};
-	for (let i = 0; i < topUsers.length; i++) {
-		const user = topUsers[i];
-		if (user) {
-			chartConfig[user.displayName] = {
-				label: user.displayName,
-				color: CHART_COLORS[i % CHART_COLORS.length],
-			};
-		}
-	}
-
-	if (topUsers.length === 0 || chartData.length === 0) {
+	if (progressionData.length === 0) {
 		return (
 			<div className="flex h-[300px] items-center justify-center text-muted-foreground">
 				No data available for chart
@@ -99,43 +173,90 @@ export function LeaderboardProgressionChart({
 		);
 	}
 
+	// Get top N users from the final data point
+	const finalPoint = progressionData[progressionData.length - 1];
+	const topUsers = finalPoint?.rankings.slice(0, topN) ?? [];
+
+	if (topUsers.length === 0) {
+		return (
+			<div className="flex h-[300px] items-center justify-center text-muted-foreground">
+				No data available for chart
+			</div>
+		);
+	}
+
+	// Prepare chart data: each progression point is a data point
+	// Also build a map of points for the tooltip
+	const pointsData = new Map<string, Map<string, number>>();
+
+	const chartData = progressionData.map((point) => {
+		const dataPoint: Record<string, string | number> = {
+			label: point.label,
+		};
+
+		const labelPoints = new Map<string, number>();
+
+		for (const topUser of topUsers) {
+			const userRanking = point.rankings.find(
+				(r) => r.userId === topUser.userId,
+			);
+			dataPoint[topUser.displayName] = userRanking?.rank ?? 0;
+			labelPoints.set(topUser.displayName, userRanking?.cumulativePoints ?? 0);
+		}
+
+		pointsData.set(point.label, labelPoints);
+		return dataPoint;
+	});
+
+	// Build chart config for colors
+	const chartConfig: ChartConfig = {};
+	const userImages = new Map<string, string | null>();
+
+	for (let i = 0; i < topUsers.length; i++) {
+		const user = topUsers[i];
+		if (user) {
+			chartConfig[user.displayName] = {
+				label: user.displayName,
+				color: CHART_COLORS[i % CHART_COLORS.length],
+			};
+			userImages.set(user.displayName, user.imageUrl);
+		}
+	}
+
 	return (
 		<ChartContainer
-			className="h-[300px] w-full sm:h-[400px]"
+			className="h-[350px] w-full sm:h-[450px]"
 			config={chartConfig}
 		>
 			<AreaChart
 				data={chartData}
-				margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+				margin={{ top: 25, right: 20, left: 10, bottom: 30 }}
 			>
 				<CartesianGrid strokeDasharray="3 3" />
-				<XAxis
-					axisLine={false}
-					dataKey="roundName"
-					tickFormatter={(value: string) => {
-						// Shorten round names for mobile
-						return value
-							.replace("Round of ", "R")
-							.replace("Quarter Finals", "QF")
-							.replace("Semi Finals", "SF");
-					}}
-					tickLine={false}
-					tickMargin={8}
-				/>
+				<XAxis axisLine={false} dataKey="label" tickLine={false} tickMargin={8}>
+					<Label offset={-20} position="insideBottom" value="Matches Played" />
+				</XAxis>
 				<YAxis
+					allowDecimals={false}
 					axisLine={false}
-					label={{ value: "Points", angle: -90, position: "insideLeft" }}
+					domain={[1, "auto"]}
+					label={{ value: "Rank", angle: -90, position: "insideLeft" }}
+					reversed
 					tickLine={false}
 					tickMargin={8}
 				/>
-				<ChartTooltip content={<ChartTooltipContent />} />
+				<ChartTooltip
+					content={(props) => (
+						<CustomTooltip {...props} pointsData={pointsData} />
+					)}
+				/>
 				<ChartLegend content={<ChartLegendContent />} />
 				{topUsers.map((user, index) => (
 					<Area
 						connectNulls={false}
 						dataKey={user.displayName}
-						fill={CHART_COLORS[index % CHART_COLORS.length]}
-						fillOpacity={0.2}
+						dot={(props) => <CustomDot {...props} userImages={userImages} />}
+						fill="transparent"
 						key={user.userId}
 						stroke={CHART_COLORS[index % CHART_COLORS.length]}
 						strokeWidth={2}

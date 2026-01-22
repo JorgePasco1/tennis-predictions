@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
 	matches,
+	matchPicks,
 	rounds,
 	tournaments,
 	userRoundPicks,
@@ -537,9 +538,134 @@ export const leaderboardsRouter = createTRPCRouter({
 				}
 			}
 
+			// 7. Build match-based progression data for chart (every 8 matches)
+			const allMatches = tournamentRounds.flatMap((round) =>
+				round.matches
+					.filter((m) => m.status === "finalized" && m.finalizedAt)
+					.map((m) => ({
+						matchId: m.id,
+						roundId: round.id,
+						finalizedAt: m.finalizedAt!,
+					})),
+			);
+
+			// Sort by finalized date
+			allMatches.sort(
+				(a, b) => a.finalizedAt.getTime() - b.finalizedAt.getTime(),
+			);
+
+			// Get all match picks for these matches
+			const matchIds = allMatches.map((m) => m.matchId);
+			let allMatchPicks: Array<{
+				oddsUserId: string;
+				oddsMatchId: number;
+				pointsEarned: number;
+			}> = [];
+
+			if (matchIds.length > 0) {
+				allMatchPicks = await ctx.db
+					.select({
+						oddsUserId: userRoundPicks.userId,
+						oddsMatchId: matchPicks.matchId,
+						pointsEarned: matchPicks.pointsEarned,
+					})
+					.from(matchPicks)
+					.innerJoin(
+						userRoundPicks,
+						eq(matchPicks.userRoundPickId, userRoundPicks.id),
+					)
+					.where(
+						and(
+							sql`${matchPicks.matchId} IN ${sql.raw(`(${matchIds.join(",")})`)}`,
+							eq(userRoundPicks.isDraft, false),
+						),
+					);
+			}
+
+			// Build user points by match
+			const userMatchPoints = new Map<string, Map<number, number>>();
+			for (const pick of allMatchPicks) {
+				if (!userMatchPoints.has(pick.oddsUserId)) {
+					userMatchPoints.set(pick.oddsUserId, new Map());
+				}
+				userMatchPoints
+					.get(pick.oddsUserId)!
+					.set(pick.oddsMatchId, pick.pointsEarned);
+			}
+
+			// Create exactly 8 progression data points, evenly distributed
+			const NUM_CHECKPOINTS = 8;
+			const progressionData: Array<{
+				matchIndex: number;
+				label: string;
+				rankings: Array<{
+					userId: string;
+					displayName: string;
+					imageUrl: string | null;
+					cumulativePoints: number;
+					rank: number;
+				}>;
+			}> = [];
+
+			// Get unique users who have submitted picks
+			const usersWithPicks = Array.from(userPicksMap.values());
+
+			if (allMatches.length > 0 && usersWithPicks.length > 0) {
+				// Calculate checkpoint intervals
+				const interval = allMatches.length / NUM_CHECKPOINTS;
+
+				for (let checkpoint = 1; checkpoint <= NUM_CHECKPOINTS; checkpoint++) {
+					const matchCount = Math.round(interval * checkpoint);
+					const matchesUpToNow = allMatches.slice(0, matchCount);
+					const matchIdsUpToNow = new Set(matchesUpToNow.map((m) => m.matchId));
+
+					// Calculate cumulative points for each user
+					const userPoints: Array<{
+						userId: string;
+						displayName: string;
+						imageUrl: string | null;
+						cumulativePoints: number;
+					}> = [];
+
+					for (const user of usersWithPicks) {
+						const userMatches = userMatchPoints.get(user.userId);
+						let cumulativePoints = 0;
+
+						if (userMatches) {
+							for (const [matchId, points] of userMatches) {
+								if (matchIdsUpToNow.has(matchId)) {
+									cumulativePoints += points;
+								}
+							}
+						}
+
+						userPoints.push({
+							userId: user.userId,
+							displayName: user.displayName,
+							imageUrl: user.imageUrl,
+							cumulativePoints,
+						});
+					}
+
+					// Sort by points and assign ranks
+					userPoints.sort((a, b) => b.cumulativePoints - a.cumulativePoints);
+					const rankedUsers = userPoints.map((user, index) => ({
+						...user,
+						rank: index + 1,
+					}));
+
+					progressionData.push({
+						matchIndex: matchCount,
+						label: `${matchCount}`,
+						rankings: rankedUsers,
+					});
+				}
+			}
+
 			return {
 				rounds: roundsMetadata,
 				userRoundData: finalRankings,
+				progressionData,
 			};
 		}),
 

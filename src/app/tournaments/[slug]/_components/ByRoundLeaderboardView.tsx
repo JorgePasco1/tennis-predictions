@@ -69,25 +69,26 @@ export function ByRoundLeaderboardView({
 		);
 	}
 
-	const { rounds, userRoundData } = data;
+	const { rounds, userRoundData, progressionData = [] } = data;
 
 	return (
 		<div className="space-y-6">
 			{/* Chart Card */}
-			<Card className="p-4">
-				<div className="mb-4">
-					<h3 className="font-semibold text-lg">Points Progression</h3>
-					<p className="text-muted-foreground text-sm">
-						Top {Math.min(10, userRoundData.length)} users' cumulative points
-						across rounds
-					</p>
-				</div>
-				<LeaderboardProgressionChart
-					rounds={rounds}
-					topN={10}
-					userRoundData={userRoundData}
-				/>
-			</Card>
+			{progressionData.length > 0 && (
+				<Card className="p-4">
+					<div className="mb-4">
+						<h3 className="font-semibold text-lg">Ranking Progression</h3>
+						<p className="text-muted-foreground text-sm">
+							Top {Math.min(10, userRoundData.length)} users' ranking changes
+							every 8 matches
+						</p>
+					</div>
+					<LeaderboardProgressionChart
+						progressionData={progressionData}
+						topN={10}
+					/>
+				</Card>
+			)}
 
 			{/* Per-Round Table Card */}
 			<Card>
