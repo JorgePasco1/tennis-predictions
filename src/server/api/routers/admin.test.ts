@@ -1883,7 +1883,7 @@ describe("commitDraw performance optimizations", () => {
 				winnerName: "Alcaraz",
 				setsWon: 3,
 				setsLost: 0,
-				finalScore: "6-1, 6-4, 6-2",
+				finalScore: "3-0",
 			};
 
 			const hasResult = !!(

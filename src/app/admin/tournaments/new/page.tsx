@@ -295,7 +295,7 @@ export default function NewTournamentPage() {
 											</p>
 											<p className="text-green-800 text-sm">
 												✓ {completedMatches} completed match
-												{completedMatches !== 1 ? "es" : ""} with scores
+												{completedMatches !== 1 ? "es" : ""} detected
 											</p>
 											<p className="text-green-800 text-sm">
 												○ {pendingMatches} pending match

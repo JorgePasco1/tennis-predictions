@@ -112,7 +112,7 @@ export default function AdminTournamentManagePage({
 	const deleteTournamentMutation = api.admin.deleteTournament.useMutation({
 		onSuccess: (result) => {
 			toast.success(
-				`Tournament "${result.tournamentName}" deleted successfully.${result.picksDeleted > 0 ? ` ${result.picksDeleted} user picks removed.` : ""}`,
+				`Tournament "${result.tournamentName}" deleted successfully.${result.picksAffected > 0 ? ` ${result.picksAffected} user picks affected.` : ""}`,
 			);
 			// Redirect to admin dashboard
 			window.location.href = "/admin";
@@ -1467,14 +1467,21 @@ export default function AdminTournamentManagePage({
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							className="bg-red-600 hover:bg-red-700"
+							disabled={deleteTournamentMutation.isPending}
 							onClick={async () => {
-								setShowDeleteDialog(false);
-								await deleteTournamentMutation.mutateAsync({
-									id: tournamentId,
-								});
+								try {
+									await deleteTournamentMutation.mutateAsync({
+										id: tournamentId,
+									});
+									setShowDeleteDialog(false);
+								} catch {
+									// Error is handled by onError callback
+								}
 							}}
 						>
-							Delete Tournament
+							{deleteTournamentMutation.isPending
+								? "Deleting..."
+								: "Delete Tournament"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

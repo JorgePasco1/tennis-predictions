@@ -19,7 +19,7 @@
  */
 
 import "dotenv/config";
-import { ilike, isNull, or, sql } from "drizzle-orm";
+import { and, ilike, isNull, or, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
 	matchPicks,
@@ -86,8 +86,8 @@ async function softDeleteTestTournaments() {
 	console.log("🔍 Finding test tournaments to soft delete...\n");
 
 	const testTournaments = await db.query.tournaments.findMany({
-		where: or(
-			...TEST_PATTERNS.map((pattern) => ilike(tournaments.name, pattern)),
+		where: and(
+			or(...TEST_PATTERNS.map((pattern) => ilike(tournaments.name, pattern))),
 			isNull(tournaments.deletedAt), // Only non-deleted ones
 		),
 		with: {

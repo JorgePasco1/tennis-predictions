@@ -181,7 +181,10 @@ export const adminRouter = createTRPCRouter({
 						.update(matches)
 						.set({ deletedAt: new Date() })
 						.where(
-							sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+							sql`${matches.roundId} IN (${sql.join(
+								roundIds.map((id) => sql`${id}`),
+								sql`, `,
+							)})`,
 						);
 				}
 			}
@@ -1015,14 +1018,17 @@ export const adminRouter = createTRPCRouter({
 					.update(matches)
 					.set({ deletedAt: new Date() })
 					.where(
-						sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+						sql`${matches.roundId} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
 					);
 			}
 
 			return {
 				success: true,
 				tournamentName: tournament.name,
-				picksDeleted: totalPicks,
+				picksAffected: totalPicks,
 			};
 		}),
 
