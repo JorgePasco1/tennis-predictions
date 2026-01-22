@@ -7,7 +7,7 @@ import { TournamentLeaderboardClient } from "~/app/leaderboards/[tournamentId]/_
 import { type RoundData, TournamentBracket } from "~/components/bracket";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
-import { Card } from "~/components/ui/card";
+import { Card, CardContent } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ByRoundLeaderboardView } from "./ByRoundLeaderboardView";
 
@@ -96,24 +96,22 @@ export function TournamentTabs({
 
 			<TabsContent className="mt-4" value="leaderboard">
 				{/* View Toggle */}
-				<Card className="mb-4 p-4">
-					<div className="flex flex-col gap-2 sm:flex-row">
-						<Button
-							onClick={() => handleViewChange("overall")}
-							size="sm"
-							variant={viewMode === "overall" ? "default" : "outline"}
-						>
-							Overall Tournament
-						</Button>
-						<Button
-							onClick={() => handleViewChange("by-round")}
-							size="sm"
-							variant={viewMode === "by-round" ? "default" : "outline"}
-						>
-							By Round
-						</Button>
-					</div>
-				</Card>
+				<div className="mb-4 flex flex-col gap-2 sm:flex-row">
+					<Button
+						onClick={() => handleViewChange("overall")}
+						size="sm"
+						variant={viewMode === "overall" ? "default" : "outline"}
+					>
+						Overall Tournament
+					</Button>
+					<Button
+						onClick={() => handleViewChange("by-round")}
+						size="sm"
+						variant={viewMode === "by-round" ? "default" : "outline"}
+					>
+						By Round
+					</Button>
+				</div>
 
 				{viewMode === "overall" ? (
 					<>
@@ -169,13 +167,13 @@ export function TournamentTabs({
 							</Card>
 						) : (
 							<Card>
-								<div className="overflow-x-auto">
+								<CardContent className="overflow-x-auto p-0">
 									<TournamentLeaderboardClient
 										currentUserSubmittedRoundIds={currentUserSubmittedRoundIds}
 										entries={leaderboardEntries}
 										tournamentId={tournamentId}
 									/>
-								</div>
+								</CardContent>
 							</Card>
 						)}
 					</>

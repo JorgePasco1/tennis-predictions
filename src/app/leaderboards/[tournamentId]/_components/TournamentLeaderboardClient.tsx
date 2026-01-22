@@ -95,11 +95,14 @@ export function TournamentLeaderboardClient({
 						const canCompare = hasSubmittedPicks && !isCurrentUser;
 
 						return (
-							<TableRow key={entry.userId}>
+							<TableRow
+								className={cn(isCurrentUser && "bg-muted/50")}
+								key={entry.userId}
+							>
 								<TableCell>
 									<Badge
 										className={cn(
-											"flex h-8 w-8 items-center justify-center rounded-full font-bold",
+											"flex h-7 w-7 items-center justify-center rounded-full font-bold text-xs",
 											entry.rank === 1
 												? "bg-yellow-500 hover:bg-yellow-600"
 												: entry.rank === 2

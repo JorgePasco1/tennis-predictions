@@ -91,14 +91,14 @@ export function ByRoundLeaderboardView({
 			)}
 
 			{/* Per-Round Table Card */}
-			<Card>
+			<Card className="px-4 pt-2 pb-4">
 				<div className="overflow-x-auto">
 					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead>Round</TableHead>
 								<TableHead>Rank</TableHead>
-								<TableHead>Player</TableHead>
+								<TableHead className="w-40">Player</TableHead>
 								<TableHead className="text-right">Round Points</TableHead>
 								<TableHead className="text-right">Cumulative</TableHead>
 								<TableHead className="text-right">Overall Rank</TableHead>
