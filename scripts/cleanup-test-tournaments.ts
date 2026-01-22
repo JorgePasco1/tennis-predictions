@@ -7,8 +7,10 @@
  * Usage:
  *   pnpm tsx scripts/cleanup-test-tournaments.ts list                    # List all test tournaments
  *   pnpm tsx scripts/cleanup-test-tournaments.ts soft-delete             # Soft delete test tournaments
- *   pnpm tsx scripts/cleanup-test-tournaments.ts hard-delete             # PERMANENTLY delete test tournaments
- *   pnpm tsx scripts/cleanup-test-tournaments.ts delete-by-id <id>       # PERMANENTLY delete tournament by ID
+ *   pnpm tsx scripts/cleanup-test-tournaments.ts hard-delete             # Show hard-delete confirmation step
+ *   pnpm tsx scripts/cleanup-test-tournaments.ts hard-delete-confirm     # PERMANENTLY delete test tournaments
+ *   pnpm tsx scripts/cleanup-test-tournaments.ts delete-by-id <id>       # Show delete-by-id confirmation step
+ *   pnpm tsx scripts/cleanup-test-tournaments.ts delete-by-id-confirm <id> # PERMANENTLY delete tournament by ID
  *
  * Test tournament patterns (case-insensitive):
  *   - Contains "test"
@@ -197,95 +199,102 @@ async function hardDeleteTestTournaments() {
 			r.matches.map((m) => m.id),
 		);
 
-		// Delete in order respecting foreign key constraints:
-		// 1. Match picks
-		if (matchIds.length > 0) {
-			await db
-				.delete(matchPicks)
-				.where(
-					sql`${matchPicks.matchId} IN (${sql.join(
-						matchIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+		// Wrap all deletes in a transaction for atomicity
+		await db.transaction(async (tx) => {
+			// Delete in order respecting foreign key constraints:
+			// 1. Match picks
+			if (matchIds.length > 0) {
+				await tx
+					.delete(matchPicks)
+					.where(
+						sql`${matchPicks.matchId} IN (${sql.join(
+							matchIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
 
-		// 2. User streaks
-		if (matchIds.length > 0) {
-			await db
-				.delete(userStreaks)
-				.where(
-					sql`${userStreaks.lastMatchId} IN (${sql.join(
-						matchIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+			// 2. User streaks
+			if (matchIds.length > 0) {
+				await tx
+					.delete(userStreaks)
+					.where(
+						sql`${userStreaks.lastMatchId} IN (${sql.join(
+							matchIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
 
-		// 3. Matches
-		if (roundIds.length > 0) {
-			await db
-				.delete(matches)
-				.where(
-					sql`${matches.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+			// 3. Matches
+			if (roundIds.length > 0) {
+				await tx
+					.delete(matches)
+					.where(
+						sql`${matches.roundId} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
 
-		// 4. User round picks
-		if (roundIds.length > 0) {
-			await db
-				.delete(userRoundPicks)
-				.where(
-					sql`${userRoundPicks.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+			// 4. User round picks
+			if (roundIds.length > 0) {
+				await tx
+					.delete(userRoundPicks)
+					.where(
+						sql`${userRoundPicks.roundId} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
 
-		// 5. Round scoring rules
-		if (roundIds.length > 0) {
-			await db
-				.delete(roundScoringRules)
-				.where(
-					sql`${roundScoringRules.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+			// 5. Round scoring rules
+			if (roundIds.length > 0) {
+				await tx
+					.delete(roundScoringRules)
+					.where(
+						sql`${roundScoringRules.roundId} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
 
-		// 6. User achievements
-		if (roundIds.length > 0) {
-			await db
-				.delete(userAchievements)
-				.where(
-					sql`${userAchievements.roundId} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+			// 6. User achievements (both round-level and tournament-level)
+			if (roundIds.length > 0) {
+				await tx
+					.delete(userAchievements)
+					.where(
+						sql`(${userAchievements.roundId} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})) OR ${userAchievements.tournamentId} = ${tournament.id}`,
+					);
+			} else {
+				await tx
+					.delete(userAchievements)
+					.where(sql`${userAchievements.tournamentId} = ${tournament.id}`);
+			}
 
-		// 7. Rounds
-		if (roundIds.length > 0) {
-			await db
-				.delete(rounds)
-				.where(
-					sql`${rounds.id} IN (${sql.join(
-						roundIds.map((id) => sql`${id}`),
-						sql`, `,
-					)})`,
-				);
-		}
+			// 7. Rounds
+			if (roundIds.length > 0) {
+				await tx
+					.delete(rounds)
+					.where(
+						sql`${rounds.id} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
 
-		// 8. Tournament
-		await db
-			.delete(tournaments)
-			.where(sql`${tournaments.id} = ${tournament.id}`);
+			// 8. Tournament
+			await tx
+				.delete(tournaments)
+				.where(sql`${tournaments.id} = ${tournament.id}`);
+		});
 
 		console.log(`    ✅ Permanently deleted\n`);
 	}
@@ -388,101 +397,109 @@ async function deleteByIdConfirm(tournamentId: number) {
 	const roundIds = tournament.rounds.map((r) => r.id);
 	const matchIds = tournament.rounds.flatMap((r) => r.matches.map((m) => m.id));
 
-	// Delete in order respecting foreign key constraints:
-	// 1. Delete match picks (references matches)
-	if (matchIds.length > 0) {
-		console.log("    Deleting match picks...");
-		await db
-			.delete(matchPicks)
-			.where(
-				sql`${matchPicks.matchId} IN (${sql.join(
-					matchIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+	// Wrap all deletes in a transaction for atomicity
+	await db.transaction(async (tx) => {
+		// Delete in order respecting foreign key constraints:
+		// 1. Delete match picks (references matches)
+		if (matchIds.length > 0) {
+			console.log("    Deleting match picks...");
+			await tx
+				.delete(matchPicks)
+				.where(
+					sql`${matchPicks.matchId} IN (${sql.join(
+						matchIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
+		}
 
-	// 2. Delete user streaks (references matches via lastMatchId)
-	if (matchIds.length > 0) {
-		console.log("    Deleting user streaks...");
-		await db
-			.delete(userStreaks)
-			.where(
-				sql`${userStreaks.lastMatchId} IN (${sql.join(
-					matchIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+		// 2. Delete user streaks (references matches via lastMatchId)
+		if (matchIds.length > 0) {
+			console.log("    Deleting user streaks...");
+			await tx
+				.delete(userStreaks)
+				.where(
+					sql`${userStreaks.lastMatchId} IN (${sql.join(
+						matchIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
+		}
 
-	// 3. Delete matches (references rounds)
-	if (roundIds.length > 0) {
-		console.log("    Deleting matches...");
-		await db
-			.delete(matches)
-			.where(
-				sql`${matches.roundId} IN (${sql.join(
-					roundIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+		// 3. Delete matches (references rounds)
+		if (roundIds.length > 0) {
+			console.log("    Deleting matches...");
+			await tx
+				.delete(matches)
+				.where(
+					sql`${matches.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
+		}
 
-	// 4. Delete user round picks (references rounds)
-	if (roundIds.length > 0) {
-		console.log("    Deleting user round picks...");
-		await db
-			.delete(userRoundPicks)
-			.where(
-				sql`${userRoundPicks.roundId} IN (${sql.join(
-					roundIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+		// 4. Delete user round picks (references rounds)
+		if (roundIds.length > 0) {
+			console.log("    Deleting user round picks...");
+			await tx
+				.delete(userRoundPicks)
+				.where(
+					sql`${userRoundPicks.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
+		}
 
-	// 5. Delete round scoring rules (references rounds)
-	if (roundIds.length > 0) {
-		console.log("    Deleting round scoring rules...");
-		await db
-			.delete(roundScoringRules)
-			.where(
-				sql`${roundScoringRules.roundId} IN (${sql.join(
-					roundIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+		// 5. Delete round scoring rules (references rounds)
+		if (roundIds.length > 0) {
+			console.log("    Deleting round scoring rules...");
+			await tx
+				.delete(roundScoringRules)
+				.where(
+					sql`${roundScoringRules.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
+		}
 
-	// 6. Delete user achievements (references rounds)
-	if (roundIds.length > 0) {
-		console.log("    Deleting user achievements...");
-		await db
-			.delete(userAchievements)
-			.where(
-				sql`${userAchievements.roundId} IN (${sql.join(
-					roundIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+		// 6. Delete user achievements (both round-level and tournament-level)
+		if (roundIds.length > 0) {
+			console.log("    Deleting user achievements...");
+			await tx
+				.delete(userAchievements)
+				.where(
+					sql`(${userAchievements.roundId} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})) OR ${userAchievements.tournamentId} = ${tournament.id}`,
+				);
+		} else {
+			console.log("    Deleting user achievements...");
+			await tx
+				.delete(userAchievements)
+				.where(sql`${userAchievements.tournamentId} = ${tournament.id}`);
+		}
 
-	// 7. Delete rounds (references tournaments)
-	if (roundIds.length > 0) {
-		console.log("    Deleting rounds...");
-		await db
-			.delete(rounds)
-			.where(
-				sql`${rounds.id} IN (${sql.join(
-					roundIds.map((id) => sql`${id}`),
-					sql`, `,
-				)})`,
-			);
-	}
+		// 7. Delete rounds (references tournaments)
+		if (roundIds.length > 0) {
+			console.log("    Deleting rounds...");
+			await tx
+				.delete(rounds)
+				.where(
+					sql`${rounds.id} IN (${sql.join(
+						roundIds.map((id) => sql`${id}`),
+						sql`, `,
+					)})`,
+				);
+		}
 
-	// 8. Delete tournament
-	console.log("    Deleting tournament...");
-	await db.delete(tournaments).where(sql`${tournaments.id} = ${tournament.id}`);
+		// 8. Delete tournament
+		console.log("    Deleting tournament...");
+		await tx.delete(tournaments).where(sql`${tournaments.id} = ${tournament.id}`);
+	});
 
 	console.log(`    ✅ Permanently deleted\n`);
 	console.log(`\n✅ Tournament "${tournament.name}" has been permanently deleted!`);
@@ -558,7 +575,13 @@ async function main() {
 					"  pnpm tsx scripts/cleanup-test-tournaments.ts hard-delete",
 				);
 				console.log(
+					"  pnpm tsx scripts/cleanup-test-tournaments.ts hard-delete-confirm",
+				);
+				console.log(
 					"  pnpm tsx scripts/cleanup-test-tournaments.ts delete-by-id <id>",
+				);
+				console.log(
+					"  pnpm tsx scripts/cleanup-test-tournaments.ts delete-by-id-confirm <id>",
 				);
 				console.log("\nTest patterns (case-insensitive):");
 				console.log("  - Contains: test, demo, sample");
