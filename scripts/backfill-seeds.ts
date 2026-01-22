@@ -20,8 +20,9 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 const TOURNAMENT_ID = (() => {
 	const idIndex = args.indexOf("--tournament-id");
-	if (idIndex !== -1 && args[idIndex + 1]) {
-		return Number.parseInt(args[idIndex + 1], 10);
+	const idValue = args[idIndex + 1];
+	if (idIndex !== -1 && idValue) {
+		return Number.parseInt(idValue, 10);
 	}
 	return 2; // Default to Australian Open 2025
 })();
@@ -175,7 +176,7 @@ function logPlannedUpdates(
 async function applySeedUpdates(
 	nextRound: Round,
 	updates: SeedUpdate[],
-	tx: typeof db,
+	tx: { update: typeof db.update },
 ) {
 	if (updates.length === 0) {
 		return;
