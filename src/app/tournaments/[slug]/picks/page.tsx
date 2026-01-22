@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CountdownTimer } from "~/components/countdown/CountdownTimer";
+import { formatPlayerName } from "~/lib/utils";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -330,10 +331,10 @@ export default function PicksPage({
 										</div>
 										<div className="text-gray-700 text-lg">
 											{pick.match.player1Seed && `(${pick.match.player1Seed}) `}
-											{pick.match.player1Name}
+											{formatPlayerName(pick.match.player1Name)}
 											<span className="mx-2 text-gray-400">vs</span>
 											{pick.match.player2Seed && `(${pick.match.player2Seed}) `}
-											{pick.match.player2Name}
+											{formatPlayerName(pick.match.player2Name)}
 										</div>
 									</div>
 
@@ -353,7 +354,7 @@ export default function PicksPage({
 												>
 													{pick.match.player1Seed &&
 														`(${pick.match.player1Seed}) `}
-													{pick.match.player1Name}
+													{formatPlayerName(pick.match.player1Name)}
 												</div>
 												<div
 													className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold ${
@@ -364,7 +365,7 @@ export default function PicksPage({
 												>
 													{pick.match.player2Seed &&
 														`(${pick.match.player2Seed}) `}
-													{pick.match.player2Name}
+													{formatPlayerName(pick.match.player2Name)}
 												</div>
 											</div>
 										</div>
@@ -574,10 +575,10 @@ export default function PicksPage({
 									</div>
 									<div className="text-gray-700 text-lg">
 										{match.player1Seed && `(${match.player1Seed}) `}
-										{match.player1Name}
+										{formatPlayerName(match.player1Name)}
 										<span className="mx-2 text-gray-400">vs</span>
 										{match.player2Seed && `(${match.player2Seed}) `}
-										{match.player2Name}
+										{formatPlayerName(match.player2Name)}
 									</div>
 								</div>
 
@@ -612,7 +613,7 @@ export default function PicksPage({
 												}
 											>
 												{match.player1Seed && `(${match.player1Seed}) `}
-												{match.player1Name}
+												{formatPlayerName(match.player1Name)}
 											</button>
 											<button
 												className={`flex-1 rounded-lg border-2 px-4 py-3 font-semibold transition ${
@@ -638,7 +639,7 @@ export default function PicksPage({
 												}
 											>
 												{match.player2Seed && `(${match.player2Seed}) `}
-												{match.player2Name}
+												{formatPlayerName(match.player2Name)}
 											</button>
 										</div>
 									</div>

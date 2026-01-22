@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, gte, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";

@@ -4,14 +4,8 @@
  * Tests for leaderboard calculations, rankings, and user statistics.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	mockMatchPicks,
-	mockRounds,
-	mockTournaments,
-	mockUserRoundPicks,
-	mockUsers,
-} from "~/test/fixtures";
+import { beforeEach, describe, expect, it } from "vitest";
+import { mockTournaments } from "~/test/fixtures";
 import { createMockDb, type MockDb } from "~/test/mock-db";
 
 describe("leaderboards router", () => {
@@ -194,10 +188,10 @@ describe("leaderboards router", () => {
 	});
 
 	describe("getUserTournamentStats", () => {
-		let mockDb: MockDb;
+		let _mockDb: MockDb;
 
 		beforeEach(() => {
-			mockDb = createMockDb();
+			_mockDb = createMockDb();
 		});
 
 		it("should return null when user has no picks", async () => {
@@ -238,10 +232,10 @@ describe("leaderboards router", () => {
 	});
 
 	describe("getUserStats", () => {
-		let mockDb: MockDb;
+		let _mockDb: MockDb;
 
 		beforeEach(() => {
-			mockDb = createMockDb();
+			_mockDb = createMockDb();
 		});
 
 		it("should calculate overall statistics", () => {
@@ -497,7 +491,7 @@ describe("leaderboard calculation edge cases", () => {
 		});
 
 		it("should handle new user with no history", () => {
-			const userPicks: unknown[] = [];
+			const _userPicks: unknown[] = [];
 
 			const stats = {
 				totalPoints: 0,

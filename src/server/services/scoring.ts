@@ -4,7 +4,6 @@ import type * as schema from "~/server/db/schema";
 import {
 	matches,
 	matchPicks,
-	rounds,
 	userRoundPicks,
 	userStreaks,
 } from "~/server/db/schema";

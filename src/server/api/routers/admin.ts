@@ -1,10 +1,9 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { adminProcedure, createTRPCRouter } from "~/server/api/trpc";
 import {
 	matches,
-	matchPicks,
 	roundScoringRules,
 	rounds,
 	tournamentFormatEnum,
@@ -12,11 +11,7 @@ import {
 	userRoundPicks,
 	users,
 } from "~/server/db/schema";
-import {
-	type ParsedDraw,
-	parseAtpDraw,
-	validateParsedDraw,
-} from "~/server/services/drawParser";
+import { parseAtpDraw, validateParsedDraw } from "~/server/services/drawParser";
 import {
 	calculateMatchPickScores,
 	unfinalizeMatchScores,
@@ -101,6 +96,11 @@ export const adminRouter = createTRPCRouter({
 									player2Name: z.string(),
 									player1Seed: z.number().int().nullable(),
 									player2Seed: z.number().int().nullable(),
+									// Optional result fields from parser
+									winnerName: z.string().optional(),
+									setsWon: z.number().int().min(0).max(3).optional(),
+									setsLost: z.number().int().min(0).max(3).optional(),
+									finalScore: z.string().optional(),
 								}),
 							),
 						}),
@@ -181,7 +181,10 @@ export const adminRouter = createTRPCRouter({
 						.update(matches)
 						.set({ deletedAt: new Date() })
 						.where(
-							sql`${matches.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+							sql`${matches.roundId} IN (${sql.join(
+								roundIds.map((id) => sql`${id}`),
+								sql`, `,
+							)})`,
 						);
 				}
 			}
@@ -206,44 +209,330 @@ export const adminRouter = createTRPCRouter({
 					throw new Error("Failed to create tournament");
 				}
 
-				// Insert rounds and matches
-				for (const roundData of parsedDraw.rounds) {
-					const [round] = await tx
-						.insert(rounds)
-						.values({
+				// PHASE 1 OPTIMIZATION: Batch insert all rounds at once (1 query instead of N)
+				const insertedRounds = await tx
+					.insert(rounds)
+					.values(
+						parsedDraw.rounds.map((roundData) => ({
 							tournamentId: tournament.id,
 							roundNumber: roundData.roundNumber,
 							name: roundData.name,
 							isActive: false,
 							isFinalized: false,
-						})
-						.returning();
+						})),
+					)
+					.returning();
 
-					if (!round) {
-						throw new Error(`Failed to create round ${roundData.roundNumber}`);
+				if (insertedRounds.length !== parsedDraw.rounds.length) {
+					throw new Error("Failed to create all rounds");
+				}
+
+				// Create mapping from round number to round ID for later use
+				const roundNumberToId = new Map(
+					insertedRounds.map((r) => [r.roundNumber, r.id]),
+				);
+
+				// PHASE 1 OPTIMIZATION: Batch insert all scoring rules at once (1 query instead of N)
+				await tx.insert(roundScoringRules).values(
+					insertedRounds.map((round) => {
+						const roundData = parsedDraw.rounds.find(
+							(r) => r.roundNumber === round.roundNumber,
+						);
+						if (!roundData) {
+							throw new Error(`Round data not found for ${round.roundNumber}`);
+						}
+						const scoring = getScoringForRound(roundData.name);
+						return {
+							roundId: round.id,
+							pointsPerWinner: scoring.pointsPerWinner,
+							pointsExactScore: scoring.pointsExactScore,
+						};
+					}),
+				);
+
+				// PHASE 2 OPTIMIZATION: Batch insert ALL matches at once (1 query instead of N)
+				// Flatten all matches from all rounds into a single array
+				const allMatchValues = parsedDraw.rounds.flatMap((roundData) => {
+					const roundId = roundNumberToId.get(roundData.roundNumber);
+					if (!roundId) {
+						throw new Error(`Round ID not found for ${roundData.roundNumber}`);
 					}
 
-					// Create scoring rule for this round using progressive scoring
-					const scoring = getScoringForRound(roundData.name);
-					await tx.insert(roundScoringRules).values({
-						roundId: round.id,
-						pointsPerWinner: scoring.pointsPerWinner,
-						pointsExactScore: scoring.pointsExactScore,
+					return roundData.matches.map((match) => {
+						// Normalize player names - use "TBD" for empty/missing names
+						const player1Name = match.player1Name?.trim() || "TBD";
+						const player2Name = match.player2Name?.trim() || "TBD";
+
+						// Detect BYE matches (case-insensitive, only if name is provided)
+						const player1IsBye = player1Name.toUpperCase() === "BYE";
+						const player2IsBye = player2Name.toUpperCase() === "BYE";
+						const isBye = player1IsBye || player2IsBye;
+
+						if (isBye) {
+							// Validate that exactly one player is BYE (not both)
+							if (player1IsBye && player2IsBye) {
+								throw new Error(
+									`Invalid BYE match in round ${roundData.roundNumber}, match ${match.matchNumber}: both players cannot be BYE`,
+								);
+							}
+
+							// BYE match: auto-finalize with non-BYE player as winner
+							const winnerName = player1IsBye ? player2Name : player1Name;
+
+							return {
+								roundId,
+								matchNumber: match.matchNumber,
+								player1Name,
+								player2Name,
+								player1Seed: match.player1Seed,
+								player2Seed: match.player2Seed,
+								winnerName,
+								status: "finalized" as const,
+								isBye: true,
+								finalizedAt: new Date(),
+								finalizedBy: ctx.user.id,
+							};
+						}
+
+						// Check if match has result from parser
+						const hasResult =
+							match.winnerName &&
+							match.setsWon != null &&
+							match.setsLost != null &&
+							match.finalScore;
+
+						if (hasResult) {
+							// Match is completed - mark as finalized with results
+							return {
+								roundId,
+								matchNumber: match.matchNumber,
+								player1Name,
+								player2Name,
+								player1Seed: match.player1Seed,
+								player2Seed: match.player2Seed,
+								winnerName: match.winnerName,
+								finalScore: match.finalScore,
+								setsWon: match.setsWon,
+								setsLost: match.setsLost,
+								status: "finalized" as const,
+								isBye: false,
+								isRetirement: false, // We can't detect retirement from HTML currently
+								finalizedAt: new Date(),
+								finalizedBy: ctx.user.id, // Imported from parser
+							};
+						}
+
+						// Normal pending match (with real names or TBD placeholders)
+						return {
+							roundId,
+							matchNumber: match.matchNumber,
+							player1Name,
+							player2Name,
+							player1Seed: player1Name === "TBD" ? null : match.player1Seed,
+							player2Seed: player2Name === "TBD" ? null : match.player2Seed,
+							status: "pending" as const,
+							isBye: false,
+						};
 					});
+				});
 
-					// Insert matches for this round
-					const matchValues = roundData.matches.map((match) => ({
-						roundId: round.id,
-						matchNumber: match.matchNumber,
-						player1Name: match.player1Name,
-						player2Name: match.player2Name,
-						player1Seed: match.player1Seed,
-						player2Seed: match.player2Seed,
-						status: "pending" as const,
-					}));
+				// Insert all matches in a single batch operation
+				if (allMatchValues.length > 0) {
+					await tx.insert(matches).values(allMatchValues);
+				}
 
-					if (matchValues.length > 0) {
-						await tx.insert(matches).values(matchValues);
+				// PHASE 3 OPTIMIZATION: Bulk winner propagation
+				// After all rounds and matches are created, propagate winners from finalized matches
+				// This handles both BYE matches and completed matches from the parser
+				const allRounds = await tx.query.rounds.findMany({
+					where: eq(rounds.tournamentId, tournament.id),
+					with: { matches: true },
+					orderBy: [asc(rounds.roundNumber)],
+				});
+
+				// Collect all winner propagation updates grouped by target round
+				type WinnerUpdate = {
+					targetRoundNumber: number;
+					targetMatchNumber: number;
+					playerSlot: "player1" | "player2";
+					winnerName: string;
+					winnerSeed: number | null;
+				};
+
+				const winnerUpdates: WinnerUpdate[] = [];
+
+				// Process each round to find finalized matches and collect updates
+				for (const currentRound of allRounds) {
+					const finalizedMatches = currentRound.matches.filter(
+						(m) => m.status === "finalized" && m.winnerName,
+					);
+
+					if (finalizedMatches.length === 0) continue;
+
+					// Find next round
+					const nextRound = allRounds.find(
+						(r) => r.roundNumber === currentRound.roundNumber + 1,
+					);
+
+					if (!nextRound) continue; // Final round, no next round to propagate to
+
+					// Collect updates for each finalized match
+					for (const finalizedMatch of finalizedMatches) {
+						// Skip if no winner name (defensive check)
+						if (!finalizedMatch.winnerName) continue;
+
+						// Calculate which match in next round this winner goes to
+						const nextMatchNumber = Math.ceil(finalizedMatch.matchNumber / 2);
+
+						// Odd match → player1, Even match → player2
+						const playerSlot =
+							finalizedMatch.matchNumber % 2 === 1 ? "player1" : "player2";
+
+						// Determine the winner's seed
+						const winnerSeed =
+							finalizedMatch.winnerName === finalizedMatch.player1Name
+								? finalizedMatch.player1Seed
+								: finalizedMatch.player2Seed;
+
+						winnerUpdates.push({
+							targetRoundNumber: nextRound.roundNumber,
+							targetMatchNumber: nextMatchNumber,
+							playerSlot,
+							winnerName: finalizedMatch.winnerName,
+							winnerSeed,
+						});
+					}
+				}
+
+				// Group updates by target round for bulk updates
+				const updatesByRound = new Map<number, WinnerUpdate[]>();
+				for (const update of winnerUpdates) {
+					const roundUpdates = updatesByRound.get(update.targetRoundNumber);
+					if (roundUpdates) {
+						roundUpdates.push(update);
+					} else {
+						updatesByRound.set(update.targetRoundNumber, [update]);
+					}
+				}
+
+				// Execute bulk updates for each round using SQL CASE statements
+				for (const [roundNumber, updates] of updatesByRound) {
+					const targetRound = allRounds.find(
+						(r) => r.roundNumber === roundNumber,
+					);
+					if (!targetRound) continue;
+
+					// Separate updates by player slot
+					const player1Updates = updates.filter(
+						(u) => u.playerSlot === "player1",
+					);
+					const player2Updates = updates.filter(
+						(u) => u.playerSlot === "player2",
+					);
+
+					// Build CASE statements for player1 updates
+					const player1NameCases = player1Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerName}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					const player1SeedCases = player1Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerSeed}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					// Build CASE statements for player2 updates
+					const player2NameCases = player2Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerName}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					const player2SeedCases = player2Updates
+						.map(
+							(u) =>
+								sql`WHEN ${matches.matchNumber} = ${u.targetMatchNumber} THEN ${u.winnerSeed}`,
+						)
+						.reduce((acc, curr) => sql`${acc} ${curr}`, sql``);
+
+					// Execute single update query for this round
+					if (updates.length > 0) {
+						// Build update object dynamically to only include fields with updates
+						const updateFields: Record<string, unknown> = {};
+
+						if (player1Updates.length > 0) {
+							updateFields.player1Name = sql`CASE ${player1NameCases} ELSE ${matches.player1Name} END`;
+							updateFields.player1Seed = sql`CASE ${player1SeedCases} ELSE ${matches.player1Seed} END`;
+						}
+
+						if (player2Updates.length > 0) {
+							updateFields.player2Name = sql`CASE ${player2NameCases} ELSE ${matches.player2Name} END`;
+							updateFields.player2Seed = sql`CASE ${player2SeedCases} ELSE ${matches.player2Seed} END`;
+						}
+
+						if (Object.keys(updateFields).length > 0) {
+							await tx
+								.update(matches)
+								.set(updateFields)
+								.where(eq(matches.roundId, targetRound.id));
+						}
+					}
+				}
+
+				// Auto-finalize rounds where all matches are completed
+				// This handles cases where the parser imports fully completed rounds
+				const roundsToFinalize = allRounds.filter((round) => {
+					const roundMatches = round.matches.filter((m) => !m.deletedAt);
+					const allMatchesFinalized = roundMatches.every(
+						(m) => m.status === "finalized",
+					);
+					return (
+						allMatchesFinalized && roundMatches.length > 0 && !round.isFinalized
+					);
+				});
+
+				// Batch update all rounds to finalize in one query
+				if (roundsToFinalize.length > 0) {
+					const roundIdsToFinalize = roundsToFinalize.map((r) => r.id);
+					await tx
+						.update(rounds)
+						.set({ isFinalized: true })
+						.where(
+							sql`${rounds.id} IN (${sql.join(
+								roundIdsToFinalize.map((id) => sql`${id}`),
+								sql`, `,
+							)})`,
+						);
+				}
+
+				// PHASE 4 OPTIMIZATION: Skip score calculation for new tournaments
+				// Check if there are any picks for this tournament before calculating scores
+				const existingPicks = await tx.query.userRoundPicks.findMany({
+					where: sql`${userRoundPicks.roundId} IN (${sql.join(
+						allRounds.map((r) => sql`${r.id}`),
+						sql`, `,
+					)})`,
+					limit: 1, // We only need to know if ANY picks exist
+				});
+
+				// Only calculate scores if there are picks to score
+				if (existingPicks.length > 0) {
+					// After winner propagation, calculate scores for all finalized matches
+					// Only calculate for non-BYE matches that have actual scores
+					const allFinalizedMatches = allRounds.flatMap((round) =>
+						round.matches.filter((m) => m.status === "finalized" && !m.isBye),
+					);
+
+					for (const match of allFinalizedMatches) {
+						// Only calculate scores if match has actual scores (not BYE)
+						if (match.setsWon != null && match.setsLost != null) {
+							await calculateMatchPickScores(tx, match.id);
+						}
 					}
 				}
 
@@ -425,6 +714,13 @@ export const adminRouter = createTRPCRouter({
 				throw new Error("Match not found");
 			}
 
+			// Prevent manual finalization of BYE matches
+			if (match.isBye) {
+				throw new Error(
+					"BYE matches are automatically finalized during tournament creation and cannot be manually updated",
+				);
+			}
+
 			// Verify winner is one of the players
 			if (
 				input.winnerName !== match.player1Name &&
@@ -496,15 +792,48 @@ export const adminRouter = createTRPCRouter({
 					// Odd match numbers → player1, Even match numbers → player2
 					const isPlayer1 = match.matchNumber % 2 === 1;
 
+					// Determine the winner's seed
+					const winnerSeed =
+						input.winnerName === match.player1Name
+							? match.player1Seed
+							: match.player2Seed;
+
+					// Build update object, only including seed if it's not null
+					const updateData = isPlayer1
+						? {
+								player1Name: input.winnerName,
+								...(winnerSeed !== null && { player1Seed: winnerSeed }),
+							}
+						: {
+								player2Name: input.winnerName,
+								...(winnerSeed !== null && { player2Seed: winnerSeed }),
+							};
+
 					await ctx.db
 						.update(matches)
-						.set(
-							isPlayer1
-								? { player1Name: input.winnerName }
-								: { player2Name: input.winnerName },
-						)
+						.set(updateData)
 						.where(eq(matches.id, nextMatch.id));
 				}
+			}
+
+			// After winner propagation, check if all matches in the round are finalized
+			// If so, automatically mark the round as finalized
+			const roundMatches = await ctx.db.query.matches.findMany({
+				where: and(
+					eq(matches.roundId, match.roundId),
+					isNull(matches.deletedAt),
+				),
+			});
+
+			const allMatchesFinalized = roundMatches.every(
+				(m) => m.status === "finalized",
+			);
+
+			if (allMatchesFinalized && !match.round.isFinalized) {
+				await ctx.db
+					.update(rounds)
+					.set({ isFinalized: true })
+					.where(eq(rounds.id, match.roundId));
 			}
 
 			return updatedMatch;
@@ -643,6 +972,67 @@ export const adminRouter = createTRPCRouter({
 		}),
 
 	/**
+	 * Soft delete a tournament
+	 * This will also soft delete all associated matches
+	 */
+	deleteTournament: adminProcedure
+		.input(
+			z.object({
+				id: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get tournament with rounds and matches to check for user picks
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(eq(tournaments.id, input.id), isNull(tournaments.deletedAt)),
+				with: {
+					rounds: {
+						with: {
+							userRoundPicks: true,
+							matches: true,
+						},
+					},
+				},
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			// Count total picks to return for user feedback
+			const totalPicks = tournament.rounds.reduce(
+				(sum, round) => sum + round.userRoundPicks.length,
+				0,
+			);
+
+			// Soft delete the tournament
+			await ctx.db
+				.update(tournaments)
+				.set({ deletedAt: new Date() })
+				.where(eq(tournaments.id, input.id));
+
+			// Soft delete all associated matches
+			const roundIds = tournament.rounds.map((r) => r.id);
+			if (roundIds.length > 0) {
+				await ctx.db
+					.update(matches)
+					.set({ deletedAt: new Date() })
+					.where(
+						sql`${matches.roundId} IN (${sql.join(
+							roundIds.map((id) => sql`${id}`),
+							sql`, `,
+						)})`,
+					);
+			}
+
+			return {
+				success: true,
+				tournamentName: tournament.name,
+				picksAffected: totalPicks,
+			};
+		}),
+
+	/**
 	 * Manually create a new round for a tournament
 	 */
 	createRound: adminProcedure
@@ -726,220 +1116,13 @@ export const adminRouter = createTRPCRouter({
 				};
 			});
 		}),
-
-	/**
-	 * Close a round - finalize it, create next round if needed, and propagate winners
-	 */
-	closeRound: adminProcedure
-		.input(
-			z.object({
-				roundId: z.number().int(),
-				activateNextRound: z.boolean().default(false),
-			}),
-		)
-		.mutation(async ({ ctx, input }) => {
-			// Get the round with its matches and tournament
-			const round = await ctx.db.query.rounds.findFirst({
-				where: eq(rounds.id, input.roundId),
-				with: {
-					tournament: {
-						with: {
-							rounds: {
-								with: {
-									matches: true,
-								},
-							},
-						},
-					},
-					matches: true,
-				},
-			});
-
-			if (!round) {
-				throw new Error("Round not found");
-			}
-
-			// Check if round is already finalized
-			if (round.isFinalized) {
-				throw new Error("Round is already closed");
-			}
-
-			// Check if all matches are finalized
-			const pendingMatches = round.matches.filter(
-				(m) => m.status === "pending" && !m.deletedAt,
-			);
-			if (pendingMatches.length > 0) {
-				throw new Error(
-					`Cannot close round: ${pendingMatches.length} match(es) are not finalized`,
-				);
-			}
-
-			// Get winners from current round sorted by match number
-			const currentMatchWinners = round.matches
-				.filter((m) => !m.deletedAt && m.winnerName)
-				.sort((a, b) => a.matchNumber - b.matchNumber)
-				.map((m) => m.winnerName as string);
-
-			// Determine if this is the final round (no next round possible)
-			const nextRoundName = getNextRoundName(round.name);
-			const isFinalRound = nextRoundName === null;
-
-			// Find existing next round (by round number)
-			const existingNextRound = round.tournament.rounds.find(
-				(r) => r.roundNumber === round.roundNumber + 1,
-			);
-
-			// Use transaction for atomic updates
-			return await ctx.db.transaction(async (tx) => {
-				// Mark round as finalized
-				await tx
-					.update(rounds)
-					.set({ isFinalized: true })
-					.where(eq(rounds.id, input.roundId));
-
-				// If this is the final round, just return
-				if (isFinalRound) {
-					return {
-						success: true,
-						hasNextRound: false,
-						nextRoundActivated: false,
-						nextRoundCreated: false,
-					};
-				}
-
-				let nextRoundId: number;
-				let nextRoundCreated = false;
-
-				// Create next round if it doesn't exist
-				if (!existingNextRound) {
-					// Calculate number of matches for next round (half of current)
-					const nextRoundMatchCount = Math.floor(
-						currentMatchWinners.length / 2,
-					);
-
-					if (nextRoundMatchCount === 0) {
-						throw new Error(
-							"Cannot create next round: not enough winners from current round",
-						);
-					}
-
-					// Create the next round
-					const [newRound] = await tx
-						.insert(rounds)
-						.values({
-							tournamentId: round.tournament.id,
-							roundNumber: round.roundNumber + 1,
-							name: nextRoundName,
-							isActive: false,
-							isFinalized: false,
-						})
-						.returning();
-
-					if (!newRound) {
-						throw new Error("Failed to create next round");
-					}
-
-					nextRoundId = newRound.id;
-					nextRoundCreated = true;
-
-					// Create scoring rules for the new round
-					const scoring = getScoringForRound(nextRoundName);
-					await tx.insert(roundScoringRules).values({
-						roundId: newRound.id,
-						pointsPerWinner: scoring.pointsPerWinner,
-						pointsExactScore: scoring.pointsExactScore,
-					});
-
-					// Create matches for the next round with player names from winners
-					const matchValues = [];
-					for (let i = 0; i < nextRoundMatchCount; i++) {
-						const player1Index = i * 2;
-						const player2Index = i * 2 + 1;
-
-						matchValues.push({
-							roundId: newRound.id,
-							matchNumber: i + 1,
-							player1Name: currentMatchWinners[player1Index] ?? "TBD",
-							player2Name: currentMatchWinners[player2Index] ?? "TBD",
-							status: "pending" as const,
-						});
-					}
-
-					await tx.insert(matches).values(matchValues);
-				} else {
-					// Next round exists, just update player names
-					nextRoundId = existingNextRound.id;
-
-					const nextRoundMatches = existingNextRound.matches
-						.filter((m) => !m.deletedAt)
-						.sort((a, b) => a.matchNumber - b.matchNumber);
-
-					// Match winners to next round:
-					// Match 1 & 2 winners → Next Match 1
-					// Match 3 & 4 winners → Next Match 2
-					// etc.
-					for (let i = 0; i < nextRoundMatches.length; i++) {
-						const player1Index = i * 2;
-						const player2Index = i * 2 + 1;
-
-						const player1Name = currentMatchWinners[player1Index];
-						const player2Name = currentMatchWinners[player2Index];
-
-						const updateData: { player1Name?: string; player2Name?: string } =
-							{};
-
-						if (player1Name) {
-							updateData.player1Name = player1Name;
-						}
-						if (player2Name) {
-							updateData.player2Name = player2Name;
-						}
-
-						if (Object.keys(updateData).length > 0) {
-							await tx
-								.update(matches)
-								.set(updateData)
-								.where(eq(matches.id, nextRoundMatches[i]!.id));
-						}
-					}
-				}
-
-				// Optionally activate the next round
-				if (input.activateNextRound) {
-					// Deactivate all rounds first
-					await tx
-						.update(rounds)
-						.set({ isActive: false })
-						.where(eq(rounds.tournamentId, round.tournament.id));
-
-					// Activate next round
-					await tx
-						.update(rounds)
-						.set({ isActive: true })
-						.where(eq(rounds.id, nextRoundId));
-
-					// Update tournament's current round number
-					await tx
-						.update(tournaments)
-						.set({ currentRoundNumber: round.roundNumber + 1 })
-						.where(eq(tournaments.id, round.tournament.id));
-				}
-
-				return {
-					success: true,
-					hasNextRound: true,
-					nextRoundActivated: input.activateNextRound,
-					nextRoundCreated,
-				};
-			});
-		}),
 });
 
 /**
  * Get the next round name based on the current round name
  * Returns null if the tournament is over (current round is Final)
  */
-function getNextRoundName(currentRoundName: string): string | null {
+function _getNextRoundName(currentRoundName: string): string | null {
 	const roundProgression: Record<string, string> = {
 		"Round of 128": "Round of 64",
 		"Round of 64": "Round of 32",

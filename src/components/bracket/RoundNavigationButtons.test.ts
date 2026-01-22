@@ -34,7 +34,9 @@ describe("button rendering", () => {
 
 		// Verify rounds are provided in order (component receives sorted rounds)
 		for (let i = 0; i < rounds.length - 1; i++) {
-			expect(rounds[i]?.roundNumber ?? 0).toBeLessThan(rounds[i + 1]?.roundNumber ?? 0);
+			expect(rounds[i]?.roundNumber ?? 0).toBeLessThan(
+				rounds[i + 1]?.roundNumber ?? 0,
+			);
 		}
 	});
 });

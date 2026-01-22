@@ -18,3 +18,31 @@ export function formatDisplayName(displayName: string): string {
 		? `${firstName} ${lastInitial}.`
 		: (firstName ?? displayName);
 }
+
+/**
+ * Format a player name with TBD fallback for empty/null values
+ * Returns "TBD" if the name is empty, null, or undefined
+ */
+export function formatPlayerName(
+	playerName: string | null | undefined,
+): string {
+	return playerName?.trim() || "TBD";
+}
+
+/**
+ * Format a full match display with player names and seeds
+ * Example: "(1) A. Player vs (2) B. Opponent"
+ * Example with TBD: "A. Player vs TBD"
+ */
+export function formatMatchDisplay(
+	player1Name: string | null | undefined,
+	player1Seed: number | null | undefined,
+	player2Name: string | null | undefined,
+	player2Seed: number | null | undefined,
+): string {
+	const p1 = formatPlayerName(player1Name);
+	const p2 = formatPlayerName(player2Name);
+	const seed1 = player1Seed ? `(${player1Seed}) ` : "";
+	const seed2 = player2Seed ? `(${player2Seed}) ` : "";
+	return `${seed1}${p1} vs ${seed2}${p2}`;
+}

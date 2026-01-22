@@ -8,7 +8,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	mockMatches,
-	mockMatchPicks,
 	mockRounds,
 	mockScoringRules,
 	mockUserRoundPicks,

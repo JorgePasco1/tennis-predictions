@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { toast } from "sonner";
+import { formatPlayerName } from "~/lib/utils";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -26,7 +27,7 @@ export default function AdminTournamentManagePage({
 	params: Promise<{ id: string }>;
 }) {
 	const { id } = use(params);
-	const tournamentId = Number.parseInt(id);
+	const tournamentId = Number.parseInt(id, 10);
 
 	const { data: tournament, refetch } = api.tournaments.getById.useQuery({
 		id: tournamentId,
@@ -70,25 +71,14 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
-	const closeRoundMutation = api.admin.closeRound.useMutation({
-		onSuccess: (result) => {
-			refetch();
-			let message = "Round closed!";
-			if (result.nextRoundCreated && result.nextRoundActivated) {
-				message = "Round closed! Next round created and activated.";
-			} else if (result.nextRoundCreated) {
-				message = "Round closed! Next round created with winners.";
-			} else if (result.nextRoundActivated) {
-				message = "Round closed! Next round has been activated.";
-			} else if (result.hasNextRound) {
-				message = "Round closed! Winners propagated to next round.";
-			}
-			toast.success(message);
+	// TODO: Remove closeRound UI - rounds now auto-finalize when all matches complete
+	// Stub mutation to prevent TypeScript errors - does not actually call API
+	const closeRoundMutation = {
+		isPending: false,
+		mutateAsync: async () => {
+			toast.info("Rounds now auto-finalize when all matches are complete");
 		},
-		onError: (error) => {
-			toast.error(error.message || "Failed to close round");
-		},
-	});
+	};
 
 	const updateRoundDatesMutation = api.admin.updateRoundDates.useMutation({
 		onSuccess: () => {
@@ -116,6 +106,19 @@ export default function AdminTournamentManagePage({
 		},
 		onError: (error) => {
 			toast.error(error.message || "Failed to create round");
+		},
+	});
+
+	const deleteTournamentMutation = api.admin.deleteTournament.useMutation({
+		onSuccess: (result) => {
+			toast.success(
+				`Tournament "${result.tournamentName}" deleted successfully.${result.picksAffected > 0 ? ` ${result.picksAffected} user picks affected.` : ""}`,
+			);
+			// Redirect to admin dashboard
+			window.location.href = "/admin";
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to delete tournament");
 		},
 	});
 
@@ -147,6 +150,7 @@ export default function AdminTournamentManagePage({
 		null,
 	);
 	const [showCloseRoundDialog, setShowCloseRoundDialog] = useState(false);
+	// TODO: Remove closeRound UI - rounds now auto-finalize when all matches complete
 	const [closeRoundDialogData, setCloseRoundDialogData] = useState<{
 		roundId: number;
 		roundName: string;
@@ -154,6 +158,7 @@ export default function AdminTournamentManagePage({
 	} | null>(null);
 	const [activateNextRound, setActivateNextRound] = useState(false);
 	const [showCreateRoundDialog, setShowCreateRoundDialog] = useState(false);
+	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 	const [createRoundForm, setCreateRoundForm] = useState({
 		name: "",
 		matchCount: 32,
@@ -299,6 +304,7 @@ export default function AdminTournamentManagePage({
 		}
 	};
 
+	// TODO: Remove closeRound UI
 	const handleOpenCloseRoundDialog = (
 		roundId: number,
 		roundName: string,
@@ -311,16 +317,11 @@ export default function AdminTournamentManagePage({
 
 	const handleConfirmCloseRound = async () => {
 		if (!closeRoundDialogData) return;
-
 		setShowCloseRoundDialog(false);
 
 		try {
-			await closeRoundMutation.mutateAsync({
-				roundId: closeRoundDialogData.roundId,
-				activateNextRound,
-			});
+			await closeRoundMutation.mutateAsync();
 		} catch (error) {
-			// Error toast is already handled by the mutation's onError
 			console.error("Failed to close round:", error);
 		}
 	};
@@ -439,6 +440,14 @@ export default function AdminTournamentManagePage({
 							onClick={() => handleStatusChange("archived")}
 						>
 							Archive
+						</button>
+						<button
+							className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={deleteTournamentMutation.isPending}
+							onClick={() => setShowDeleteDialog(true)}
+							type="button"
+						>
+							Delete Tournament
 						</button>
 					</div>
 				</div>
@@ -803,26 +812,12 @@ export default function AdminTournamentManagePage({
 										</span>
 									</div>
 									<button
-										className={`rounded px-4 py-2 font-medium text-sm transition ${
-											canClose
-												? "bg-purple-600 text-white hover:bg-purple-700"
-												: "cursor-not-allowed bg-gray-200 text-gray-500"
-										}`}
-										disabled={!canClose || closeRoundMutation.isPending}
-										onClick={() =>
-											handleOpenCloseRoundDialog(
-												round.id,
-												round.name,
-												!!nextRound,
-											)
-										}
+										className="cursor-not-allowed rounded bg-gray-200 px-4 py-2 font-medium text-gray-500 text-sm transition"
+										disabled={true}
+										title="Rounds auto-finalize when all matches are complete"
 										type="button"
 									>
-										{isClosed
-											? "Closed"
-											: closeRoundMutation.isPending
-												? "Closing..."
-												: "Close Round"}
+										{isClosed ? "Closed" : "Auto-finalizes"}
 									</button>
 								</div>
 							);
@@ -843,7 +838,7 @@ export default function AdminTournamentManagePage({
 							className="w-full rounded-lg border border-gray-300 px-4 py-2"
 							onChange={(e) =>
 								setSelectedRound(
-									e.target.value ? Number.parseInt(e.target.value) : null,
+									e.target.value ? Number.parseInt(e.target.value, 10) : null,
 								)
 							}
 							value={selectedRound ?? ""}
@@ -903,9 +898,9 @@ export default function AdminTournamentManagePage({
 															</div>
 															<div className="text-gray-600">
 																{match.player1Seed && `(${match.player1Seed}) `}
-																{match.player1Name} vs{" "}
+																{formatPlayerName(match.player1Name)} vs{" "}
 																{match.player2Seed && `(${match.player2Seed}) `}
-																{match.player2Name}
+																{formatPlayerName(match.player2Name)}
 															</div>
 														</div>
 														{match.status === "finalized" && (
@@ -1249,54 +1244,40 @@ export default function AdminTournamentManagePage({
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{/* Close Round Confirmation Dialog */}
+			{/* Auto-finalize Information Dialog (kept for compatibility) */}
 			<AlertDialog
 				onOpenChange={setShowCloseRoundDialog}
 				open={showCloseRoundDialog}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Close Round?</AlertDialogTitle>
+						<AlertDialogTitle>Rounds Auto-Finalize</AlertDialogTitle>
 						<AlertDialogDescription asChild>
 							<div className="text-muted-foreground text-sm">
-								<p>Close {closeRoundDialogData?.roundName}?</p>
+								<p className="mb-3">
+									{closeRoundDialogData?.roundName} will automatically finalize
+									when all matches are complete.
+								</p>
 								<div className="mt-3 space-y-2 text-left">
-									<p className="font-medium text-foreground">This will:</p>
+									<p className="font-medium text-foreground">
+										Automatic finalization will:
+									</p>
 									<ul className="list-inside list-disc space-y-1">
 										<li>Mark the round as finalized</li>
 										{closeRoundDialogData?.hasNextRound && (
 											<li>Propagate winners to the next round</li>
 										)}
 									</ul>
-									<p className="mt-3 font-medium text-yellow-700">
-										This action cannot be easily undone.
+									<p className="mt-3 text-blue-700">
+										No manual action required.
 									</p>
 								</div>
-								{closeRoundDialogData?.hasNextRound && (
-									<div className="mt-4">
-										<label className="flex cursor-pointer items-center gap-2">
-											<input
-												checked={activateNextRound}
-												className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-												onChange={(e) => setActivateNextRound(e.target.checked)}
-												type="checkbox"
-											/>
-											<span className="text-gray-700">
-												Activate next round automatically
-											</span>
-										</label>
-									</div>
-								)}
 							</div>
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-purple-600 hover:bg-purple-700"
-							onClick={handleConfirmCloseRound}
-						>
-							Close Round
+						<AlertDialogAction onClick={() => setShowCloseRoundDialog(false)}>
+							Got it
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -1424,6 +1405,55 @@ export default function AdminTournamentManagePage({
 							onClick={handleCreateRound}
 						>
 							{createRoundMutation.isPending ? "Creating..." : "Create Round"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Delete Tournament Confirmation Dialog */}
+			<AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete Tournament?</AlertDialogTitle>
+						<AlertDialogDescription>
+							<div className="space-y-3">
+								<p>
+									Are you sure you want to delete{" "}
+									<span className="font-semibold">{tournament?.name}</span>?
+								</p>
+								<div className="rounded-lg border border-red-200 bg-red-50 p-3">
+									<p className="font-medium text-red-900 text-sm">
+										⚠️ This action will soft delete the tournament
+									</p>
+									<ul className="mt-2 list-inside list-disc space-y-1 text-red-800 text-sm">
+										<li>Tournament will be hidden from all views</li>
+										<li>All matches will be soft deleted</li>
+										<li>User picks will be preserved but hidden</li>
+										<li>Data can be restored from database if needed</li>
+									</ul>
+								</div>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-red-600 hover:bg-red-700"
+							disabled={deleteTournamentMutation.isPending}
+							onClick={async () => {
+								try {
+									await deleteTournamentMutation.mutateAsync({
+										id: tournamentId,
+									});
+									setShowDeleteDialog(false);
+								} catch {
+									// Error is handled by onError callback
+								}
+							}}
+						>
+							{deleteTournamentMutation.isPending
+								? "Deleting..."
+								: "Delete Tournament"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
