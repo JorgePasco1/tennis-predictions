@@ -676,6 +676,63 @@ export const adminRouter = createTRPCRouter({
 		}),
 
 	/**
+	 * Reopen submissions for a previously closed round
+	 * This allows users to submit/modify picks again
+	 * Note: Finalized matches within the round cannot be voted on
+	 */
+	reopenRoundSubmissions: adminProcedure
+		.input(
+			z.object({
+				roundId: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get the round with its tournament
+			const round = await ctx.db.query.rounds.findFirst({
+				where: eq(rounds.id, input.roundId),
+				with: {
+					tournament: true,
+					matches: {
+						where: isNull(matches.deletedAt),
+					},
+				},
+			});
+
+			if (!round) {
+				throw new Error("Round not found");
+			}
+
+			// Validate round has been closed
+			if (!round.submissionsClosedAt) {
+				throw new Error("This round's submissions are not currently closed");
+			}
+
+			// Count finalized vs pending matches for informational purposes
+			const finalizedMatches = round.matches.filter(
+				(m) => m.status === "finalized",
+			);
+			const pendingMatches = round.matches.filter(
+				(m) => m.status === "pending",
+			);
+
+			// Reopen submissions
+			await ctx.db
+				.update(rounds)
+				.set({
+					submissionsClosedAt: null,
+					submissionsClosedBy: null,
+				})
+				.where(eq(rounds.id, input.roundId));
+
+			return {
+				success: true,
+				totalMatches: round.matches.length,
+				finalizedMatches: finalizedMatches.length,
+				pendingMatches: pendingMatches.length,
+			};
+		}),
+
+	/**
 	 * Finalize a match result and propagate winner to next round if it exists
 	 */
 	finalizeMatch: adminProcedure

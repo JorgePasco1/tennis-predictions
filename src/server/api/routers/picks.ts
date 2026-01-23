@@ -125,6 +125,18 @@ export const picksRouter = createTRPCRouter({
 				}
 			}
 
+			// Validate that picks are not for finalized matches
+			const matchesById = new Map(round.matches.map((m) => [m.id, m]));
+			for (const pick of input.picks) {
+				const match = matchesById.get(pick.matchId);
+				if (match?.status === "finalized") {
+					throw new TRPCError({
+						code: "BAD_REQUEST",
+						message: `Cannot submit pick for match ${match.matchNumber} (${match.player1Name} vs ${match.player2Name}) - it has already been finalized`,
+					});
+				}
+			}
+
 			// Get tournament format for score validation
 			const tournamentFormat = round.tournament.format;
 			const requiredSetsToWin = tournamentFormat === "bo5" ? 3 : 2;
@@ -400,6 +412,18 @@ export const picksRouter = createTRPCRouter({
 					throw new TRPCError({
 						code: "BAD_REQUEST",
 						message: `Match ${pick.matchId} is not in this round`,
+					});
+				}
+			}
+
+			// Validate that picks are not for finalized matches
+			const matchesById = new Map(round.matches.map((m) => [m.id, m]));
+			for (const pick of input.picks) {
+				const match = matchesById.get(pick.matchId);
+				if (match?.status === "finalized") {
+					throw new TRPCError({
+						code: "BAD_REQUEST",
+						message: `Cannot submit pick for match ${match.matchNumber} (${match.player1Name} vs ${match.player2Name}) - it has already been finalized`,
 					});
 				}
 			}

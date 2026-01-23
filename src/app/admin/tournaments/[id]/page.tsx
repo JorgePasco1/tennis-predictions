@@ -71,6 +71,24 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
+	const reopenSubmissionsMutation = api.admin.reopenRoundSubmissions.useMutation(
+		{
+			onSuccess: (result) => {
+				refetch();
+				if (result.finalizedMatches > 0) {
+					toast.success(
+						`Submissions reopened! ${result.pendingMatches} of ${result.totalMatches} matches are available for voting (${result.finalizedMatches} already finalized).`,
+					);
+				} else {
+					toast.success("Submissions reopened for all matches!");
+				}
+			},
+			onError: (error) => {
+				toast.error(error.message || "Failed to reopen submissions");
+			},
+		},
+	);
+
 	// TODO: Remove closeRound UI - rounds now auto-finalize when all matches complete
 	// Stub mutation to prevent TypeScript errors - does not actually call API
 	const closeRoundMutation = {
@@ -144,6 +162,13 @@ export default function AdminTournamentManagePage({
 	const [closeDialogData, setCloseDialogData] = useState<{
 		roundId: number;
 		roundName: string;
+	} | null>(null);
+	const [showReopenDialog, setShowReopenDialog] = useState(false);
+	const [reopenDialogData, setReopenDialogData] = useState<{
+		roundId: number;
+		roundName: string;
+		pendingMatches: number;
+		finalizedMatches: number;
 	} | null>(null);
 	const [showUnfinalizeDialog, setShowUnfinalizeDialog] = useState(false);
 	const [unfinalizeMatchId, setUnfinalizeMatchId] = useState<number | null>(
@@ -301,6 +326,31 @@ export default function AdminTournamentManagePage({
 		} catch (error) {
 			// Error toast is already handled by the mutation's onError
 			console.error("Failed to close submissions:", error);
+		}
+	};
+
+	const handleReopenSubmissions = (
+		roundId: number,
+		roundName: string,
+		pendingMatches: number,
+		finalizedMatches: number,
+	) => {
+		setReopenDialogData({ roundId, roundName, pendingMatches, finalizedMatches });
+		setShowReopenDialog(true);
+	};
+
+	const handleConfirmReopen = async () => {
+		if (!reopenDialogData) return;
+
+		setShowReopenDialog(false);
+
+		try {
+			await reopenSubmissionsMutation.mutateAsync({
+				roundId: reopenDialogData.roundId,
+			});
+		} catch (error) {
+			// Error toast is already handled by the mutation's onError
+			console.error("Failed to reopen submissions:", error);
 		}
 	};
 
@@ -735,30 +785,81 @@ export default function AdminTournamentManagePage({
 					</h2>
 					<p className="mb-4 text-gray-600 text-sm">
 						Close submissions for a round to prevent new picks and automatically
-						finalize all existing drafts.
+						finalize all existing drafts. Reopen to allow submissions for
+						pending matches.
 					</p>
-					<div className="flex flex-wrap gap-2">
+					<div className="flex flex-wrap gap-4">
 						{tournament.rounds.map((round) => {
 							const isClosed = !!round.submissionsClosedAt;
 							const canClose = round.isActive && !isClosed;
+							const activeMatches = round.matches.filter((m) => !m.deletedAt);
+							const pendingMatches = activeMatches.filter(
+								(m) => m.status === "pending",
+							);
+							const finalizedMatches = activeMatches.filter(
+								(m) => m.status === "finalized",
+							);
+							const canReopen = isClosed && round.isActive;
 
 							return (
-								<div className="flex flex-col" key={round.id}>
-									<button
-										className={`rounded px-4 py-2 font-medium transition ${
-											canClose
-												? "bg-red-500 text-white hover:bg-red-600"
-												: "cursor-not-allowed bg-gray-200 text-gray-500"
-										}`}
-										disabled={!canClose || closeSubmissionsMutation.isPending}
-										onClick={() => handleCloseSubmissions(round.id, round.name)}
-										type="button"
-									>
-										{isClosed ? "✓ Closed" : `Close ${round.name}`}
-									</button>
+								<div
+									className="flex flex-col rounded border border-gray-200 p-3"
+									key={round.id}
+								>
+									<span className="mb-2 font-medium">{round.name}</span>
+									<div className="flex gap-2">
+										{!isClosed ? (
+											<button
+												className={`rounded px-4 py-2 font-medium text-sm transition ${
+													canClose
+														? "bg-red-500 text-white hover:bg-red-600"
+														: "cursor-not-allowed bg-gray-200 text-gray-500"
+												}`}
+												disabled={
+													!canClose || closeSubmissionsMutation.isPending
+												}
+												onClick={() =>
+													handleCloseSubmissions(round.id, round.name)
+												}
+												type="button"
+											>
+												Close
+											</button>
+										) : (
+											<>
+												<span className="rounded bg-gray-100 px-3 py-2 text-gray-600 text-sm">
+													✓ Closed
+												</span>
+												{canReopen && (
+													<button
+														className="rounded bg-green-500 px-4 py-2 font-medium text-sm text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+														disabled={reopenSubmissionsMutation.isPending}
+														onClick={() =>
+															handleReopenSubmissions(
+																round.id,
+																round.name,
+																pendingMatches.length,
+																finalizedMatches.length,
+															)
+														}
+														type="button"
+													>
+														Reopen
+													</button>
+												)}
+											</>
+										)}
+									</div>
 									{isClosed && round.submissionsClosedAt && (
-										<span className="mt-1 text-gray-500 text-xs">
+										<span className="mt-2 text-gray-500 text-xs">
+											Closed:{" "}
 											{new Date(round.submissionsClosedAt).toLocaleString()}
+										</span>
+									)}
+									{isClosed && finalizedMatches.length > 0 && (
+										<span className="mt-1 text-orange-600 text-xs">
+											{finalizedMatches.length} of {activeMatches.length}{" "}
+											matches finalized
 										</span>
 									)}
 								</div>
@@ -1214,6 +1315,56 @@ export default function AdminTournamentManagePage({
 							onClick={handleConfirmClose}
 						>
 							Close Submissions
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Reopen Submissions Confirmation Dialog */}
+			<AlertDialog onOpenChange={setShowReopenDialog} open={showReopenDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Reopen Submissions?</AlertDialogTitle>
+						<AlertDialogDescription asChild>
+							<div className="text-muted-foreground text-sm">
+								<p>
+									Reopen submissions for {reopenDialogData?.roundName}?
+								</p>
+								<div className="mt-3 space-y-2 text-left">
+									<p className="font-medium text-foreground">This will allow:</p>
+									<ul className="list-inside list-disc space-y-1">
+										<li>Users to submit or modify picks for pending matches</li>
+										<li>Draft saves for matches not yet finalized</li>
+									</ul>
+									{reopenDialogData?.finalizedMatches &&
+									reopenDialogData.finalizedMatches > 0 ? (
+										<div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
+											<p className="font-medium text-orange-900">
+												⚠️ Partial Round Warning
+											</p>
+											<p className="mt-1 text-orange-800 text-sm">
+												{reopenDialogData.finalizedMatches} match(es) have
+												already been finalized and cannot be voted on.
+												Only {reopenDialogData.pendingMatches} pending
+												match(es) will be available for picks.
+											</p>
+										</div>
+									) : (
+										<p className="mt-3 text-green-700">
+											All matches are pending and available for picks.
+										</p>
+									)}
+								</div>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-green-600 hover:bg-green-700"
+							onClick={handleConfirmReopen}
+						>
+							Reopen Submissions
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
