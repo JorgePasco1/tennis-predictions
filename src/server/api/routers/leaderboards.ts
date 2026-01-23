@@ -662,8 +662,14 @@ export const leaderboardsRouter = createTRPCRouter({
 						});
 					}
 
-					// Sort by points and assign ranks
-					userPoints.sort((a, b) => b.cumulativePoints - a.cumulativePoints);
+					// Sort by points with tiebreaker for deterministic ordering
+					userPoints.sort((a, b) => {
+						if (b.cumulativePoints !== a.cumulativePoints) {
+							return b.cumulativePoints - a.cumulativePoints;
+						}
+						// Tiebreaker: alphabetical by displayName for consistency
+						return a.displayName.localeCompare(b.displayName);
+					});
 					const rankedUsers = userPoints.map((user, index) => ({
 						...user,
 						rank: index + 1,
