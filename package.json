@@ -50,7 +50,7 @@
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0",
 		"react-hook-form": "^7.71.1",
-		"recharts": "2.15.4",
+		"recharts": "^3.7.0",
 		"server-only": "^0.0.1",
 		"sonner": "^2.0.7",
 		"superjson": "^2.2.1",
@@ -78,10 +78,5 @@
 	"ct3aMetadata": {
 		"initVersion": "7.40.0"
 	},
-	"packageManager": "pnpm@10.23.0",
-	"pnpm": {
-		"overrides": {
-			"recharts>react-is": "^19.0.0"
-		}
-	}
+	"packageManager": "pnpm@10.23.0"
 }

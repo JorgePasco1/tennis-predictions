@@ -1,6 +1,8 @@
 "use client";
 
 import { Area, AreaChart, CartesianGrid, Label, XAxis, YAxis } from "recharts";
+import type { TooltipContentProps } from "recharts/types/component/Tooltip";
+import type { DotItemDotProps } from "recharts/types/util/types";
 import {
 	type ChartConfig,
 	ChartContainer,
@@ -25,18 +27,15 @@ interface LeaderboardProgressionChartProps {
 }
 
 // Custom dot component to render user avatars
-interface CustomDotProps {
-	cx?: number;
-	cy?: number;
-	payload?: Record<string, unknown>;
-	dataKey?: string;
+interface CustomDotProps extends DotItemDotProps {
 	userImages: Map<string, string | null>;
 }
 
 function CustomDot({ cx, cy, dataKey, userImages }: CustomDotProps) {
 	if (cx === undefined || cy === undefined || !dataKey) return null;
+	const dataKeyStr = String(dataKey);
 
-	const imageUrl = userImages.get(dataKey);
+	const imageUrl = userImages.get(dataKeyStr);
 	const size = 28;
 
 	return (
@@ -61,7 +60,7 @@ function CustomDot({ cx, cy, dataKey, userImages }: CustomDotProps) {
 				{imageUrl ? (
 					// biome-ignore lint/performance/noImgElement: Using img inside SVG foreignObject where Next.js Image doesn't work
 					<img
-						alt={dataKey}
+						alt={dataKeyStr}
 						src={imageUrl}
 						style={{
 							width: size,
@@ -100,16 +99,7 @@ const CHART_COLORS = [
 ];
 
 // Custom tooltip that shows players sorted by rank with their points
-interface TooltipPayloadEntry {
-	dataKey?: string | number;
-	value?: unknown;
-	color?: string;
-}
-
-interface CustomTooltipProps {
-	active?: boolean;
-	payload?: TooltipPayloadEntry[];
-	label?: string;
+interface CustomChartTooltipProps extends TooltipContentProps<number, string> {
 	pointsData: Map<string, Map<string, number>>; // label -> displayName -> points
 }
 
@@ -118,14 +108,12 @@ function CustomTooltip({
 	payload,
 	label,
 	pointsData,
-}: CustomTooltipProps) {
+}: CustomChartTooltipProps) {
 	if (!active || !payload || !label) return null;
 
 	// Get points for this label and sort by rank (which is the value)
 	const validPayload = payload.filter(
-		(
-			p,
-		): p is TooltipPayloadEntry & { dataKey: string | number; value: number } =>
+		(p): p is (typeof payload)[number] & { value: number } =>
 			p.dataKey !== undefined && typeof p.value === "number",
 	);
 	const sortedPayload = [...validPayload].sort((a, b) => a.value - b.value);
@@ -245,14 +233,19 @@ export function LeaderboardProgressionChart({
 				/>
 				<ChartTooltip
 					content={(props) => (
-						<CustomTooltip {...props} pointsData={pointsData} />
+						<CustomTooltip
+							{...(props as TooltipContentProps<number, string>)}
+							pointsData={pointsData}
+						/>
 					)}
 				/>
 				{topUsers.map((user, index) => (
 					<Area
 						connectNulls={false}
 						dataKey={user.displayName}
-						dot={(props) => <CustomDot {...props} userImages={userImages} />}
+						dot={(props: DotItemDotProps) => (
+							<CustomDot {...props} userImages={userImages} />
+						)}
 						fill="transparent"
 						key={user.userId}
 						stroke={CHART_COLORS[index % CHART_COLORS.length]}
