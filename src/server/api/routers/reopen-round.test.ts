@@ -338,11 +338,6 @@ describe("admin router - reopenRoundSubmissions", () => {
 // =============================================================================
 
 describe("picks router - finalized match validation", () => {
-	beforeEach(() => {
-		// Mock DB not needed for these unit tests, but kept for consistency
-		createMockDb();
-	});
-
 	describe("submitRoundPicks - finalized match rejection", () => {
 		it("should reject picks for finalized matches", () => {
 			const finalizedMatch = {
