@@ -319,6 +319,7 @@ export const leaderboardsRouter = createTRPCRouter({
 				return {
 					rounds: [],
 					userRoundData: [],
+					progressionData: [],
 				};
 			}
 
@@ -369,6 +370,7 @@ export const leaderboardsRouter = createTRPCRouter({
 				return {
 					rounds: roundsMetadata,
 					userRoundData: [],
+					progressionData: [],
 				};
 			}
 
