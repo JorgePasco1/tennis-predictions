@@ -166,13 +166,18 @@ export default function PicksPage({
 		);
 	}
 
+	// Check if all pending matches have picks (finalized matches don't need picks)
+	const votableMatches = activeRound.matches.filter(
+		(m) => m.status === "pending",
+	);
 	const allPicksComplete =
-		activeRound.matches.length > 0 &&
-		activeRound.matches.every((match) => picks[match.id]?.predictedWinner);
+		votableMatches.length > 0 &&
+		votableMatches.every((match) => picks[match.id]?.predictedWinner);
 
 	const scrollToFirstIncomplete = () => {
 		if (!activeRound) return;
-		const firstIncompleteMatch = activeRound.matches.find(
+		// Only scroll to incomplete pending matches (not finalized ones)
+		const firstIncompleteMatch = votableMatches.find(
 			(match) => !picks[match.id]?.predictedWinner,
 		);
 		if (firstIncompleteMatch) {
@@ -211,9 +216,10 @@ export default function PicksPage({
 		setShowConfirmDialog(false);
 
 		try {
+			// Only submit picks for pending (votable) matches
 			await submitPicksMutation.mutateAsync({
 				roundId: activeRound!.id,
-				picks: activeRound!.matches.map((match) => ({
+				picks: votableMatches.map((match) => ({
 					matchId: match.id,
 					predictedWinner: picks[match.id]!.predictedWinner,
 					predictedSetsWon: picks[match.id]!.predictedSetsWon,
@@ -390,17 +396,21 @@ export default function PicksPage({
 	}
 
 	// Editable picks view - filter matches
-	const filteredMatches = filterMatchesByPlayerName(
-		activeRound.matches,
-		searchQuery,
+	// First, filter out finalized matches (users can't vote on them)
+	const pendingMatches = activeRound.matches.filter(
+		(m) => m.status === "pending",
 	);
-	const totalMatchesCount = activeRound.matches.length;
+	const finalizedMatchesCount =
+		activeRound.matches.length - pendingMatches.length;
+	const filteredMatches = filterMatchesByPlayerName(pendingMatches, searchQuery);
+	const totalMatchesCount = pendingMatches.length;
 	const filteredMatchesCount = filteredMatches.length;
 	const isSubmissionsClosed = !!activeRound.submissionsClosedAt;
 	const isNotYetOpen = !!(
 		activeRound.opensAt && new Date() < new Date(activeRound.opensAt)
 	);
 	const isDisabled = isSubmissionsClosed || isNotYetOpen;
+	const hasPartiallyFinalizedRound = finalizedMatchesCount > 0;
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -481,6 +491,21 @@ export default function PicksPage({
 								minute: "2-digit",
 							})}
 							. You cannot submit or save picks until then.
+						</p>
+					</div>
+				)}
+
+				{/* Partially Finalized Round Banner */}
+				{hasPartiallyFinalizedRound && !isSubmissionsClosed && (
+					<div className="mb-8 rounded-lg border border-orange-300 bg-orange-50 p-6">
+						<div className="mb-2 font-semibold text-orange-900 text-xl">
+							⚡ Partial Round - Some Matches Already Finalized
+						</div>
+						<p className="text-orange-800">
+							{finalizedMatchesCount} of {activeRound.matches.length} matches in
+							this round have already been finalized and cannot be voted on.
+							You can submit picks for the remaining {totalMatchesCount} pending
+							matches.
 						</p>
 					</div>
 				)}
@@ -789,8 +814,13 @@ export default function PicksPage({
 					<div className="flex items-center justify-between">
 						<div>
 							<div className="font-semibold text-gray-900">
-								{Object.keys(picks).length} of {activeRound.matches.length}{" "}
-								picks completed
+								{Object.keys(picks).length} of {votableMatches.length} picks
+								completed
+								{hasPartiallyFinalizedRound && (
+									<span className="ml-2 text-orange-600 text-sm">
+										({finalizedMatchesCount} matches already finalized)
+									</span>
+								)}
 							</div>
 							<div className="text-gray-600 text-sm">
 								{activeRound.scoringRule &&

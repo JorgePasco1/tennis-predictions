@@ -11,6 +11,34 @@ import {
 	users,
 } from "~/server/db/schema";
 
+/**
+ * Validates that none of the picks are for finalized matches.
+ * Throws TRPCError if any pick targets a finalized match.
+ */
+function validateNoFinalizedMatches(
+	picks: Array<{ matchId: number }>,
+	matchesById: Map<
+		number,
+		{
+			id: number;
+			status: string;
+			matchNumber: number;
+			player1Name: string;
+			player2Name: string;
+		}
+	>,
+) {
+	for (const pick of picks) {
+		const match = matchesById.get(pick.matchId);
+		if (match?.status === "finalized") {
+			throw new TRPCError({
+				code: "BAD_REQUEST",
+				message: `Cannot submit pick for match ${match.matchNumber} (${match.player1Name} vs ${match.player2Name}) - it has already been finalized`,
+			});
+		}
+	}
+}
+
 export const picksRouter = createTRPCRouter({
 	/**
 	 * Submit picks for a round
@@ -124,6 +152,10 @@ export const picksRouter = createTRPCRouter({
 					});
 				}
 			}
+
+			// Validate that picks are not for finalized matches
+			const matchesById = new Map(round.matches.map((m) => [m.id, m]));
+			validateNoFinalizedMatches(input.picks, matchesById);
 
 			// Get tournament format for score validation
 			const tournamentFormat = round.tournament.format;
@@ -403,6 +435,10 @@ export const picksRouter = createTRPCRouter({
 					});
 				}
 			}
+
+			// Validate that picks are not for finalized matches
+			const matchesById = new Map(round.matches.map((m) => [m.id, m]));
+			validateNoFinalizedMatches(input.picks, matchesById);
 
 			// Get tournament format for score validation
 			const tournamentFormat = round.tournament.format;
