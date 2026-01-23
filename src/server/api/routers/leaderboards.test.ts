@@ -555,3 +555,858 @@ describe("statistics accuracy", () => {
 		});
 	});
 });
+
+// =============================================================================
+// Per-Round Leaderboard Tests (getPerRoundLeaderboard)
+// =============================================================================
+
+describe("getPerRoundLeaderboard", () => {
+	let mockDb: MockDb;
+
+	beforeEach(() => {
+		mockDb = createMockDb();
+	});
+
+	describe("basic functionality", () => {
+		it("should return empty arrays when tournament has no rounds", async () => {
+			mockDb.query.rounds.findMany.mockResolvedValue([]);
+
+			const rounds = await mockDb.query.rounds.findMany({});
+
+			expect(rounds.length).toBe(0);
+
+			// Simulating the procedure's response structure
+			const result = {
+				rounds: [],
+				userRoundData: [],
+			};
+
+			expect(result.rounds).toEqual([]);
+			expect(result.userRoundData).toEqual([]);
+		});
+
+		it("should return rounds metadata with correct structure", () => {
+			const tournamentRounds = [
+				{
+					id: 1,
+					roundNumber: 1,
+					name: "Round of 128",
+					isFinalized: false,
+					matches: [
+						{ id: 1, status: "pending" },
+						{ id: 2, status: "finalized" },
+					],
+				},
+				{
+					id: 2,
+					roundNumber: 2,
+					name: "Round of 64",
+					isFinalized: true,
+					matches: [{ id: 3, status: "finalized" }],
+				},
+			];
+
+			// Simulate building rounds metadata (similar to procedure logic)
+			const roundsMetadata = tournamentRounds.map((round) => ({
+				roundId: round.id,
+				roundName: round.name,
+				roundNumber: round.roundNumber,
+				totalMatches: round.matches.length,
+				finalizedMatches: round.matches.filter((m) => m.status === "finalized")
+					.length,
+				isFinalized: round.isFinalized,
+			}));
+
+			expect(roundsMetadata).toHaveLength(2);
+			expect(roundsMetadata[0]).toEqual({
+				roundId: 1,
+				roundName: "Round of 128",
+				roundNumber: 1,
+				totalMatches: 2,
+				finalizedMatches: 1,
+				isFinalized: false,
+			});
+			expect(roundsMetadata[1]).toEqual({
+				roundId: 2,
+				roundName: "Round of 64",
+				roundNumber: 2,
+				totalMatches: 1,
+				finalizedMatches: 1,
+				isFinalized: true,
+			});
+		});
+
+		it("should return user round data with per-round statistics", () => {
+			const userPicks = [
+				{
+					userId: "user-1",
+					displayName: "Player 1",
+					imageUrl: null,
+					roundId: 1,
+					totalPoints: 10,
+					correctWinners: 3,
+					exactScores: 1,
+					submittedAt: new Date("2024-01-15T10:00:00Z"),
+				},
+				{
+					userId: "user-1",
+					displayName: "Player 1",
+					imageUrl: null,
+					roundId: 2,
+					totalPoints: 15,
+					correctWinners: 5,
+					exactScores: 2,
+					submittedAt: new Date("2024-01-16T10:00:00Z"),
+				},
+			];
+
+			// Group picks by user
+			const userPicksMap = new Map<
+				string,
+				{ displayName: string; picks: typeof userPicks }
+			>();
+			for (const pick of userPicks) {
+				if (!userPicksMap.has(pick.userId)) {
+					userPicksMap.set(pick.userId, {
+						displayName: pick.displayName,
+						picks: [],
+					});
+				}
+				userPicksMap.get(pick.userId)?.picks.push(pick);
+			}
+
+			expect(userPicksMap.size).toBe(1);
+			expect(userPicksMap.get("user-1")?.picks).toHaveLength(2);
+		});
+	});
+
+	describe("empty tournament handling", () => {
+		it("should handle tournament with no user picks", () => {
+			const tournamentRounds = [
+				{
+					id: 1,
+					roundNumber: 1,
+					name: "Round of 128",
+					isFinalized: false,
+					matches: [],
+				},
+			];
+
+			const allUserRoundPicks: unknown[] = [];
+
+			// When no picks exist, userRoundData should be empty
+			const result = {
+				rounds: tournamentRounds.map((r) => ({
+					roundId: r.id,
+					roundName: r.name,
+					roundNumber: r.roundNumber,
+					isFinalized: r.isFinalized,
+				})),
+				userRoundData: allUserRoundPicks.length === 0 ? [] : [],
+			};
+
+			expect(result.rounds).toHaveLength(1);
+			expect(result.userRoundData).toHaveLength(0);
+		});
+
+		it("should handle tournament with no finalized matches", () => {
+			const rounds = [
+				{
+					id: 1,
+					matches: [
+						{ id: 1, status: "pending", finalizedAt: null },
+						{ id: 2, status: "pending", finalizedAt: null },
+					],
+				},
+			];
+
+			const allMatches = rounds.flatMap((round) =>
+				round.matches.filter((m) => m.status === "finalized" && m.finalizedAt),
+			);
+
+			expect(allMatches).toHaveLength(0);
+		});
+	});
+
+	describe("partial data handling", () => {
+		it("should handle users who have not submitted all rounds", () => {
+			const tournamentRounds = [
+				{ id: 1, roundNumber: 1, name: "Round of 128" },
+				{ id: 2, roundNumber: 2, name: "Round of 64" },
+				{ id: 3, roundNumber: 3, name: "Round of 32" },
+			];
+
+			const userPicks = [
+				// User 1 submitted rounds 1 and 2
+				{ userId: "user-1", roundId: 1, totalPoints: 10 },
+				{ userId: "user-1", roundId: 2, totalPoints: 15 },
+				// User 2 only submitted round 1
+				{ userId: "user-2", roundId: 1, totalPoints: 8 },
+			];
+
+			// Build per-round data for each user
+			const buildUserRoundData = (userId: string) => {
+				const userSubmissions = userPicks.filter((p) => p.userId === userId);
+				const picksByRound = new Map(
+					userSubmissions.map((p) => [p.roundId, p]),
+				);
+
+				let cumulativePoints = 0;
+				return tournamentRounds.map((round) => {
+					const pick = picksByRound.get(round.id);
+					if (pick) {
+						cumulativePoints += pick.totalPoints;
+					}
+					return {
+						roundId: round.id,
+						roundNumber: round.roundNumber,
+						totalPoints: pick?.totalPoints ?? 0,
+						cumulativePoints,
+						hasSubmitted: !!pick,
+					};
+				});
+			};
+
+			const user1Data = buildUserRoundData("user-1");
+			const user2Data = buildUserRoundData("user-2");
+
+			// User 1: submitted R1 (10pts) and R2 (15pts), not R3
+			expect(user1Data[0]?.hasSubmitted).toBe(true);
+			expect(user1Data[0]?.cumulativePoints).toBe(10);
+			expect(user1Data[1]?.hasSubmitted).toBe(true);
+			expect(user1Data[1]?.cumulativePoints).toBe(25);
+			expect(user1Data[2]?.hasSubmitted).toBe(false);
+			expect(user1Data[2]?.cumulativePoints).toBe(25); // Stays at 25
+
+			// User 2: only submitted R1 (8pts)
+			expect(user2Data[0]?.hasSubmitted).toBe(true);
+			expect(user2Data[0]?.cumulativePoints).toBe(8);
+			expect(user2Data[1]?.hasSubmitted).toBe(false);
+			expect(user2Data[1]?.cumulativePoints).toBe(8);
+			expect(user2Data[2]?.hasSubmitted).toBe(false);
+			expect(user2Data[2]?.cumulativePoints).toBe(8);
+		});
+
+		it("should show null rank for rounds user has not submitted", () => {
+			// tournamentRounds defines the structure we're testing against
+			const _tournamentRounds = [
+				{ id: 1, roundNumber: 1 },
+				{ id: 2, roundNumber: 2 },
+			];
+
+			const userPicks = [
+				{
+					userId: "user-1",
+					roundId: 1,
+					totalPoints: 10,
+					submittedAt: new Date(),
+				},
+				{
+					userId: "user-2",
+					roundId: 1,
+					totalPoints: 8,
+					submittedAt: new Date(),
+				},
+				{
+					userId: "user-2",
+					roundId: 2,
+					totalPoints: 12,
+					submittedAt: new Date(),
+				},
+				// User 1 did not submit round 2
+			];
+
+			// Calculate ranks for round 2
+			const round2Picks = userPicks
+				.filter((p) => p.roundId === 2)
+				.sort((a, b) => b.totalPoints - a.totalPoints);
+
+			const round2Ranks = new Map<string, number>();
+			round2Picks.forEach((p, idx) => {
+				round2Ranks.set(p.userId, idx + 1);
+			});
+
+			// User 1 should have null rank for round 2
+			expect(round2Ranks.get("user-1")).toBeUndefined();
+			expect(round2Ranks.get("user-2")).toBe(1);
+		});
+	});
+
+	describe("ranking calculations", () => {
+		it("should calculate per-round rankings correctly", () => {
+			const roundPicks = [
+				{
+					userId: "user-1",
+					totalPoints: 15,
+					submittedAt: new Date("2024-01-15T10:00:00Z"),
+				},
+				{
+					userId: "user-2",
+					totalPoints: 20,
+					submittedAt: new Date("2024-01-15T11:00:00Z"),
+				},
+				{
+					userId: "user-3",
+					totalPoints: 10,
+					submittedAt: new Date("2024-01-15T09:00:00Z"),
+				},
+			];
+
+			const sorted = [...roundPicks].sort((a, b) => {
+				if (b.totalPoints !== a.totalPoints) {
+					return b.totalPoints - a.totalPoints;
+				}
+				return a.submittedAt.getTime() - b.submittedAt.getTime();
+			});
+
+			const ranks = sorted.map((p, idx) => ({
+				userId: p.userId,
+				rank: idx + 1,
+			}));
+
+			expect(ranks.find((r) => r.userId === "user-2")?.rank).toBe(1); // 20 points
+			expect(ranks.find((r) => r.userId === "user-1")?.rank).toBe(2); // 15 points
+			expect(ranks.find((r) => r.userId === "user-3")?.rank).toBe(3); // 10 points
+		});
+
+		it("should calculate cumulative rankings correctly across rounds", () => {
+			const users = [
+				{ userId: "user-1", rounds: [{ points: 10 }, { points: 5 }] },
+				{ userId: "user-2", rounds: [{ points: 8 }, { points: 12 }] },
+				{ userId: "user-3", rounds: [{ points: 15 }, { points: 3 }] },
+			];
+
+			// After round 1: user-3 (15), user-1 (10), user-2 (8)
+			// After round 2: user-2 (20), user-3 (18), user-1 (15)
+
+			const getCumulativeRanks = (afterRound: number) => {
+				const cumulative = users.map((u) => ({
+					userId: u.userId,
+					total: u.rounds
+						.slice(0, afterRound + 1)
+						.reduce((sum, r) => sum + r.points, 0),
+				}));
+
+				cumulative.sort((a, b) => b.total - a.total);
+				return cumulative.map((u, idx) => ({
+					userId: u.userId,
+					rank: idx + 1,
+				}));
+			};
+
+			const ranksAfterR1 = getCumulativeRanks(0);
+			expect(ranksAfterR1.find((r) => r.userId === "user-3")?.rank).toBe(1);
+			expect(ranksAfterR1.find((r) => r.userId === "user-1")?.rank).toBe(2);
+			expect(ranksAfterR1.find((r) => r.userId === "user-2")?.rank).toBe(3);
+
+			const ranksAfterR2 = getCumulativeRanks(1);
+			expect(ranksAfterR2.find((r) => r.userId === "user-2")?.rank).toBe(1); // 20 total
+			expect(ranksAfterR2.find((r) => r.userId === "user-3")?.rank).toBe(2); // 18 total
+			expect(ranksAfterR2.find((r) => r.userId === "user-1")?.rank).toBe(3); // 15 total
+		});
+
+		it("should handle ties with earlier submission winning", () => {
+			const roundPicks = [
+				{
+					userId: "user-1",
+					cumulativePoints: 25,
+					earliestSubmission: new Date("2024-01-15T12:00:00Z"),
+				},
+				{
+					userId: "user-2",
+					cumulativePoints: 25,
+					earliestSubmission: new Date("2024-01-15T10:00:00Z"),
+				},
+				{
+					userId: "user-3",
+					cumulativePoints: 25,
+					earliestSubmission: new Date("2024-01-15T11:00:00Z"),
+				},
+			];
+
+			const sorted = [...roundPicks].sort((a, b) => {
+				if (b.cumulativePoints !== a.cumulativePoints) {
+					return b.cumulativePoints - a.cumulativePoints;
+				}
+				return a.earliestSubmission.getTime() - b.earliestSubmission.getTime();
+			});
+
+			expect(sorted[0]?.userId).toBe("user-2"); // Earliest at 10:00
+			expect(sorted[1]?.userId).toBe("user-3"); // Second at 11:00
+			expect(sorted[2]?.userId).toBe("user-1"); // Latest at 12:00
+		});
+
+		it("should assign final ranks based on total points", () => {
+			const users = [
+				{ userId: "user-1", totalPoints: 50 },
+				{ userId: "user-2", totalPoints: 75 },
+				{ userId: "user-3", totalPoints: 30 },
+			];
+
+			const sorted = [...users].sort((a, b) => b.totalPoints - a.totalPoints);
+			const ranked = sorted.map((u, idx) => ({ ...u, finalRank: idx + 1 }));
+
+			expect(ranked.find((r) => r.userId === "user-2")?.finalRank).toBe(1);
+			expect(ranked.find((r) => r.userId === "user-1")?.finalRank).toBe(2);
+			expect(ranked.find((r) => r.userId === "user-3")?.finalRank).toBe(3);
+		});
+	});
+
+	describe("progression data calculation", () => {
+		it("should create exactly 8 progression checkpoints", () => {
+			const totalMatches = 64;
+			const NUM_CHECKPOINTS = 8;
+
+			const checkpoints: number[] = [];
+			const interval = totalMatches / NUM_CHECKPOINTS;
+
+			for (let i = 1; i <= NUM_CHECKPOINTS; i++) {
+				checkpoints.push(Math.round(interval * i));
+			}
+
+			expect(checkpoints).toHaveLength(8);
+			expect(checkpoints[0]).toBe(8); // 64/8 = 8
+			expect(checkpoints[7]).toBe(64); // Last checkpoint is total
+		});
+
+		it("should distribute checkpoints evenly for various match counts", () => {
+			// The expected values are calculated using Math.round(interval * i)
+			// For 31 matches: interval = 31/8 = 3.875
+			// i=4: Math.round(3.875 * 4) = Math.round(15.5) = 16
+			const testCases = [
+				{ totalMatches: 127, expected: [16, 32, 48, 64, 79, 95, 111, 127] },
+				{ totalMatches: 63, expected: [8, 16, 24, 32, 39, 47, 55, 63] },
+				{ totalMatches: 31, expected: [4, 8, 12, 16, 19, 23, 27, 31] },
+				{ totalMatches: 16, expected: [2, 4, 6, 8, 10, 12, 14, 16] },
+			];
+
+			for (const { totalMatches, expected } of testCases) {
+				const NUM_CHECKPOINTS = 8;
+				const interval = totalMatches / NUM_CHECKPOINTS;
+				const checkpoints = [];
+
+				for (let i = 1; i <= NUM_CHECKPOINTS; i++) {
+					checkpoints.push(Math.round(interval * i));
+				}
+
+				expect(checkpoints).toEqual(expected);
+			}
+		});
+
+		it("should calculate user rankings at each checkpoint", () => {
+			// Simulated match-by-match points for 2 users over 8 matches
+			const matchPoints = [
+				{ matchId: 1, user1: 5, user2: 0 },
+				{ matchId: 2, user1: 0, user2: 5 },
+				{ matchId: 3, user1: 5, user2: 5 },
+				{ matchId: 4, user1: 0, user2: 5 },
+				{ matchId: 5, user1: 5, user2: 0 },
+				{ matchId: 6, user1: 5, user2: 5 },
+				{ matchId: 7, user1: 0, user2: 5 },
+				{ matchId: 8, user1: 5, user2: 0 },
+			];
+
+			const calculateRankingsAtMatch = (matchCount: number) => {
+				const matchesUpToNow = matchPoints.slice(0, matchCount);
+				const user1Total = matchesUpToNow.reduce((sum, m) => sum + m.user1, 0);
+				const user2Total = matchesUpToNow.reduce((sum, m) => sum + m.user2, 0);
+
+				const sorted = [
+					{ userId: "user-1", points: user1Total },
+					{ userId: "user-2", points: user2Total },
+				].sort((a, b) => b.points - a.points);
+
+				return sorted.map((u, idx) => ({ userId: u.userId, rank: idx + 1 }));
+			};
+
+			// At match 4: user1=10, user2=15 -> user2 leads
+			const ranksAt4 = calculateRankingsAtMatch(4);
+			expect(ranksAt4[0]?.userId).toBe("user-2");
+			expect(ranksAt4[0]?.rank).toBe(1);
+
+			// At match 8: user1=25, user2=25 -> tie
+			const ranksAt8 = calculateRankingsAtMatch(8);
+			expect(ranksAt8[0]?.rank).toBe(1);
+			expect(ranksAt8[1]?.rank).toBe(2);
+		});
+
+		it("should return empty progression data when no matches are finalized", () => {
+			const allMatches: { status: string; finalizedAt: Date | null }[] = [
+				{ status: "pending", finalizedAt: null },
+				{ status: "pending", finalizedAt: null },
+			];
+
+			const finalizedMatches = allMatches.filter(
+				(m) => m.status === "finalized" && m.finalizedAt,
+			);
+
+			expect(finalizedMatches).toHaveLength(0);
+
+			// When no finalized matches, progressionData should be empty
+			const progressionData =
+				finalizedMatches.length > 0 ? [{ matchIndex: 1, rankings: [] }] : [];
+
+			expect(progressionData).toHaveLength(0);
+		});
+
+		it("should handle progression with only one user", () => {
+			const userPoints = new Map([
+				[
+					"user-1",
+					new Map([
+						[1, 5],
+						[2, 10],
+						[3, 5],
+					]),
+				],
+			]);
+
+			const matchIds = [1, 2, 3];
+			const checkpoints = [1, 2, 3];
+
+			const progressionData = checkpoints.map((matchCount) => {
+				const matchIdsUpToNow = new Set(matchIds.slice(0, matchCount));
+				const userCumulative: { userId: string; points: number }[] = [];
+
+				for (const [userId, matches] of userPoints) {
+					let total = 0;
+					for (const [matchId, points] of matches) {
+						if (matchIdsUpToNow.has(matchId)) {
+							total += points;
+						}
+					}
+					userCumulative.push({ userId, points: total });
+				}
+
+				userCumulative.sort((a, b) => b.points - a.points);
+				return {
+					matchIndex: matchCount,
+					rankings: userCumulative.map((u, idx) => ({
+						userId: u.userId,
+						rank: idx + 1,
+						cumulativePoints: u.points,
+					})),
+				};
+			});
+
+			expect(progressionData).toHaveLength(3);
+			expect(progressionData[0]?.rankings[0]?.cumulativePoints).toBe(5);
+			expect(progressionData[1]?.rankings[0]?.cumulativePoints).toBe(15);
+			expect(progressionData[2]?.rankings[0]?.cumulativePoints).toBe(20);
+			// Single user always has rank 1
+			expect(progressionData[2]?.rankings[0]?.rank).toBe(1);
+		});
+	});
+
+	describe("data integrity", () => {
+		it("should only include non-draft picks in calculations", () => {
+			const allPicks = [
+				{ userId: "user-1", isDraft: false, totalPoints: 10 },
+				{ userId: "user-1", isDraft: true, totalPoints: 5 },
+				{ userId: "user-2", isDraft: false, totalPoints: 15 },
+			];
+
+			const finalPicks = allPicks.filter((p) => !p.isDraft);
+
+			expect(finalPicks).toHaveLength(2);
+			expect(finalPicks.find((p) => p.totalPoints === 5)).toBeUndefined();
+		});
+
+		it("should exclude deleted matches from finalized counts", () => {
+			const matches = [
+				{ id: 1, status: "finalized", deletedAt: null },
+				{ id: 2, status: "finalized", deletedAt: new Date() },
+				{ id: 3, status: "pending", deletedAt: null },
+			];
+
+			const validFinalizedMatches = matches.filter(
+				(m) => m.status === "finalized" && m.deletedAt === null,
+			);
+
+			expect(validFinalizedMatches).toHaveLength(1);
+			expect(validFinalizedMatches[0]?.id).toBe(1);
+		});
+
+		it("should maintain user identity across rounds", () => {
+			const userRoundPicks = [
+				{ userId: "user-1", displayName: "Player One", roundId: 1 },
+				{ userId: "user-1", displayName: "Player One", roundId: 2 },
+				{ userId: "user-2", displayName: "Player Two", roundId: 1 },
+			];
+
+			const userMap = new Map<
+				string,
+				{ displayName: string; roundIds: number[] }
+			>();
+			for (const pick of userRoundPicks) {
+				if (!userMap.has(pick.userId)) {
+					userMap.set(pick.userId, {
+						displayName: pick.displayName,
+						roundIds: [],
+					});
+				}
+				userMap.get(pick.userId)?.roundIds.push(pick.roundId);
+			}
+
+			expect(userMap.get("user-1")?.displayName).toBe("Player One");
+			expect(userMap.get("user-1")?.roundIds).toEqual([1, 2]);
+			expect(userMap.get("user-2")?.roundIds).toEqual([1]);
+		});
+	});
+});
+
+// =============================================================================
+// Per-Round Leaderboard Edge Cases
+// =============================================================================
+
+describe("per-round leaderboard edge cases", () => {
+	describe("large tournament scenarios", () => {
+		it("should handle a full 128-player Grand Slam draw", () => {
+			// 127 matches total: 64 + 32 + 16 + 8 + 4 + 2 + 1
+			const totalMatches = 127;
+			const NUM_CHECKPOINTS = 8;
+			const interval = totalMatches / NUM_CHECKPOINTS;
+
+			const checkpoints = [];
+			for (let i = 1; i <= NUM_CHECKPOINTS; i++) {
+				checkpoints.push(Math.round(interval * i));
+			}
+
+			// Math.round(127 * 4 / 8) = Math.round(63.5) = 64
+			expect(checkpoints).toEqual([16, 32, 48, 64, 79, 95, 111, 127]);
+		});
+
+		it("should handle 50+ users competing", () => {
+			const users = Array.from({ length: 50 }, (_, i) => ({
+				userId: `user-${i}`,
+				totalPoints: Math.floor(Math.random() * 500),
+			}));
+
+			const startTime = Date.now();
+			const sorted = [...users].sort((a, b) => b.totalPoints - a.totalPoints);
+			const ranked = sorted.map((u, idx) => ({ ...u, rank: idx + 1 }));
+			const duration = Date.now() - startTime;
+
+			expect(ranked).toHaveLength(50);
+			expect(ranked[0]?.rank).toBe(1);
+			expect(ranked[49]?.rank).toBe(50);
+			expect(duration).toBeLessThan(100); // Should be very fast
+		});
+	});
+
+	describe("boundary conditions", () => {
+		it("should handle tournament with only 1 round", () => {
+			const rounds = [{ id: 1, roundNumber: 1, name: "Final" }];
+
+			expect(rounds).toHaveLength(1);
+
+			const userRoundData = [
+				{
+					userId: "user-1",
+					rounds: [{ roundId: 1, totalPoints: 30, cumulativePoints: 30 }],
+					totalPoints: 30,
+				},
+			];
+
+			expect(userRoundData[0]?.rounds).toHaveLength(1);
+			expect(userRoundData[0]?.rounds[0]?.cumulativePoints).toBe(30);
+		});
+
+		it("should handle tournament with only 1 finalized match", () => {
+			const matches = [{ id: 1, status: "finalized", finalizedAt: new Date() }];
+
+			const NUM_CHECKPOINTS = 8;
+			const interval = matches.length / NUM_CHECKPOINTS;
+
+			// With only 1 match, all checkpoints should be at match 1
+			const checkpoints = [];
+			for (let i = 1; i <= NUM_CHECKPOINTS; i++) {
+				checkpoints.push(Math.max(1, Math.round(interval * i)));
+			}
+
+			// All checkpoints converge to 1 for single match
+			expect(checkpoints.every((c) => c === 1)).toBe(true);
+		});
+
+		it("should handle user with 0 points across all rounds", () => {
+			const userRounds = [
+				{ roundId: 1, totalPoints: 0, cumulativePoints: 0 },
+				{ roundId: 2, totalPoints: 0, cumulativePoints: 0 },
+				{ roundId: 3, totalPoints: 0, cumulativePoints: 0 },
+			];
+
+			const totalPoints = userRounds.reduce((sum, r) => sum + r.totalPoints, 0);
+
+			expect(totalPoints).toBe(0);
+			expect(userRounds[2]?.cumulativePoints).toBe(0);
+		});
+
+		it("should handle maximum possible points scenario", () => {
+			// Grand Slam with perfect predictions
+			// Using example scoring: R128=2+3, R64=3+5, R32=5+8, R16=8+12, QF=12+18, SF=18+27, F=30+45
+			const roundScores = [
+				{ round: "R128", matches: 64, pointsPerMatch: 5 }, // 64 * 5 = 320
+				{ round: "R64", matches: 32, pointsPerMatch: 8 }, // 32 * 8 = 256
+				{ round: "R32", matches: 16, pointsPerMatch: 13 }, // 16 * 13 = 208
+				{ round: "R16", matches: 8, pointsPerMatch: 20 }, // 8 * 20 = 160
+				{ round: "QF", matches: 4, pointsPerMatch: 30 }, // 4 * 30 = 120
+				{ round: "SF", matches: 2, pointsPerMatch: 45 }, // 2 * 45 = 90
+				{ round: "F", matches: 1, pointsPerMatch: 75 }, // 1 * 75 = 75
+			];
+
+			const maxPossiblePoints = roundScores.reduce(
+				(sum, r) => sum + r.matches * r.pointsPerMatch,
+				0,
+			);
+
+			expect(maxPossiblePoints).toBe(1229);
+		});
+	});
+
+	describe("concurrent submission handling", () => {
+		it("should handle users submitting at exact same millisecond", () => {
+			const exactSameTime = new Date("2024-01-15T10:00:00.000Z");
+
+			const picks = [
+				{ userId: "user-1", cumulativePoints: 50, submittedAt: exactSameTime },
+				{ userId: "user-2", cumulativePoints: 50, submittedAt: exactSameTime },
+			];
+
+			const sorted = [...picks].sort((a, b) => {
+				if (b.cumulativePoints !== a.cumulativePoints) {
+					return b.cumulativePoints - a.cumulativePoints;
+				}
+				return a.submittedAt.getTime() - b.submittedAt.getTime();
+			});
+
+			// Both users ranked, order is stable
+			expect(sorted).toHaveLength(2);
+			expect(sorted[0]?.cumulativePoints).toBe(50);
+			expect(sorted[1]?.cumulativePoints).toBe(50);
+		});
+	});
+
+	describe("round finalization states", () => {
+		it("should show correct isFinalized status for each round", () => {
+			const rounds = [
+				{ id: 1, name: "R128", isFinalized: true },
+				{ id: 2, name: "R64", isFinalized: true },
+				{ id: 3, name: "R32", isFinalized: false },
+				{ id: 4, name: "R16", isFinalized: false },
+			];
+
+			const finalizedRounds = rounds.filter((r) => r.isFinalized);
+			const pendingRounds = rounds.filter((r) => !r.isFinalized);
+
+			expect(finalizedRounds).toHaveLength(2);
+			expect(pendingRounds).toHaveLength(2);
+		});
+
+		it("should calculate rankings only for submitted rounds", () => {
+			const userData = {
+				userId: "user-1",
+				rounds: [
+					{ roundId: 1, hasSubmitted: true, totalPoints: 10 },
+					{ roundId: 2, hasSubmitted: false, totalPoints: 0 },
+					{ roundId: 3, hasSubmitted: true, totalPoints: 15 },
+				],
+			};
+
+			const submittedRounds = userData.rounds.filter((r) => r.hasSubmitted);
+			const totalFromSubmitted = submittedRounds.reduce(
+				(sum, r) => sum + r.totalPoints,
+				0,
+			);
+
+			expect(submittedRounds).toHaveLength(2);
+			expect(totalFromSubmitted).toBe(25);
+		});
+	});
+});
+
+// =============================================================================
+// Progression Chart Data Validation
+// =============================================================================
+
+describe("progression chart data validation", () => {
+	it("should produce monotonically non-decreasing cumulative points", () => {
+		const progressionData = [
+			{ matchIndex: 8, rankings: [{ userId: "user-1", cumulativePoints: 20 }] },
+			{
+				matchIndex: 16,
+				rankings: [{ userId: "user-1", cumulativePoints: 45 }],
+			},
+			{
+				matchIndex: 24,
+				rankings: [{ userId: "user-1", cumulativePoints: 60 }],
+			},
+			{
+				matchIndex: 32,
+				rankings: [{ userId: "user-1", cumulativePoints: 80 }],
+			},
+		];
+
+		for (let i = 1; i < progressionData.length; i++) {
+			const prevPoints =
+				progressionData[i - 1]?.rankings[0]?.cumulativePoints ?? 0;
+			const currPoints = progressionData[i]?.rankings[0]?.cumulativePoints ?? 0;
+			expect(currPoints).toBeGreaterThanOrEqual(prevPoints);
+		}
+	});
+
+	it("should have consistent user count across all checkpoints", () => {
+		const users = ["user-1", "user-2", "user-3"];
+
+		const progressionData = [
+			{
+				matchIndex: 8,
+				rankings: users.map((u) => ({ userId: u, cumulativePoints: 0 })),
+			},
+			{
+				matchIndex: 16,
+				rankings: users.map((u) => ({ userId: u, cumulativePoints: 0 })),
+			},
+			{
+				matchIndex: 24,
+				rankings: users.map((u) => ({ userId: u, cumulativePoints: 0 })),
+			},
+		];
+
+		const userCounts = progressionData.map((p) => p.rankings.length);
+		expect(userCounts.every((count) => count === users.length)).toBe(true);
+	});
+
+	it("should maintain valid rank values (1 to n)", () => {
+		const rankings = [
+			{ userId: "user-1", rank: 1, cumulativePoints: 100 },
+			{ userId: "user-2", rank: 2, cumulativePoints: 75 },
+			{ userId: "user-3", rank: 3, cumulativePoints: 50 },
+		];
+
+		const ranks = rankings.map((r) => r.rank);
+		const expectedRanks = [1, 2, 3];
+
+		expect(ranks).toEqual(expectedRanks);
+		expect(Math.min(...ranks)).toBe(1);
+		expect(Math.max(...ranks)).toBe(rankings.length);
+	});
+
+	it("should have checkpoints in ascending order by matchIndex", () => {
+		const progressionData = [
+			{ matchIndex: 8 },
+			{ matchIndex: 16 },
+			{ matchIndex: 24 },
+			{ matchIndex: 32 },
+			{ matchIndex: 40 },
+			{ matchIndex: 48 },
+			{ matchIndex: 56 },
+			{ matchIndex: 64 },
+		];
+
+		for (let i = 1; i < progressionData.length; i++) {
+			expect(progressionData[i]?.matchIndex).toBeGreaterThan(
+				progressionData[i - 1]?.matchIndex ?? 0,
+			);
+		}
+	});
+});

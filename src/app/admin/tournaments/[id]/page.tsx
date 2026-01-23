@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { toast } from "sonner";
-import { formatPlayerName } from "~/lib/utils";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -19,6 +18,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { formatPlayerName } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
 export default function AdminTournamentManagePage({

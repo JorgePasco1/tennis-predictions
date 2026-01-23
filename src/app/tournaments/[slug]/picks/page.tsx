@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CountdownTimer } from "~/components/countdown/CountdownTimer";
-import { formatPlayerName } from "~/lib/utils";
 import {
 	filterMatchesByPlayerName,
 	SearchInput,
@@ -21,6 +20,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { formatPlayerName } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
 export default function PicksPage({

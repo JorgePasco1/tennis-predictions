@@ -12,7 +12,7 @@
  */
 
 import "dotenv/config";
-import { eq, sql, and, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { matches } from "~/server/db/schema";
 
@@ -20,8 +20,9 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 const TOURNAMENT_ID = (() => {
 	const idIndex = args.indexOf("--tournament-id");
-	if (idIndex !== -1 && args[idIndex + 1]) {
-		return Number.parseInt(args[idIndex + 1], 10);
+	const idValue = args[idIndex + 1];
+	if (idIndex !== -1 && idValue) {
+		return Number.parseInt(idValue, 10);
 	}
 	return 2; // Default to Australian Open 2025
 })();
@@ -81,16 +82,23 @@ function analyzeSeedDistribution(rounds: Round[]) {
 	console.log("📊 Current Seed Distribution:\n");
 
 	for (const round of rounds) {
-		const player1Seeds = round.matches.filter((m) => m.player1Seed !== null).length;
-		const player2Seeds = round.matches.filter((m) => m.player2Seed !== null).length;
+		const player1Seeds = round.matches.filter(
+			(m) => m.player1Seed !== null,
+		).length;
+		const player2Seeds = round.matches.filter(
+			(m) => m.player2Seed !== null,
+		).length;
 		const totalMatches = round.matches.length;
 		const totalSeeds = player1Seeds + player2Seeds;
 		const maxPossibleSeeds = totalMatches * 2;
 
-		const status = totalSeeds === 0 ? "❌" : totalSeeds === maxPossibleSeeds ? "✅" : "⚠️";
+		const status =
+			totalSeeds === 0 ? "❌" : totalSeeds === maxPossibleSeeds ? "✅" : "⚠️";
 
 		console.log(`  ${status} Round ${round.roundNumber}: ${round.name}`);
-		console.log(`     ${totalMatches} matches, ${player1Seeds} player1_seeds, ${player2Seeds} player2_seeds`);
+		console.log(
+			`     ${totalMatches} matches, ${player1Seeds} player1_seeds, ${player2Seeds} player2_seeds`,
+		);
 	}
 	console.log("");
 }
@@ -153,7 +161,9 @@ function logPlannedUpdates(
 	console.log(`  📋 ${updates.length} seeds to propagate:`);
 	for (const update of updates.slice(0, 10)) {
 		// Show first 10
-		const seedStr = update.winnerSeed ? `seed=${update.winnerSeed}` : "unseeded";
+		const seedStr = update.winnerSeed
+			? `seed=${update.winnerSeed}`
+			: "unseeded";
 		console.log(
 			`     Match ${update.fromMatchNumber}: (${update.winnerSeed}) ${update.winnerName} → Match ${update.targetMatchNumber} (${update.playerSlot}) ${seedStr}`,
 		);
@@ -166,7 +176,7 @@ function logPlannedUpdates(
 async function applySeedUpdates(
 	nextRound: Round,
 	updates: SeedUpdate[],
-	tx: typeof db,
+	tx: { update: typeof db.update },
 ) {
 	if (updates.length === 0) {
 		return;
@@ -258,8 +268,12 @@ async function executeBackfill() {
 		0,
 	);
 
-	console.log(`📈 Total (from current state): ${totalUpdates} seeds to propagate\n`);
-	console.log("ℹ️  Note: More seeds may be propagated after each round is updated\n");
+	console.log(
+		`📈 Total (from current state): ${totalUpdates} seeds to propagate\n`,
+	);
+	console.log(
+		"ℹ️  Note: More seeds may be propagated after each round is updated\n",
+	);
 
 	if (DRY_RUN) {
 		console.log("✅ Dry run complete. Run without --dry-run to execute.");

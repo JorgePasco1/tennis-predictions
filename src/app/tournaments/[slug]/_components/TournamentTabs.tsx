@@ -1,11 +1,15 @@
 "use client";
 
 import { Info } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { TournamentLeaderboardClient } from "~/app/leaderboards/[tournamentId]/_components/TournamentLeaderboardClient";
 import { type RoundData, TournamentBracket } from "~/components/bracket";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
-import { Card } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { ByRoundLeaderboardView } from "./ByRoundLeaderboardView";
 
 interface LeaderboardEntry {
 	userId: string;
@@ -44,6 +48,10 @@ interface TournamentTabsProps {
 	defaultTab: "bracket" | "leaderboard";
 }
 
+// Validate view query param to prevent invalid state
+const isValidView = (v: string | null): v is "overall" | "by-round" =>
+	v === "overall" || v === "by-round";
+
 export function TournamentTabs({
 	bracketRounds,
 	leaderboardEntries,
@@ -52,6 +60,30 @@ export function TournamentTabs({
 	tournamentStats,
 	defaultTab,
 }: TournamentTabsProps) {
+	const router = useRouter();
+	const searchParams = useSearchParams();
+
+	// Get initial view from URL or default to "overall"
+	const [viewMode, setViewMode] = useState<"overall" | "by-round">(() => {
+		const view = searchParams.get("view");
+		return isValidView(view) ? view : "overall";
+	});
+
+	// Update viewMode when URL changes
+	useEffect(() => {
+		const view = searchParams.get("view");
+		setViewMode(isValidView(view) ? view : "overall");
+	}, [searchParams]);
+
+	const handleViewChange = (newView: "overall" | "by-round") => {
+		setViewMode(newView);
+
+		// Update URL with new view parameter
+		const params = new URLSearchParams(searchParams.toString());
+		params.set("view", newView);
+		router.push(`?${params.toString()}`, { scroll: false });
+	};
+
 	return (
 		<Tabs className="w-full" defaultValue={defaultTab}>
 			<TabsList>
@@ -66,64 +98,90 @@ export function TournamentTabs({
 			</TabsContent>
 
 			<TabsContent className="mt-4" value="leaderboard">
-				{/* Tournament Progress */}
-				{tournamentStats.totalMatches > 0 && (
-					<Card className="mb-6 p-4">
-						<div className="flex flex-wrap items-center justify-between gap-4">
-							<div className="flex flex-wrap gap-6">
-								<div>
-									<div className="font-semibold text-2xl">
-										{tournamentStats.finalizedMatches}/
-										{tournamentStats.totalMatches}
-									</div>
-									<div className="text-muted-foreground text-sm">
-										Matches Played
-									</div>
-								</div>
-								<div>
-									<div className="font-semibold text-2xl">
-										{tournamentStats.maxPossiblePoints}
-									</div>
-									<div className="text-muted-foreground text-sm">
-										Max Possible Points
-									</div>
-								</div>
-								<div>
-									<div className="font-semibold text-2xl">
-										{tournamentStats.totalMatches > 0
-											? Math.round(
-													(tournamentStats.finalizedMatches /
-														tournamentStats.totalMatches) *
-														100,
-												)
-											: 0}
-										%
-									</div>
-									<div className="text-muted-foreground text-sm">Complete</div>
-								</div>
-							</div>
-						</div>
-					</Card>
-				)}
+				{/* View Toggle */}
+				<div className="mb-4 flex flex-col gap-2 sm:flex-row">
+					<Button
+						onClick={() => handleViewChange("overall")}
+						size="sm"
+						variant={viewMode === "overall" ? "default" : "outline"}
+					>
+						Overall Tournament
+					</Button>
+					<Button
+						onClick={() => handleViewChange("by-round")}
+						size="sm"
+						variant={viewMode === "by-round" ? "default" : "outline"}
+					>
+						By Round
+					</Button>
+				</div>
 
-				{leaderboardEntries.length === 0 ? (
-					<Card className="p-12 text-center">
-						<div className="mb-4 text-6xl">🏆</div>
-						<h2 className="mb-2 font-semibold text-2xl">No Rankings Yet</h2>
-						<p className="text-muted-foreground">
-							Rankings will appear once players submit picks
-						</p>
-					</Card>
+				{viewMode === "overall" ? (
+					<>
+						{/* Tournament Progress */}
+						{tournamentStats.totalMatches > 0 && (
+							<Card className="mb-6 p-4">
+								<div className="flex flex-wrap items-center justify-between gap-4">
+									<div className="flex flex-wrap gap-6">
+										<div>
+											<div className="font-semibold text-2xl">
+												{tournamentStats.finalizedMatches}/
+												{tournamentStats.totalMatches}
+											</div>
+											<div className="text-muted-foreground text-sm">
+												Matches Played
+											</div>
+										</div>
+										<div>
+											<div className="font-semibold text-2xl">
+												{tournamentStats.maxPossiblePoints}
+											</div>
+											<div className="text-muted-foreground text-sm">
+												Max Possible Points
+											</div>
+										</div>
+										<div>
+											<div className="font-semibold text-2xl">
+												{tournamentStats.totalMatches > 0
+													? Math.round(
+															(tournamentStats.finalizedMatches /
+																tournamentStats.totalMatches) *
+																100,
+														)
+													: 0}
+												%
+											</div>
+											<div className="text-muted-foreground text-sm">
+												Complete
+											</div>
+										</div>
+									</div>
+								</div>
+							</Card>
+						)}
+
+						{leaderboardEntries.length === 0 ? (
+							<Card className="p-12 text-center">
+								<div className="mb-4 text-6xl">🏆</div>
+								<h2 className="mb-2 font-semibold text-2xl">No Rankings Yet</h2>
+								<p className="text-muted-foreground">
+									Rankings will appear once players submit picks
+								</p>
+							</Card>
+						) : (
+							<Card>
+								<CardContent className="overflow-x-auto p-0">
+									<TournamentLeaderboardClient
+										currentUserSubmittedRoundIds={currentUserSubmittedRoundIds}
+										entries={leaderboardEntries}
+										tournamentId={tournamentId}
+									/>
+								</CardContent>
+							</Card>
+						)}
+					</>
 				) : (
-					<Card>
-						<div className="overflow-x-auto">
-							<TournamentLeaderboardClient
-								currentUserSubmittedRoundIds={currentUserSubmittedRoundIds}
-								entries={leaderboardEntries}
-								tournamentId={tournamentId}
-							/>
-						</div>
-					</Card>
+					<ByRoundLeaderboardView tournamentId={tournamentId} />
 				)}
 
 				<Alert className="mt-6">

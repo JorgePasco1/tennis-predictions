@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
 	matches,
+	matchPicks,
 	rounds,
 	tournaments,
 	userRoundPicks,
@@ -289,6 +290,408 @@ export const leaderboardsRouter = createTRPCRouter({
 				rank: userIndex + 1,
 				totalParticipants: leaderboard.length,
 				...leaderboard[userIndex],
+			};
+		}),
+
+	/**
+	 * Get per-round leaderboard breakdown
+	 * Returns round-by-round statistics and rankings for chart/table visualization
+	 */
+	getPerRoundLeaderboard: protectedProcedure
+		.input(
+			z.object({
+				tournamentId: z.number().int(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			// 1. Get all rounds for tournament with their scoring info
+			const tournamentRounds = await ctx.db.query.rounds.findMany({
+				where: eq(rounds.tournamentId, input.tournamentId),
+				with: {
+					matches: {
+						where: isNull(matches.deletedAt),
+					},
+				},
+				orderBy: [asc(rounds.roundNumber)],
+			});
+
+			if (tournamentRounds.length === 0) {
+				return {
+					rounds: [],
+					userRoundData: [],
+					progressionData: [],
+				};
+			}
+
+			const roundIds = tournamentRounds.map((r) => r.id);
+
+			// Build rounds metadata
+			const roundsMetadata = tournamentRounds.map((round) => {
+				const scoring = getScoringForRound(round.name);
+				const finalizedMatches = round.matches.filter(
+					(m) => m.status === "finalized",
+				).length;
+
+				return {
+					roundId: round.id,
+					roundName: round.name,
+					roundNumber: round.roundNumber,
+					pointsPerWinner: scoring.pointsPerWinner,
+					pointsExactScore: scoring.pointsExactScore,
+					totalMatches: round.matches.length,
+					finalizedMatches,
+					isFinalized: round.isFinalized,
+				};
+			});
+
+			// 2. Get all user round picks (non-draft) for these rounds
+			const allUserRoundPicks = await ctx.db
+				.select({
+					userId: userRoundPicks.userId,
+					displayName: users.displayName,
+					imageUrl: users.imageUrl,
+					roundId: userRoundPicks.roundId,
+					totalPoints: userRoundPicks.totalPoints,
+					correctWinners: userRoundPicks.correctWinners,
+					exactScores: userRoundPicks.exactScores,
+					submittedAt: userRoundPicks.submittedAt,
+				})
+				.from(userRoundPicks)
+				.innerJoin(users, eq(userRoundPicks.userId, users.id))
+				.where(
+					and(
+						sql`${userRoundPicks.roundId} IN ${sql.raw(`(${roundIds.join(",")})`)}`,
+						eq(userRoundPicks.isDraft, false),
+					),
+				)
+				.orderBy(asc(userRoundPicks.submittedAt));
+
+			if (allUserRoundPicks.length === 0) {
+				return {
+					rounds: roundsMetadata,
+					userRoundData: [],
+					progressionData: [],
+				};
+			}
+
+			// 3. Group picks by user
+			const userPicksMap = new Map<
+				string,
+				{
+					userId: string;
+					displayName: string;
+					imageUrl: string | null;
+					picks: Array<{
+						roundId: number;
+						totalPoints: number;
+						correctWinners: number;
+						exactScores: number;
+						submittedAt: Date;
+					}>;
+				}
+			>();
+
+			for (const pick of allUserRoundPicks) {
+				if (!userPicksMap.has(pick.userId)) {
+					userPicksMap.set(pick.userId, {
+						userId: pick.userId,
+						displayName: pick.displayName,
+						imageUrl: pick.imageUrl,
+						picks: [],
+					});
+				}
+				userPicksMap.get(pick.userId)!.picks.push({
+					roundId: pick.roundId,
+					totalPoints: pick.totalPoints,
+					correctWinners: pick.correctWinners,
+					exactScores: pick.exactScores,
+					submittedAt: pick.submittedAt,
+				});
+			}
+
+			// 4. Calculate cumulative points and rankings
+			const userRoundData = Array.from(userPicksMap.values()).map((user) => {
+				const picksByRound = new Map(user.picks.map((p) => [p.roundId, p]));
+
+				let cumulativePoints = 0;
+				const rounds = tournamentRounds.map((round) => {
+					const pick = picksByRound.get(round.id);
+
+					if (pick) {
+						cumulativePoints += pick.totalPoints;
+					}
+
+					return {
+						roundId: round.id,
+						roundNumber: round.roundNumber,
+						roundName: round.name,
+						totalPoints: pick?.totalPoints ?? 0,
+						correctWinners: pick?.correctWinners ?? 0,
+						exactScores: pick?.exactScores ?? 0,
+						submittedAt: pick?.submittedAt ?? null,
+						cumulativePoints,
+						hasSubmitted: !!pick,
+						rank: null as number | null,
+						cumulativeRank: null as number | null,
+					};
+				});
+
+				const totalPoints = cumulativePoints;
+
+				return {
+					userId: user.userId,
+					displayName: user.displayName,
+					imageUrl: user.imageUrl,
+					rounds,
+					totalPoints,
+				};
+			});
+
+			// 5. Calculate per-round rankings
+			// For each round, rank users based on cumulative points up to that round
+			for (let i = 0; i < tournamentRounds.length; i++) {
+				const roundNumber = tournamentRounds[i]!.roundNumber;
+
+				// Get all users' cumulative points at this round
+				// Include users who have submitted in any round up to this one
+				const userPointsAtRound = userRoundData
+					.map((user) => {
+						const earliestSubmission = user.rounds
+							.slice(0, i + 1)
+							.find((r) => r.submittedAt)?.submittedAt;
+						const hasSubmittedUpToRound = !!earliestSubmission;
+						return {
+							userId: user.userId,
+							cumulativePoints: user.rounds[i]!.cumulativePoints,
+							earliestSubmission,
+							hasSubmittedUpToRound,
+						};
+					})
+					.filter((u) => u.hasSubmittedUpToRound)
+					.sort((a, b) => {
+						if (b.cumulativePoints !== a.cumulativePoints) {
+							return b.cumulativePoints - a.cumulativePoints;
+						}
+						// Tiebreaker: earliest submission
+						if (a.earliestSubmission && b.earliestSubmission) {
+							return (
+								a.earliestSubmission.getTime() - b.earliestSubmission.getTime()
+							);
+						}
+						return 0;
+					});
+
+				// Assign ranks
+				const rankMap = new Map<string, number>();
+				for (let j = 0; j < userPointsAtRound.length; j++) {
+					rankMap.set(userPointsAtRound[j]!.userId, j + 1);
+				}
+
+				// Add rank to each user's round data
+				for (const user of userRoundData) {
+					const round = user.rounds[i]!;
+					round.cumulativeRank = rankMap.get(user.userId) ?? null;
+				}
+			}
+
+			// 6. Calculate final rankings and per-round rankings
+			const finalRankings = userRoundData
+				.sort((a, b) => {
+					if (b.totalPoints !== a.totalPoints) {
+						return b.totalPoints - a.totalPoints;
+					}
+					// Tiebreaker: earliest submission
+					const aFirst = a.rounds.find((r) => r.submittedAt)?.submittedAt;
+					const bFirst = b.rounds.find((r) => r.submittedAt)?.submittedAt;
+					if (aFirst && bFirst) {
+						return aFirst.getTime() - bFirst.getTime();
+					}
+					return 0;
+				})
+				.map((user, index) => ({
+					...user,
+					finalRank: index + 1,
+				}));
+
+			// Calculate per-round rankings (who won each round)
+			for (let i = 0; i < tournamentRounds.length; i++) {
+				const roundId = tournamentRounds[i]!.id;
+
+				const roundRankings = finalRankings
+					.map((user) => ({
+						userId: user.userId,
+						roundPoints: user.rounds[i]!.totalPoints,
+						submittedAt: user.rounds[i]!.submittedAt,
+					}))
+					.filter((u) => u.submittedAt !== null)
+					.sort((a, b) => {
+						if (b.roundPoints !== a.roundPoints) {
+							return b.roundPoints - a.roundPoints;
+						}
+						if (a.submittedAt && b.submittedAt) {
+							return a.submittedAt.getTime() - b.submittedAt.getTime();
+						}
+						return 0;
+					});
+
+				const roundRankMap = new Map<string, number>();
+				for (let j = 0; j < roundRankings.length; j++) {
+					roundRankMap.set(roundRankings[j]!.userId, j + 1);
+				}
+
+				for (const user of finalRankings) {
+					const round = user.rounds[i]!;
+					round.rank = roundRankMap.get(user.userId) ?? null;
+				}
+			}
+
+			// 7. Build match-based progression data for chart (every 8 matches)
+			const allMatches = tournamentRounds.flatMap((round) =>
+				round.matches
+					.filter((m) => m.status === "finalized" && m.finalizedAt)
+					.map((m) => ({
+						matchId: m.id,
+						roundId: round.id,
+						finalizedAt: m.finalizedAt!,
+					})),
+			);
+
+			// Sort by finalized date
+			allMatches.sort(
+				(a, b) => a.finalizedAt.getTime() - b.finalizedAt.getTime(),
+			);
+
+			// Get all match picks for these matches
+			const matchIds = allMatches.map((m) => m.matchId);
+			let allMatchPicks: Array<{
+				oddsUserId: string;
+				oddsMatchId: number;
+				pointsEarned: number;
+			}> = [];
+
+			if (matchIds.length > 0) {
+				allMatchPicks = await ctx.db
+					.select({
+						oddsUserId: userRoundPicks.userId,
+						oddsMatchId: matchPicks.matchId,
+						pointsEarned: matchPicks.pointsEarned,
+					})
+					.from(matchPicks)
+					.innerJoin(
+						userRoundPicks,
+						eq(matchPicks.userRoundPickId, userRoundPicks.id),
+					)
+					.where(
+						and(
+							sql`${matchPicks.matchId} IN ${sql.raw(`(${matchIds.join(",")})`)}`,
+							eq(userRoundPicks.isDraft, false),
+						),
+					);
+			}
+
+			// Build user points by match
+			const userMatchPoints = new Map<string, Map<number, number>>();
+			for (const pick of allMatchPicks) {
+				if (!userMatchPoints.has(pick.oddsUserId)) {
+					userMatchPoints.set(pick.oddsUserId, new Map());
+				}
+				userMatchPoints
+					.get(pick.oddsUserId)!
+					.set(pick.oddsMatchId, pick.pointsEarned);
+			}
+
+			// Create exactly 8 progression data points, evenly distributed
+			const NUM_CHECKPOINTS = 8;
+			const progressionData: Array<{
+				matchIndex: number;
+				label: string;
+				rankings: Array<{
+					userId: string;
+					displayName: string;
+					imageUrl: string | null;
+					cumulativePoints: number;
+					rank: number;
+				}>;
+			}> = [];
+
+			// Get unique users who have submitted picks
+			const usersWithPicks = Array.from(userPicksMap.values());
+
+			if (allMatches.length > 0 && usersWithPicks.length > 0) {
+				// Calculate checkpoint intervals
+				const interval = allMatches.length / NUM_CHECKPOINTS;
+				let previousMatchCount = 0;
+
+				for (let checkpoint = 1; checkpoint <= NUM_CHECKPOINTS; checkpoint++) {
+					// Guard against 0/duplicate checkpoint labels when matches < 8
+					let matchCount = Math.min(
+						allMatches.length,
+						Math.max(1, Math.round(interval * checkpoint)),
+					);
+					// Ensure monotonically increasing checkpoints
+					if (
+						matchCount <= previousMatchCount &&
+						previousMatchCount < allMatches.length
+					) {
+						matchCount = previousMatchCount + 1;
+					}
+					previousMatchCount = matchCount;
+					const matchesUpToNow = allMatches.slice(0, matchCount);
+					const matchIdsUpToNow = new Set(matchesUpToNow.map((m) => m.matchId));
+
+					// Calculate cumulative points for each user
+					const userPoints: Array<{
+						userId: string;
+						displayName: string;
+						imageUrl: string | null;
+						cumulativePoints: number;
+					}> = [];
+
+					for (const user of usersWithPicks) {
+						const userMatches = userMatchPoints.get(user.userId);
+						let cumulativePoints = 0;
+
+						if (userMatches) {
+							for (const [matchId, points] of userMatches) {
+								if (matchIdsUpToNow.has(matchId)) {
+									cumulativePoints += points;
+								}
+							}
+						}
+
+						userPoints.push({
+							userId: user.userId,
+							displayName: user.displayName,
+							imageUrl: user.imageUrl,
+							cumulativePoints,
+						});
+					}
+
+					// Sort by points with tiebreaker for deterministic ordering
+					userPoints.sort((a, b) => {
+						if (b.cumulativePoints !== a.cumulativePoints) {
+							return b.cumulativePoints - a.cumulativePoints;
+						}
+						// Tiebreaker: alphabetical by displayName for consistency
+						return a.displayName.localeCompare(b.displayName);
+					});
+					const rankedUsers = userPoints.map((user, index) => ({
+						...user,
+						rank: index + 1,
+					}));
+
+					progressionData.push({
+						matchIndex: matchCount,
+						label: `${matchCount}`,
+						rankings: rankedUsers,
+					});
+				}
+			}
+
+			return {
+				rounds: roundsMetadata,
+				userRoundData: finalRankings,
+				progressionData,
 			};
 		}),
 

@@ -75,9 +75,10 @@ When the user runs this command with a PR number:
 
 7. Ask the user to confirm which ones they want to fix.
 
-8. Once finished fixing, reply to each comment individually in the conversation with a meaningful message (NEVER MAKE A DIRECT COMMENT TO THE PR), explaining how we fixed or why we decided not to fix. Then resolve each comment.
+8. Once finished fixing, commit and push the code.
 
-9. Commit and push the code.
+9. Reply to each comment individually in the conversation with a meaningful message (NEVER MAKE A DIRECT COMMENT TO THE PR), explaining how we fixed or why we decided not to fix. Then resolve each comment.
+
 
 ## Example Output
 

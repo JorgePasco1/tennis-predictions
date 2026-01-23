@@ -1698,7 +1698,12 @@ describe("commitDraw performance optimizations", () => {
 					"Semi Finals": { pointsPerWinner: 20, pointsExactScore: 30 },
 					Final: { pointsPerWinner: 30, pointsExactScore: 45 },
 				};
-				return scoringConfig[roundName] ?? { pointsPerWinner: 10, pointsExactScore: 5 };
+				return (
+					scoringConfig[roundName] ?? {
+						pointsPerWinner: 10,
+						pointsExactScore: 5,
+					}
+				);
 			};
 
 			const insertedRounds = [
@@ -2379,9 +2384,21 @@ describe("commitDraw performance optimizations", () => {
 
 		it("should only calculate scores for non-BYE finalized matches", () => {
 			const allMatches = [
-				{ id: 1, status: "finalized", isBye: true, setsWon: null, setsLost: null },
+				{
+					id: 1,
+					status: "finalized",
+					isBye: true,
+					setsWon: null,
+					setsLost: null,
+				},
 				{ id: 2, status: "finalized", isBye: false, setsWon: 3, setsLost: 1 },
-				{ id: 3, status: "pending", isBye: false, setsWon: null, setsLost: null },
+				{
+					id: 3,
+					status: "pending",
+					isBye: false,
+					setsWon: null,
+					setsLost: null,
+				},
 				{ id: 4, status: "finalized", isBye: false, setsWon: 2, setsLost: 0 },
 			];
 
@@ -3030,7 +3047,11 @@ describe("edge cases and regression tests", () => {
 				}>;
 			}
 
-			const parsedDraw: { tournamentName: string; year: number; rounds: ParsedRound[] } = {
+			const parsedDraw: {
+				tournamentName: string;
+				year: number;
+				rounds: ParsedRound[];
+			} = {
 				tournamentName: "Empty Tournament",
 				year: 2024,
 				rounds: [],
@@ -3047,9 +3068,7 @@ describe("edge cases and regression tests", () => {
 			const parsedDraw = {
 				tournamentName: "Partial Tournament",
 				year: 2024,
-				rounds: [
-					{ roundNumber: 1, name: "Round 1", matches: [] },
-				],
+				rounds: [{ roundNumber: 1, name: "Round 1", matches: [] }],
 			};
 
 			const allMatchValues = parsedDraw.rounds.flatMap((r) => r.matches);
@@ -3115,7 +3134,9 @@ describe("edge cases and regression tests", () => {
 				}
 			};
 
-			await expect(executeTransaction()).rejects.toThrow("Match insertion failed");
+			await expect(executeTransaction()).rejects.toThrow(
+				"Match insertion failed",
+			);
 			expect(transactionComplete).toBe(false);
 			// In a real transaction, roundsInserted would also be rolled back
 		});

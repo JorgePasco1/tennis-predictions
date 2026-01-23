@@ -295,6 +295,26 @@ Ensure sufficient contrast ratios:
 
 ## Design Decision Log
 
+### 2026-01-22: Leaderboard Table UI/UX Improvements
+
+**Problem**: By Round leaderboard feature had inconsistent spacing, badge sizing, and mobile responsiveness issues.
+
+**Solution**: Standardized Card-Table integration pattern, sticky columns, and badge sizing across all leaderboards.
+
+**Rationale**:
+- CardContent with `p-0` allows Tables to control their own padding while Cards provide structure
+- Sticky first column maintains context during horizontal scroll on mobile
+- Standardized `h-7 w-7` badges improve visual consistency and touch targets
+- Current user row highlighting improves navigation in long leaderboards
+- Theme-aware border colors ensure proper contrast in light/dark modes
+
+**Files Updated**:
+- `/src/app/tournaments/[slug]/_components/ByRoundLeaderboardView.tsx`
+- `/src/app/tournaments/[slug]/_components/TournamentTabs.tsx`
+- `/src/app/leaderboards/[tournamentId]/_components/TournamentLeaderboardClient.tsx`
+
+**Detailed Documentation**: See `/docs/ui-fixes-2026-01-22-leaderboard.md`
+
 ### 2026-01-17: Mobile Navigation Clearance
 
 **Problem**: Floating hamburger menu (fixed at top-4 left-4) overlaps with "Back to..." navigation links in admin pages.
@@ -329,6 +349,112 @@ Ensure sufficient contrast ratios:
 - `/src/app/admin/tournaments/new/page.tsx`
 - `/src/app/tournaments/[slug]/picks/page.tsx` (multiple instances)
 
+## Table Design Patterns
+
+### Table-Card Integration
+
+When embedding tables in Card components, use this pattern to ensure proper spacing:
+
+```tsx
+<Card>
+  <CardContent className="overflow-x-auto p-0">
+    <div className="inline-block min-w-full align-middle">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Column</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>Data</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  </CardContent>
+</Card>
+```
+
+**Key Points**:
+- CardContent with `p-0` removes default padding (Cards default to `py-6`)
+- Inner div with `inline-block min-w-full align-middle` ensures proper table rendering
+- `overflow-x-auto` on CardContent handles horizontal scroll
+- Table controls its own internal spacing via TableHead/TableCell padding (`p-2`)
+
+### Sticky Columns
+
+For wide tables that require horizontal scrolling, make the first column sticky:
+
+```tsx
+<TableHeader>
+  <TableRow>
+    <TableHead className="sticky left-0 z-10 bg-background">
+      Fixed Column
+    </TableHead>
+    <TableHead>Scrollable Column</TableHead>
+  </TableRow>
+</TableHeader>
+<TableBody>
+  <TableRow>
+    <TableCell className="sticky left-0 z-10 bg-background">
+      Fixed Content
+    </TableCell>
+    <TableCell>Scrollable Content</TableCell>
+  </TableRow>
+</TableBody>
+```
+
+**Requirements**:
+- `sticky left-0`: Creates sticky positioning behavior
+- `z-10`: Ensures proper layering over scrolling content
+- `bg-background`: Prevents visual bleed-through from overlapped cells
+- Apply to both TableHead and TableCell for consistency
+- Works with rowSpan - apply classes to TableCell, not wrapper divs
+
+### Current User Row Highlighting
+
+Highlight the current user's row in leaderboards for easy identification:
+
+```tsx
+<TableRow className={cn(isCurrentUser && "bg-muted/50")}>
+  {/* Row content */}
+</TableRow>
+```
+
+## Badge Patterns
+
+### Rank Badges
+
+Standardized rank badge pattern for leaderboards:
+
+```tsx
+<Badge
+  className={cn(
+    "flex h-7 w-7 items-center justify-center rounded-full font-bold text-xs",
+    rank === 1 ? "bg-yellow-500 hover:bg-yellow-600"    // Gold
+    : rank === 2 ? "bg-gray-400 hover:bg-gray-500"      // Silver
+    : rank === 3 ? "bg-orange-600 hover:bg-orange-700"  // Bronze
+    : "bg-primary",                                      // Default
+  )}
+>
+  {rank}
+</Badge>
+```
+
+**Specifications**:
+- Size: `h-7 w-7` (28px) for optimal balance between visibility and table density
+- Text: `font-bold text-xs` ensures legibility at this size
+- Colors: Consistent gold/silver/bronze palette for top 3 ranks
+- Layout: `flex items-center justify-center` for perfect centering
+- Consistent sizing across all rank badges in a table
+
+**Color Meanings**:
+- Gold (`bg-yellow-500`): 1st place
+- Silver (`bg-gray-400`): 2nd place
+- Bronze (`bg-orange-600`): 3rd place
+- Primary (`bg-primary`): All other ranks
+
 ## Implementation Checklist
 
 When creating or updating UI components:
@@ -336,6 +462,10 @@ When creating or updating UI components:
 - [ ] Mobile navigation clearance accounted for (if custom nav present)
 - [ ] URLs use `break-all` class
 - [ ] Long text content has appropriate wrapping
+- [ ] Tables embedded in Cards use CardContent with `p-0`
+- [ ] Wide tables have sticky first column for mobile navigation
+- [ ] Rank badges use standardized h-7 w-7 sizing
+- [ ] Current user rows highlighted in leaderboards
 - [ ] Sufficient color contrast for all text
 - [ ] Focus states visible on all interactive elements
 - [ ] Disabled states have proper visual feedback
