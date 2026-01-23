@@ -48,6 +48,10 @@ interface TournamentTabsProps {
 	defaultTab: "bracket" | "leaderboard";
 }
 
+// Validate view query param to prevent invalid state
+const isValidView = (v: string | null): v is "overall" | "by-round" =>
+	v === "overall" || v === "by-round";
+
 export function TournamentTabs({
 	bracketRounds,
 	leaderboardEntries,
@@ -60,16 +64,15 @@ export function TournamentTabs({
 	const searchParams = useSearchParams();
 
 	// Get initial view from URL or default to "overall"
-	const [viewMode, setViewMode] = useState<"overall" | "by-round">(
-		(searchParams.get("view") as "overall" | "by-round") ?? "overall",
-	);
+	const [viewMode, setViewMode] = useState<"overall" | "by-round">(() => {
+		const view = searchParams.get("view");
+		return isValidView(view) ? view : "overall";
+	});
 
 	// Update viewMode when URL changes
 	useEffect(() => {
-		const view = searchParams.get("view") as "overall" | "by-round" | null;
-		if (view) {
-			setViewMode(view);
-		}
+		const view = searchParams.get("view");
+		setViewMode(isValidView(view) ? view : "overall");
 	}, [searchParams]);
 
 	const handleViewChange = (newView: "overall" | "by-round") => {

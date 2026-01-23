@@ -80,6 +80,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 
 	return (
 		<style
+			// biome-ignore lint/security/noDangerouslySetInnerHtml: Required for dynamic CSS injection in chart theming, keys are sanitized with CSS.escape()
 			dangerouslySetInnerHTML={{
 				__html: Object.entries(THEMES)
 					.map(
@@ -87,10 +88,11 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 ${prefix} [data-chart=${id}] {
 ${colorConfig
 	.map(([key, itemConfig]) => {
+		const safeKey = CSS.escape(key);
 		const color =
 			itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
 			itemConfig.color;
-		return color ? `  --color-${key}: ${color};` : null;
+		return color ? `  --color-${safeKey}: ${color};` : null;
 	})
 	.join("\n")}
 }
@@ -234,7 +236,7 @@ function ChartTooltipContent({
 													{itemConfig?.label || item.name}
 												</span>
 											</div>
-											{item.value && (
+											{item.value !== undefined && item.value !== null && (
 												<span className="font-medium font-mono text-foreground tabular-nums">
 													{item.value.toLocaleString()}
 												</span>

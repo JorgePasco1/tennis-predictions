@@ -613,9 +613,22 @@ export const leaderboardsRouter = createTRPCRouter({
 			if (allMatches.length > 0 && usersWithPicks.length > 0) {
 				// Calculate checkpoint intervals
 				const interval = allMatches.length / NUM_CHECKPOINTS;
+				let previousMatchCount = 0;
 
 				for (let checkpoint = 1; checkpoint <= NUM_CHECKPOINTS; checkpoint++) {
-					const matchCount = Math.round(interval * checkpoint);
+					// Guard against 0/duplicate checkpoint labels when matches < 8
+					let matchCount = Math.min(
+						allMatches.length,
+						Math.max(1, Math.round(interval * checkpoint)),
+					);
+					// Ensure monotonically increasing checkpoints
+					if (
+						matchCount <= previousMatchCount &&
+						previousMatchCount < allMatches.length
+					) {
+						matchCount = previousMatchCount + 1;
+					}
+					previousMatchCount = matchCount;
 					const matchesUpToNow = allMatches.slice(0, matchCount);
 					const matchIdsUpToNow = new Set(matchesUpToNow.map((m) => m.matchId));
 
