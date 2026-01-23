@@ -453,16 +453,21 @@ export const leaderboardsRouter = createTRPCRouter({
 				const roundNumber = tournamentRounds[i]!.roundNumber;
 
 				// Get all users' cumulative points at this round
+				// Include users who have submitted in any round up to this one
 				const userPointsAtRound = userRoundData
-					.map((user) => ({
-						userId: user.userId,
-						cumulativePoints: user.rounds[i]!.cumulativePoints,
-						earliestSubmission: user.rounds
+					.map((user) => {
+						const earliestSubmission = user.rounds
 							.slice(0, i + 1)
-							.find((r) => r.submittedAt)?.submittedAt,
-						hasSubmitted: user.rounds[i]!.hasSubmitted,
-					}))
-					.filter((u) => u.hasSubmitted)
+							.find((r) => r.submittedAt)?.submittedAt;
+						const hasSubmittedUpToRound = !!earliestSubmission;
+						return {
+							userId: user.userId,
+							cumulativePoints: user.rounds[i]!.cumulativePoints,
+							earliestSubmission,
+							hasSubmittedUpToRound,
+						};
+					})
+					.filter((u) => u.hasSubmittedUpToRound)
 					.sort((a, b) => {
 						if (b.cumulativePoints !== a.cumulativePoints) {
 							return b.cumulativePoints - a.cumulativePoints;
