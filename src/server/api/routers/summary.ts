@@ -192,10 +192,20 @@ export const summaryRouter = createTRPCRouter({
 					),
 				);
 
-			// Best single round accuracy
-			// First, count matches per round
+			// Best single round accuracy (up to Round of 16)
+			const accuracyRoundNames = new Set([
+				"Round of 128",
+				"Round of 64",
+				"Round of 32",
+				"Round of 16",
+			]);
+			const accuracyRounds = tournamentRounds.filter((round) =>
+				accuracyRoundNames.has(round.name),
+			);
 			const matchesPerRound = new Map<number, number>();
-			for (const round of tournamentRounds) {
+			const roundNameById = new Map<number, string>();
+			for (const round of accuracyRounds) {
+				roundNameById.set(round.id, round.name);
 				const finalizedCount = round.matches.filter(
 					(m) => m.status === "finalized",
 				).length;
@@ -214,11 +224,12 @@ export const summaryRouter = createTRPCRouter({
 			} | null = null;
 
 			for (const pick of allUserRoundPicks) {
+				if (!roundNameById.has(pick.roundId)) continue;
 				const totalMatches = matchesPerRound.get(pick.roundId) ?? 0;
 				if (totalMatches === 0) continue;
 
 				const accuracy = (pick.correctWinners / totalMatches) * 100;
-				const round = tournamentRounds.find((r) => r.id === pick.roundId);
+				const roundName = roundNameById.get(pick.roundId) ?? "Unknown Round";
 
 				if (
 					!bestRoundAccuracy ||
@@ -230,7 +241,7 @@ export const summaryRouter = createTRPCRouter({
 						userId: pick.userId,
 						displayName: pick.displayName,
 						imageUrl: pick.imageUrl,
-						roundName: round?.name ?? "Unknown Round",
+						roundName,
 						accuracy,
 						correctWinners: pick.correctWinners,
 						totalMatches,
