@@ -67,3 +67,36 @@ Date: 2026-02-02
 - Confirm whether summary should be visible to logged-out users; adjust auth handling accordingly.
 - Decide whether achievements should be part of the summary UI; remove or render consistently.
 - Define a single source of truth for tournament-scoped vs global stats and label them clearly.
+
+## Follow-up Audit (2026-02-02)
+
+### Summary
+- Prior correctness and UX gaps were addressed (seeded upset rate, auth redirect, achievements rendering, overview for zero participants).
+- New tests were added, but they are spec-style and do not exercise the tRPC summary procedure.
+
+### Resolved From Prior Audit
+- Upset rate uses seeded matches only, and the UI clarifies the denominator.
+  - Evidence: `src/server/api/routers/summary.ts`, `src/app/tournaments/[slug]/summary/_components/TournamentOverview.tsx`.
+- Longest streak is now explicitly labeled as all-time.
+  - Evidence: `src/app/tournaments/[slug]/summary/_components/TopPerformersGrid.tsx`.
+- Achievements are now rendered in the summary page.
+  - Evidence: `src/app/tournaments/[slug]/summary/_components/AchievementsSection.tsx`, `src/app/tournaments/[slug]/summary/_components/TournamentSummaryView.tsx`.
+- Unauthorized users are redirected to sign-in instead of 404.
+  - Evidence: `src/app/tournaments/[slug]/summary/page.tsx`.
+- Overview stats render even with zero participants.
+  - Evidence: `src/app/tournaments/[slug]/summary/_components/TournamentSummaryView.tsx`.
+
+### Remaining / New Findings
+
+#### Low
+- Summary tests validate logic patterns but do not call production aggregation code.
+  - Evidence: `src/server/api/routers/summary.test.ts` uses local helpers and inline arrays; no imports from `src/server/api/routers/summary.ts`.
+  - Impact: Risk of tests drifting from actual behavior.
+  - Recommendation: Add integration tests around `summaryRouter.getTournamentSummary` with fixtures or a test DB harness.
+  - Note: This is consistent with the codebase's testing pattern using mock-db. True integration tests would require a test database setup.
+
+### Resolved in Second Pass
+
+- Client hydration eliminated for summary components.
+  - Evidence: `src/app/tournaments/[slug]/summary/_components/ServerAvatar.tsx` provides a server-safe avatar implementation.
+  - All summary components now use `ServerAvatar` instead of Radix Avatar, removing client-side JS requirements.
