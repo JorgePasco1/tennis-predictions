@@ -4,71 +4,120 @@ import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { api, HydrateClient } from "~/trpc/server";
+import { PastTournamentsGrid } from "./_components/PastTournamentsGrid";
 
 export default async function TournamentsPage() {
-	const activeTournaments = await api.tournaments.list({ status: "active" });
+	const allTournaments = await api.tournaments.list();
+	const activeTournaments = allTournaments.filter(
+		(tournament) => tournament.status === "active",
+	);
+	const archivedTournaments = allTournaments.filter(
+		(tournament) => tournament.status === "archived",
+	);
+	const pastTournaments = archivedTournaments.map((tournament) => ({
+		id: tournament.id,
+		slug: tournament.slug,
+		name: tournament.name,
+		year: tournament.year,
+		closedAt: tournament.closedAt ? tournament.closedAt.toISOString() : null,
+		uploadedBy: tournament.uploadedByUser.displayName,
+	}));
 
 	return (
 		<HydrateClient>
 			<div className="min-h-screen bg-muted/30">
 				<main className="container mx-auto px-4 py-8">
 					<div className="mb-8">
-						<h1 className="mb-2 font-bold text-4xl">Active Tournaments</h1>
+						<h1 className="mb-2 font-bold text-4xl">Tournaments</h1>
 						<p className="text-muted-foreground">
-							Select a tournament to view details and submit your predictions
+							Browse active tournaments and revisit past results
 						</p>
 					</div>
 
-					{activeTournaments.length === 0 ? (
+					{activeTournaments.length === 0 &&
+					archivedTournaments.length === 0 ? (
 						<Card className="p-12 text-center">
 							<div className="mb-4 text-6xl">🎾</div>
 							<h2 className="mb-2 font-semibold text-2xl">
-								No Active Tournaments
+								No Tournaments Yet
 							</h2>
 							<p className="text-muted-foreground">
 								Check back soon for upcoming ATP tournaments
 							</p>
 						</Card>
 					) : (
-						<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-							{activeTournaments.map((tournament) => (
-								<Link
-									className="group"
-									href={`/tournaments/${tournament.slug}`}
-									key={tournament.id}
-								>
-									<Card className="overflow-hidden transition-shadow hover:shadow-lg">
-										<CardHeader className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white">
-											<CardTitle className="mb-2 text-2xl">
-												{tournament.name}
-											</CardTitle>
-											<p className="text-blue-100">{tournament.year}</p>
-										</CardHeader>
-										<CardContent className="p-6">
-											<div className="mb-4 flex items-center gap-2">
-												<Badge
-													className="bg-green-600 hover:bg-green-700"
-													variant="default"
-												>
-													Active
-												</Badge>
-												{tournament.currentRoundNumber && (
-													<span className="text-muted-foreground text-sm">
-														Round {tournament.currentRoundNumber}
-													</span>
-												)}
-											</div>
-											<p className="text-muted-foreground text-sm">
-												Uploaded by {tournament.uploadedByUser.displayName}
-											</p>
-											<div className="mt-4 font-medium text-primary group-hover:underline">
-												View Tournament →
-											</div>
-										</CardContent>
+						<>
+							<div className="mb-10">
+								<h2 className="mb-4 font-bold text-2xl">Active Tournaments</h2>
+								{activeTournaments.length === 0 ? (
+									<Card className="p-8 text-center">
+										<h3 className="mb-2 font-semibold text-lg">
+											No Active Tournaments
+										</h3>
+										<p className="text-muted-foreground text-sm">
+											Check back soon for upcoming ATP tournaments
+										</p>
 									</Card>
-								</Link>
-							))}
-						</div>
+								) : (
+									<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+										{activeTournaments.map((tournament) => (
+											<Link
+												className="group"
+												href={`/tournaments/${tournament.slug}`}
+												key={tournament.id}
+											>
+												<Card className="overflow-hidden transition-shadow hover:shadow-lg">
+													<CardHeader className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white">
+														<CardTitle className="mb-2 text-2xl">
+															{tournament.name}
+														</CardTitle>
+														<p className="text-blue-100">{tournament.year}</p>
+													</CardHeader>
+													<CardContent className="p-6">
+														<div className="mb-4 flex items-center gap-2">
+															<Badge
+																className="bg-green-600 hover:bg-green-700"
+																variant="default"
+															>
+																Active
+															</Badge>
+															{tournament.currentRoundNumber && (
+																<span className="text-muted-foreground text-sm">
+																	Round {tournament.currentRoundNumber}
+																</span>
+															)}
+														</div>
+														<p className="text-muted-foreground text-sm">
+															Uploaded by{" "}
+															{tournament.uploadedByUser.displayName}
+														</p>
+														<div className="mt-4 font-medium text-primary group-hover:underline">
+															View Tournament →
+														</div>
+													</CardContent>
+												</Card>
+											</Link>
+										))}
+									</div>
+								)}
+							</div>
+
+							<div>
+								<h2 className="mb-4 font-bold text-2xl">Past Tournaments</h2>
+								{pastTournaments.length === 0 ? (
+									<Card className="p-8 text-center">
+										<h3 className="mb-2 font-semibold text-lg">
+											No Past Tournaments
+										</h3>
+										<p className="text-muted-foreground text-sm">
+											Completed tournaments will appear here
+										</p>
+									</Card>
+								) : (
+									<PastTournamentsGrid tournaments={pastTournaments} />
+								)}
+							</div>
+						</>
 					)}
 
 					<Alert className="mt-12">

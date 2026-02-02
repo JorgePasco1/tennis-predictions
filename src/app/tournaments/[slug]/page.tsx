@@ -1,4 +1,4 @@
-import { BarChart3, FileText } from "lucide-react";
+import { BarChart3, FileText, Trophy } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CountdownTimer } from "~/components/countdown/CountdownTimer";
@@ -19,10 +19,11 @@ export default async function TournamentDetailPage({
 	const { slug } = await params;
 	const { tab } = await searchParams;
 
-	let tournament;
-	try {
-		tournament = await api.tournaments.getBySlug({ slug });
-	} catch {
+	const tournament = await api.tournaments
+		.getBySlug({ slug })
+		.catch(() => null);
+
+	if (!tournament) {
 		notFound();
 	}
 
@@ -117,6 +118,52 @@ export default async function TournamentDetailPage({
 						</CardHeader>
 					</Card>
 
+					{/* Quick Links */}
+					<div
+						className={cn(
+							"mb-8 grid gap-4",
+							tournament.closedAt ? "md:grid-cols-3" : "md:grid-cols-2",
+						)}
+					>
+						<Link className="group" href={`/tournaments/${slug}/picks`}>
+							<Card className="transition-shadow hover:shadow-md">
+								<CardContent className="p-6">
+									<FileText className="mb-2 h-8 w-8 text-primary" />
+									<h3 className="mb-2 font-semibold text-lg">Your Picks</h3>
+									<p className="text-muted-foreground text-sm">
+										View or submit your predictions
+									</p>
+								</CardContent>
+							</Card>
+						</Link>
+						<Link className="group" href={`/tournaments/${slug}/results`}>
+							<Card className="transition-shadow hover:shadow-md">
+								<CardContent className="p-6">
+									<BarChart3 className="mb-2 h-8 w-8 text-primary" />
+									<h3 className="mb-2 font-semibold text-lg">Results</h3>
+									<p className="text-muted-foreground text-sm">
+										View match results and your scores
+									</p>
+								</CardContent>
+							</Card>
+						</Link>
+						{tournament.closedAt && (
+							<Link className="group" href={`/tournaments/${slug}/summary`}>
+								<Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50 transition-shadow hover:shadow-md">
+									<CardContent className="p-6">
+										<Trophy className="mb-2 h-8 w-8 text-amber-500" />
+										<h3 className="mb-2 font-semibold text-lg">
+											Tournament Summary
+										</h3>
+										<p className="text-muted-foreground text-sm">
+											View final standings, top performers & fun stats
+										</p>
+									</CardContent>
+								</Card>
+							</Link>
+						)}
+					</div>
+
 					{/* Active Round Alert */}
 					{activeRound && (
 						<Alert
@@ -202,32 +249,6 @@ export default async function TournamentDetailPage({
 						tournamentId={tournament.id}
 						tournamentStats={leaderboardData.tournamentStats}
 					/>
-
-					{/* Quick Links */}
-					<div className="mt-8 grid gap-4 md:grid-cols-2">
-						<Link className="group" href={`/tournaments/${slug}/picks`}>
-							<Card className="transition-shadow hover:shadow-md">
-								<CardContent className="p-6">
-									<FileText className="mb-2 h-8 w-8 text-primary" />
-									<h3 className="mb-2 font-semibold text-lg">Your Picks</h3>
-									<p className="text-muted-foreground text-sm">
-										View or submit your predictions
-									</p>
-								</CardContent>
-							</Card>
-						</Link>
-						<Link className="group" href={`/tournaments/${slug}/results`}>
-							<Card className="transition-shadow hover:shadow-md">
-								<CardContent className="p-6">
-									<BarChart3 className="mb-2 h-8 w-8 text-primary" />
-									<h3 className="mb-2 font-semibold text-lg">Results</h3>
-									<p className="text-muted-foreground text-sm">
-										View match results and your scores
-									</p>
-								</CardContent>
-							</Card>
-						</Link>
-					</div>
 				</main>
 			</div>
 		</HydrateClient>
