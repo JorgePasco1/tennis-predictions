@@ -122,7 +122,15 @@ export function TopPerformersGrid({ topPerformers }: TopPerformersGridProps) {
 							iconBgColor="bg-green-100"
 							mainStat={topPerformers.mostExactScores.exactScores}
 							mainStatLabel="Exact Scores"
-							secondaryStat={`${((topPerformers.mostExactScores.exactScores / topPerformers.mostExactScores.totalPredictions) * 100).toFixed(1)}% rate`}
+							secondaryStat={`${
+								topPerformers.mostExactScores.totalPredictions > 0
+									? (
+											(topPerformers.mostExactScores.exactScores /
+												topPerformers.mostExactScores.totalPredictions) *
+											100
+										).toFixed(1)
+									: "0.0"
+							}% rate`}
 							title="Most Exact Scores"
 							user={topPerformers.mostExactScores}
 						/>

@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -34,13 +35,18 @@ export const summaryRouter = createTRPCRouter({
 			});
 
 			if (!tournament) {
-				throw new Error("Tournament not found");
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Tournament not found",
+				});
 			}
 
 			if (!tournament.closedAt) {
-				throw new Error(
-					"Tournament summary is only available after the tournament is closed",
-				);
+				throw new TRPCError({
+					code: "PRECONDITION_FAILED",
+					message:
+						"Tournament summary is only available after the tournament is closed",
+				});
 			}
 
 			// Get all rounds for this tournament

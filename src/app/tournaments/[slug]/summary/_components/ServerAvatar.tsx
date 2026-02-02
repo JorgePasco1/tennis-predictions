@@ -44,12 +44,7 @@ export function ServerAvatar({
 			)}
 		>
 			{/* Fallback text shown behind the image */}
-			<span
-				className={cn(
-					"absolute text-muted-foreground",
-					fallbackClassName,
-				)}
-			>
+			<span className={cn("absolute text-muted-foreground", fallbackClassName)}>
 				{fallback}
 			</span>
 			{/* Image overlays the fallback when loaded successfully */}
