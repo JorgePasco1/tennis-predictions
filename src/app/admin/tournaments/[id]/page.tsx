@@ -140,6 +140,29 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
+	const closeTournamentMutation = api.admin.closeTournament.useMutation({
+		onSuccess: (result) => {
+			refetch();
+			toast.success(
+				`Tournament closed successfully! Summary: ${result.summary.totalRounds} rounds, ${result.summary.totalMatches} matches, ${result.summary.totalParticipants} participants.`,
+			);
+			setShowCloseTournamentDialog(false);
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to close tournament");
+		},
+	});
+
+	const reopenTournamentMutation = api.admin.reopenTournament.useMutation({
+		onSuccess: () => {
+			refetch();
+			toast.success("Tournament reopened successfully!");
+		},
+		onError: (error) => {
+			toast.error(error.message || "Failed to reopen tournament");
+		},
+	});
+
 	const [selectedRound, setSelectedRound] = useState<number | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isEditingProperties, setIsEditingProperties] = useState(false);
@@ -184,6 +207,8 @@ export default function AdminTournamentManagePage({
 	const [activateNextRound, setActivateNextRound] = useState(false);
 	const [showCreateRoundDialog, setShowCreateRoundDialog] = useState(false);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+	const [showCloseTournamentDialog, setShowCloseTournamentDialog] =
+		useState(false);
 	const [createRoundForm, setCreateRoundForm] = useState({
 		name: "",
 		matchCount: 32,
@@ -454,6 +479,11 @@ export default function AdminTournamentManagePage({
 					</h1>
 					<p className="text-gray-600">
 						Year: {tournament.year} • Status: {tournament.status}
+						{tournament.closedAt && (
+							<span className="ml-2 text-green-600">
+								• Closed: {new Date(tournament.closedAt).toLocaleDateString()}
+							</span>
+						)}
 					</p>
 				</div>
 
@@ -499,6 +529,36 @@ export default function AdminTournamentManagePage({
 						>
 							Delete Tournament
 						</button>
+						{tournament.status === "active" && (
+							<button
+								className="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={closeTournamentMutation.isPending}
+								onClick={() => setShowCloseTournamentDialog(true)}
+								type="button"
+							>
+								Close Tournament
+							</button>
+						)}
+						{tournament.status === "archived" && tournament.closedAt && (
+							<button
+								className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={reopenTournamentMutation.isPending}
+								onClick={async () => {
+									try {
+										await reopenTournamentMutation.mutateAsync({
+											tournamentId,
+										});
+									} catch {
+										// Error handled by onError
+									}
+								}}
+								type="button"
+							>
+								{reopenTournamentMutation.isPending
+									? "Reopening..."
+									: "Reopen Tournament"}
+							</button>
+						)}
 					</div>
 				</div>
 
@@ -1605,6 +1665,142 @@ export default function AdminTournamentManagePage({
 							{deleteTournamentMutation.isPending
 								? "Deleting..."
 								: "Delete Tournament"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Close Tournament Confirmation Dialog */}
+			<AlertDialog
+				onOpenChange={setShowCloseTournamentDialog}
+				open={showCloseTournamentDialog}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Close Tournament?</AlertDialogTitle>
+						<AlertDialogDescription asChild>
+							<div className="text-muted-foreground text-sm">
+								<p>
+									Close{" "}
+									<span className="font-semibold text-foreground">
+										{tournament?.name}
+									</span>
+									?
+								</p>
+
+								{/* Pre-validation status */}
+								{(() => {
+									const unfinalizedRounds = tournament.rounds.filter(
+										(r) => !r.isFinalized,
+									);
+									const pendingMatches = tournament.rounds.flatMap((r) =>
+										r.matches
+											.filter((m) => !m.deletedAt && m.status !== "finalized")
+											.map((m) => ({ roundName: r.name, matchNumber: m.matchNumber })),
+									);
+									const isReady =
+										unfinalizedRounds.length === 0 &&
+										pendingMatches.length === 0 &&
+										tournament.rounds.length > 0;
+
+									if (isReady) {
+										return (
+											<div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+												<p className="font-medium text-green-900">
+													✓ Ready to close
+												</p>
+												<ul className="mt-2 list-inside list-disc space-y-1 text-green-800 text-sm">
+													<li>All {tournament.rounds.length} rounds are finalized</li>
+													<li>
+														All{" "}
+														{tournament.rounds.reduce(
+															(sum, r) =>
+																sum + r.matches.filter((m) => !m.deletedAt).length,
+															0,
+														)}{" "}
+														matches are finalized
+													</li>
+												</ul>
+											</div>
+										);
+									}
+
+									return (
+										<div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+											<p className="font-medium text-red-900">
+												✗ Cannot close tournament
+											</p>
+											<ul className="mt-2 list-inside list-disc space-y-1 text-red-800 text-sm">
+												{tournament.rounds.length === 0 && (
+													<li>Tournament has no rounds</li>
+												)}
+												{unfinalizedRounds.length > 0 && (
+													<li>
+														{unfinalizedRounds.length} round(s) not finalized:{" "}
+														{unfinalizedRounds.map((r) => r.name).join(", ")}
+													</li>
+												)}
+												{pendingMatches.length > 0 && (
+													<li>
+														{pendingMatches.length} match(es) pending:{" "}
+														{pendingMatches
+															.slice(0, 3)
+															.map(
+																(m) => `${m.roundName} #${m.matchNumber}`,
+															)
+															.join(", ")}
+														{pendingMatches.length > 3 &&
+															` and ${pendingMatches.length - 3} more`}
+													</li>
+												)}
+											</ul>
+										</div>
+									);
+								})()}
+
+								<div className="mt-3 space-y-2 text-left">
+									<p className="font-medium text-foreground">
+										Closing the tournament will:
+									</p>
+									<ul className="list-inside list-disc space-y-1">
+										<li>Archive the tournament</li>
+										<li>Record the closure date and admin</li>
+										<li>Make it read-only for users</li>
+									</ul>
+									<p className="mt-3 text-yellow-700">
+										You can reopen it later if needed.
+									</p>
+								</div>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-purple-600 hover:bg-purple-700"
+							disabled={
+								closeTournamentMutation.isPending ||
+								tournament.rounds.filter((r) => !r.isFinalized).length > 0 ||
+								tournament.rounds.flatMap((r) =>
+									r.matches.filter(
+										(m) => !m.deletedAt && m.status !== "finalized",
+									),
+								).length > 0 ||
+								tournament.rounds.length === 0
+							}
+							onClick={async () => {
+								try {
+									await closeTournamentMutation.mutateAsync({
+										tournamentId,
+									});
+								} catch {
+									// Error handled by onError
+								}
+							}}
+						>
+							{closeTournamentMutation.isPending
+								? "Closing..."
+								: "Close Tournament"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

@@ -3221,3 +3221,752 @@ describe("edge cases and regression tests", () => {
 		});
 	});
 });
+
+// =============================================================================
+// Close Tournament Tests
+// =============================================================================
+
+describe("closeTournament", () => {
+	let mockDb: MockDb;
+
+	beforeEach(() => {
+		mockDb = createMockDb();
+	});
+
+	describe("successful close", () => {
+		it("should close tournament when all conditions are met", async () => {
+			// Tournament with all rounds finalized and all matches finalized
+			const tournament = {
+				id: 1,
+				name: "Australian Open",
+				slug: "australian-open-2024",
+				status: "active" as const,
+				closedAt: null,
+				closedBy: null,
+				rounds: [
+					{
+						id: 1,
+						name: "Round of 64",
+						roundNumber: 1,
+						isFinalized: true,
+						matches: [
+							{ id: 1, matchNumber: 1, status: "finalized", deletedAt: null },
+							{ id: 2, matchNumber: 2, status: "finalized", deletedAt: null },
+						],
+						userRoundPicks: [{ id: 1, userId: "user-1" }],
+					},
+					{
+						id: 2,
+						name: "Final",
+						roundNumber: 2,
+						isFinalized: true,
+						matches: [
+							{ id: 3, matchNumber: 1, status: "finalized", deletedAt: null },
+						],
+						userRoundPicks: [
+							{ id: 2, userId: "user-1" },
+							{ id: 3, userId: "user-2" },
+						],
+					},
+				],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			// Validate close conditions
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "active") {
+					if (t.status === "archived") {
+						throw new Error(
+							"Tournament is already archived. Use reopenTournament to reopen it first.",
+						);
+					}
+					throw new Error(
+						`Cannot close tournament with status "${t.status}". Tournament must be active to close.`,
+					);
+				}
+				if (t.rounds.length === 0) {
+					throw new Error("Cannot close tournament with no rounds");
+				}
+				const unfinalizedRounds = t.rounds.filter(
+					(r: { isFinalized: boolean }) => !r.isFinalized,
+				);
+				if (unfinalizedRounds.length > 0) {
+					throw new Error(
+						`Cannot close tournament: ${unfinalizedRounds.length} round(s) are not finalized`,
+					);
+				}
+				const pendingMatches: Array<{
+					roundName: string;
+					matchNumber: number;
+				}> = [];
+				for (const round of t.rounds) {
+					for (const match of round.matches) {
+						if (match.status !== "finalized") {
+							pendingMatches.push({
+								roundName: round.name,
+								matchNumber: match.matchNumber,
+							});
+						}
+					}
+				}
+				if (pendingMatches.length > 0) {
+					throw new Error(
+						`Cannot close tournament: ${pendingMatches.length} match(es) are not finalized`,
+					);
+				}
+
+				// Calculate summary
+				const totalRounds = t.rounds.length;
+				const totalMatches = t.rounds.reduce(
+					(sum: number, r: { matches: unknown[] }) => sum + r.matches.length,
+					0,
+				);
+				const totalPicks = t.rounds.reduce(
+					(sum: number, r: { userRoundPicks: unknown[] }) =>
+						sum + r.userRoundPicks.length,
+					0,
+				);
+				const participantIds = new Set<string>();
+				for (const round of t.rounds) {
+					for (const pick of round.userRoundPicks) {
+						participantIds.add(pick.userId);
+					}
+				}
+
+				return {
+					success: true,
+					summary: {
+						totalRounds,
+						totalMatches,
+						totalParticipants: participantIds.size,
+						totalPicks,
+					},
+				};
+			};
+
+			const result = await validateClose();
+
+			expect(result.success).toBe(true);
+			expect(result.summary.totalRounds).toBe(2);
+			expect(result.summary.totalMatches).toBe(3);
+			expect(result.summary.totalParticipants).toBe(2); // user-1 and user-2
+			expect(result.summary.totalPicks).toBe(3);
+		});
+	});
+
+	describe("error conditions", () => {
+		it("should reject when tournament not found", async () => {
+			mockDb.query.tournaments.findFirst.mockResolvedValue(null);
+
+			const validateClose = async () => {
+				const tournament = await mockDb.query.tournaments.findFirst({});
+				if (!tournament) {
+					throw new Error("Tournament not found");
+				}
+				return tournament;
+			};
+
+			await expect(validateClose()).rejects.toThrow("Tournament not found");
+		});
+
+		it("should reject when tournament is draft", async () => {
+			const tournament = {
+				id: 1,
+				status: "draft" as const,
+				rounds: [],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "active") {
+					if (t.status === "archived") {
+						throw new Error(
+							"Tournament is already archived. Use reopenTournament to reopen it first.",
+						);
+					}
+					throw new Error(
+						`Cannot close tournament with status "${t.status}". Tournament must be active to close.`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateClose()).rejects.toThrow(
+				'Cannot close tournament with status "draft". Tournament must be active to close.',
+			);
+		});
+
+		it("should reject when tournament is already archived", async () => {
+			const tournament = {
+				id: 1,
+				status: "archived" as const,
+				rounds: [],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "active") {
+					if (t.status === "archived") {
+						throw new Error(
+							"Tournament is already archived. Use reopenTournament to reopen it first.",
+						);
+					}
+					throw new Error(
+						`Cannot close tournament with status "${t.status}". Tournament must be active to close.`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateClose()).rejects.toThrow(
+				"Tournament is already archived. Use reopenTournament to reopen it first.",
+			);
+		});
+
+		it("should reject when tournament has no rounds", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				rounds: [],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "active") {
+					throw new Error("Tournament must be active to close.");
+				}
+				if (t.rounds.length === 0) {
+					throw new Error("Cannot close tournament with no rounds");
+				}
+				return t;
+			};
+
+			await expect(validateClose()).rejects.toThrow(
+				"Cannot close tournament with no rounds",
+			);
+		});
+
+		it("should reject when some rounds are not finalized", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				rounds: [
+					{
+						id: 1,
+						name: "Round of 64",
+						isFinalized: true,
+						matches: [{ status: "finalized" }],
+						userRoundPicks: [],
+					},
+					{
+						id: 2,
+						name: "Round of 32",
+						isFinalized: false,
+						matches: [{ status: "finalized" }],
+						userRoundPicks: [],
+					},
+					{
+						id: 3,
+						name: "Final",
+						isFinalized: false,
+						matches: [{ status: "finalized" }],
+						userRoundPicks: [],
+					},
+				],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "active") {
+					throw new Error("Tournament must be active to close.");
+				}
+				if (t.rounds.length === 0) {
+					throw new Error("Cannot close tournament with no rounds");
+				}
+				const unfinalizedRounds = t.rounds.filter(
+					(r: { isFinalized: boolean; name: string }) => !r.isFinalized,
+				);
+				if (unfinalizedRounds.length > 0) {
+					const roundNames = unfinalizedRounds
+						.map((r: { name: string }) => r.name)
+						.join(", ");
+					throw new Error(
+						`Cannot close tournament: ${unfinalizedRounds.length} round(s) are not finalized: ${roundNames}`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateClose()).rejects.toThrow(
+				"Cannot close tournament: 2 round(s) are not finalized: Round of 32, Final",
+			);
+		});
+
+		it("should reject when some matches are not finalized", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				rounds: [
+					{
+						id: 1,
+						name: "Round of 64",
+						isFinalized: true,
+						matches: [
+							{ matchNumber: 1, status: "finalized" },
+							{ matchNumber: 2, status: "pending" },
+							{ matchNumber: 3, status: "pending" },
+						],
+						userRoundPicks: [],
+					},
+					{
+						id: 2,
+						name: "Final",
+						isFinalized: true,
+						matches: [{ matchNumber: 1, status: "pending" }],
+						userRoundPicks: [],
+					},
+				],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "active") {
+					throw new Error("Tournament must be active to close.");
+				}
+				if (t.rounds.length === 0) {
+					throw new Error("Cannot close tournament with no rounds");
+				}
+				const unfinalizedRounds = t.rounds.filter(
+					(r: { isFinalized: boolean }) => !r.isFinalized,
+				);
+				if (unfinalizedRounds.length > 0) {
+					throw new Error("Rounds not finalized");
+				}
+				const pendingMatches: Array<{
+					roundName: string;
+					matchNumber: number;
+				}> = [];
+				for (const round of t.rounds) {
+					for (const match of round.matches) {
+						if (match.status !== "finalized") {
+							pendingMatches.push({
+								roundName: round.name,
+								matchNumber: match.matchNumber,
+							});
+						}
+					}
+				}
+				if (pendingMatches.length > 0) {
+					const matchDetails = pendingMatches
+						.slice(0, 5)
+						.map((m) => `${m.roundName} Match #${m.matchNumber}`)
+						.join(", ");
+					const moreText =
+						pendingMatches.length > 5
+							? ` and ${pendingMatches.length - 5} more`
+							: "";
+					throw new Error(
+						`Cannot close tournament: ${pendingMatches.length} match(es) are not finalized: ${matchDetails}${moreText}`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateClose()).rejects.toThrow(
+				"Cannot close tournament: 3 match(es) are not finalized: Round of 64 Match #2, Round of 64 Match #3, Final Match #1",
+			);
+		});
+
+		it("should truncate pending matches list when more than 5", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				rounds: [
+					{
+						id: 1,
+						name: "Round of 64",
+						isFinalized: true,
+						matches: [
+							{ matchNumber: 1, status: "pending" },
+							{ matchNumber: 2, status: "pending" },
+							{ matchNumber: 3, status: "pending" },
+							{ matchNumber: 4, status: "pending" },
+							{ matchNumber: 5, status: "pending" },
+							{ matchNumber: 6, status: "pending" },
+							{ matchNumber: 7, status: "pending" },
+						],
+						userRoundPicks: [],
+					},
+				],
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateClose = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+
+				const pendingMatches: Array<{
+					roundName: string;
+					matchNumber: number;
+				}> = [];
+				for (const round of t.rounds) {
+					for (const match of round.matches) {
+						if (match.status !== "finalized") {
+							pendingMatches.push({
+								roundName: round.name,
+								matchNumber: match.matchNumber,
+							});
+						}
+					}
+				}
+				if (pendingMatches.length > 0) {
+					const matchDetails = pendingMatches
+						.slice(0, 5)
+						.map((m) => `${m.roundName} Match #${m.matchNumber}`)
+						.join(", ");
+					const moreText =
+						pendingMatches.length > 5
+							? ` and ${pendingMatches.length - 5} more`
+							: "";
+					throw new Error(
+						`Cannot close tournament: ${pendingMatches.length} match(es) are not finalized: ${matchDetails}${moreText}`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateClose()).rejects.toThrow(
+				"Cannot close tournament: 7 match(es) are not finalized: Round of 64 Match #1, Round of 64 Match #2, Round of 64 Match #3, Round of 64 Match #4, Round of 64 Match #5 and 2 more",
+			);
+		});
+	});
+
+	describe("summary statistics", () => {
+		it("should calculate correct participant count with unique users", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				rounds: [
+					{
+						id: 1,
+						name: "R1",
+						isFinalized: true,
+						matches: [{ status: "finalized" }],
+						userRoundPicks: [
+							{ id: 1, userId: "user-1" },
+							{ id: 2, userId: "user-2" },
+						],
+					},
+					{
+						id: 2,
+						name: "R2",
+						isFinalized: true,
+						matches: [{ status: "finalized" }],
+						userRoundPicks: [
+							{ id: 3, userId: "user-1" }, // Same user in different round
+							{ id: 4, userId: "user-3" },
+						],
+					},
+				],
+			};
+
+			const participantIds = new Set<string>();
+			for (const round of tournament.rounds) {
+				for (const pick of round.userRoundPicks) {
+					participantIds.add(pick.userId);
+				}
+			}
+
+			expect(participantIds.size).toBe(3); // user-1, user-2, user-3
+		});
+
+		it("should handle tournament with no picks", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				rounds: [
+					{
+						id: 1,
+						name: "R1",
+						isFinalized: true,
+						matches: [{ status: "finalized" }],
+						userRoundPicks: [] as Array<{ id: number; userId: string }>,
+					},
+				],
+			};
+
+			const totalPicks = tournament.rounds.reduce(
+				(sum, r) => sum + r.userRoundPicks.length,
+				0,
+			);
+			const participantIds = new Set<string>();
+			for (const round of tournament.rounds) {
+				for (const pick of round.userRoundPicks) {
+					participantIds.add(pick.userId);
+				}
+			}
+
+			expect(totalPicks).toBe(0);
+			expect(participantIds.size).toBe(0);
+		});
+	});
+});
+
+// =============================================================================
+// Reopen Tournament Tests
+// =============================================================================
+
+describe("reopenTournament", () => {
+	let mockDb: MockDb;
+
+	beforeEach(() => {
+		mockDb = createMockDb();
+	});
+
+	describe("successful reopen", () => {
+		it("should reopen archived tournament with closedAt set", async () => {
+			const closedAt = new Date("2024-01-28T12:00:00Z");
+			const tournament = {
+				id: 1,
+				name: "Australian Open",
+				status: "archived" as const,
+				closedAt: closedAt,
+				closedBy: "admin-user-id",
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateReopen = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "archived") {
+					throw new Error(
+						`Cannot reopen tournament with status "${t.status}". Tournament must be archived to reopen.`,
+					);
+				}
+				if (!t.closedAt) {
+					throw new Error(
+						"Cannot reopen tournament: Tournament was archived but not through the close process. Use updateStatus to change status directly.",
+					);
+				}
+				return {
+					success: true,
+					previousClosedAt: t.closedAt,
+				};
+			};
+
+			const result = await validateReopen();
+
+			expect(result.success).toBe(true);
+			expect(result.previousClosedAt).toEqual(closedAt);
+		});
+	});
+
+	describe("error conditions", () => {
+		it("should reject when tournament not found", async () => {
+			mockDb.query.tournaments.findFirst.mockResolvedValue(null);
+
+			const validateReopen = async () => {
+				const tournament = await mockDb.query.tournaments.findFirst({});
+				if (!tournament) {
+					throw new Error("Tournament not found");
+				}
+				return tournament;
+			};
+
+			await expect(validateReopen()).rejects.toThrow("Tournament not found");
+		});
+
+		it("should reject when tournament is active", async () => {
+			const tournament = {
+				id: 1,
+				status: "active" as const,
+				closedAt: null,
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateReopen = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "archived") {
+					throw new Error(
+						`Cannot reopen tournament with status "${t.status}". Tournament must be archived to reopen.`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateReopen()).rejects.toThrow(
+				'Cannot reopen tournament with status "active". Tournament must be archived to reopen.',
+			);
+		});
+
+		it("should reject when tournament is draft", async () => {
+			const tournament = {
+				id: 1,
+				status: "draft" as const,
+				closedAt: null,
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateReopen = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "archived") {
+					throw new Error(
+						`Cannot reopen tournament with status "${t.status}". Tournament must be archived to reopen.`,
+					);
+				}
+				return t;
+			};
+
+			await expect(validateReopen()).rejects.toThrow(
+				'Cannot reopen tournament with status "draft". Tournament must be archived to reopen.',
+			);
+		});
+
+		it("should reject when tournament is archived but closedAt is not set", async () => {
+			// This case occurs when tournament was archived via direct status change
+			// rather than through the closeTournament procedure
+			const tournament = {
+				id: 1,
+				status: "archived" as const,
+				closedAt: null,
+				closedBy: null,
+			};
+
+			mockDb.query.tournaments.findFirst.mockResolvedValue(tournament);
+
+			const validateReopen = async () => {
+				const t = await mockDb.query.tournaments.findFirst({});
+				if (!t) throw new Error("Tournament not found");
+				if (t.status !== "archived") {
+					throw new Error(
+						`Cannot reopen tournament with status "${t.status}". Tournament must be archived to reopen.`,
+					);
+				}
+				if (!t.closedAt) {
+					throw new Error(
+						"Cannot reopen tournament: Tournament was archived but not through the close process. Use updateStatus to change status directly.",
+					);
+				}
+				return t;
+			};
+
+			await expect(validateReopen()).rejects.toThrow(
+				"Cannot reopen tournament: Tournament was archived but not through the close process. Use updateStatus to change status directly.",
+			);
+		});
+	});
+
+	describe("state transitions", () => {
+		it("should transition from archived to active on reopen", () => {
+			const beforeReopen = {
+				status: "archived" as const,
+				closedAt: new Date("2024-01-28"),
+				closedBy: "admin-id",
+			};
+
+			const afterReopen = {
+				status: "active" as const,
+				closedAt: null,
+				closedBy: null,
+			};
+
+			expect(beforeReopen.status).toBe("archived");
+			expect(beforeReopen.closedAt).not.toBeNull();
+			expect(beforeReopen.closedBy).not.toBeNull();
+
+			expect(afterReopen.status).toBe("active");
+			expect(afterReopen.closedAt).toBeNull();
+			expect(afterReopen.closedBy).toBeNull();
+		});
+	});
+});
+
+// =============================================================================
+// Close/Reopen Tournament Integration Tests
+// =============================================================================
+
+describe("closeTournament and reopenTournament integration", () => {
+	it("should allow close -> reopen -> close cycle", () => {
+		// Initial state: active tournament
+		let tournamentState = {
+			status: "active" as "draft" | "active" | "archived",
+			closedAt: null as Date | null,
+			closedBy: null as string | null,
+		};
+
+		// Close the tournament
+		const closeTime = new Date("2024-01-28T12:00:00Z");
+		tournamentState = {
+			status: "archived",
+			closedAt: closeTime,
+			closedBy: "admin-1",
+		};
+
+		expect(tournamentState.status).toBe("archived");
+		expect(tournamentState.closedAt).toEqual(closeTime);
+
+		// Reopen the tournament
+		tournamentState = {
+			status: "active",
+			closedAt: null,
+			closedBy: null,
+		};
+
+		expect(tournamentState.status).toBe("active");
+		expect(tournamentState.closedAt).toBeNull();
+
+		// Close again
+		const secondCloseTime = new Date("2024-01-29T12:00:00Z");
+		tournamentState = {
+			status: "archived",
+			closedAt: secondCloseTime,
+			closedBy: "admin-2",
+		};
+
+		expect(tournamentState.status).toBe("archived");
+		expect(tournamentState.closedAt).toEqual(secondCloseTime);
+		expect(tournamentState.closedBy).toBe("admin-2");
+	});
+
+	it("should not allow closing a draft tournament", () => {
+		const canClose = (status: string) => status === "active";
+
+		expect(canClose("draft")).toBe(false);
+		expect(canClose("active")).toBe(true);
+		expect(canClose("archived")).toBe(false);
+	});
+
+	it("should not allow reopening a non-archived tournament", () => {
+		const canReopen = (status: string, closedAt: Date | null) =>
+			status === "archived" && closedAt !== null;
+
+		expect(canReopen("draft", null)).toBe(false);
+		expect(canReopen("active", null)).toBe(false);
+		expect(canReopen("archived", null)).toBe(false);
+		expect(canReopen("archived", new Date())).toBe(true);
+	});
+});

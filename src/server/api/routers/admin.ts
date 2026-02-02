@@ -1090,6 +1090,186 @@ export const adminRouter = createTRPCRouter({
 		}),
 
 	/**
+	 * Close a tournament after all rounds and matches are complete
+	 * This archives the tournament and records who closed it and when
+	 */
+	closeTournament: adminProcedure
+		.input(
+			z.object({
+				tournamentId: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			// Get tournament with all rounds and matches
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(
+					eq(tournaments.id, input.tournamentId),
+					isNull(tournaments.deletedAt),
+				),
+				with: {
+					rounds: {
+						with: {
+							matches: {
+								where: isNull(matches.deletedAt),
+							},
+							userRoundPicks: true,
+						},
+					},
+				},
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			// Validate tournament status is active
+			if (tournament.status !== "active") {
+				if (tournament.status === "archived") {
+					throw new Error(
+						"Tournament is already archived. Use reopenTournament to reopen it first.",
+					);
+				}
+				throw new Error(
+					`Cannot close tournament with status "${tournament.status}". Tournament must be active to close.`,
+				);
+			}
+
+			// Validate tournament has at least one round
+			if (tournament.rounds.length === 0) {
+				throw new Error("Cannot close tournament with no rounds");
+			}
+
+			// Validate all rounds are finalized
+			const unfinalizedRounds = tournament.rounds.filter((r) => !r.isFinalized);
+			if (unfinalizedRounds.length > 0) {
+				const roundNames = unfinalizedRounds.map((r) => r.name).join(", ");
+				throw new Error(
+					`Cannot close tournament: ${unfinalizedRounds.length} round(s) are not finalized: ${roundNames}`,
+				);
+			}
+
+			// Validate all matches are finalized
+			const pendingMatches: Array<{ roundName: string; matchNumber: number }> =
+				[];
+			for (const round of tournament.rounds) {
+				for (const match of round.matches) {
+					if (match.status !== "finalized") {
+						pendingMatches.push({
+							roundName: round.name,
+							matchNumber: match.matchNumber,
+						});
+					}
+				}
+			}
+
+			if (pendingMatches.length > 0) {
+				const matchDetails = pendingMatches
+					.slice(0, 5)
+					.map((m) => `${m.roundName} Match #${m.matchNumber}`)
+					.join(", ");
+				const moreText =
+					pendingMatches.length > 5
+						? ` and ${pendingMatches.length - 5} more`
+						: "";
+				throw new Error(
+					`Cannot close tournament: ${pendingMatches.length} match(es) are not finalized: ${matchDetails}${moreText}`,
+				);
+			}
+
+			// All validations passed, close the tournament
+			const now = new Date();
+			await ctx.db
+				.update(tournaments)
+				.set({
+					status: "archived",
+					closedAt: now,
+					closedBy: ctx.user.id,
+				})
+				.where(eq(tournaments.id, input.tournamentId));
+
+			// Calculate summary statistics
+			const totalRounds = tournament.rounds.length;
+			const totalMatches = tournament.rounds.reduce(
+				(sum, r) => sum + r.matches.length,
+				0,
+			);
+			const totalPicks = tournament.rounds.reduce(
+				(sum, r) => sum + r.userRoundPicks.length,
+				0,
+			);
+
+			// Get unique participants
+			const participantIds = new Set<string>();
+			for (const round of tournament.rounds) {
+				for (const pick of round.userRoundPicks) {
+					participantIds.add(pick.userId);
+				}
+			}
+
+			return {
+				success: true,
+				closedAt: now,
+				summary: {
+					totalRounds,
+					totalMatches,
+					totalParticipants: participantIds.size,
+					totalPicks,
+				},
+			};
+		}),
+
+	/**
+	 * Reopen a closed/archived tournament
+	 * This allows undoing accidental closures
+	 */
+	reopenTournament: adminProcedure
+		.input(
+			z.object({
+				tournamentId: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(
+					eq(tournaments.id, input.tournamentId),
+					isNull(tournaments.deletedAt),
+				),
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			// Validate tournament is archived and was properly closed
+			if (tournament.status !== "archived") {
+				throw new Error(
+					`Cannot reopen tournament with status "${tournament.status}". Tournament must be archived to reopen.`,
+				);
+			}
+
+			if (!tournament.closedAt) {
+				throw new Error(
+					"Cannot reopen tournament: Tournament was archived but not through the close process. Use updateStatus to change status directly.",
+				);
+			}
+
+			// Reopen the tournament
+			await ctx.db
+				.update(tournaments)
+				.set({
+					status: "active",
+					closedAt: null,
+					closedBy: null,
+				})
+				.where(eq(tournaments.id, input.tournamentId));
+
+			return {
+				success: true,
+				previousClosedAt: tournament.closedAt,
+			};
+		}),
+
+	/**
 	 * Manually create a new round for a tournament
 	 */
 	createRound: adminProcedure
