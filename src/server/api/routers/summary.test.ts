@@ -24,9 +24,7 @@ describe("summary podium calculations", () => {
 				{ userId: "user3", totalPoints: 60 },
 			];
 
-			const sorted = leaderboard.sort(
-				(a, b) => b.totalPoints - a.totalPoints,
-			);
+			const sorted = leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
 
 			expect(sorted[0]?.userId).toBe("user1");
 			expect(sorted[1]?.userId).toBe("user2");
@@ -56,9 +54,7 @@ describe("summary podium calculations", () => {
 				if (b.totalPoints !== a.totalPoints) {
 					return b.totalPoints - a.totalPoints;
 				}
-				return (
-					a.earliestSubmission.getTime() - b.earliestSubmission.getTime()
-				);
+				return a.earliestSubmission.getTime() - b.earliestSubmission.getTime();
 			});
 
 			expect(sorted[0]?.userId).toBe("user2"); // Submitted earliest
@@ -119,11 +115,7 @@ describe("summary podium calculations", () => {
 			const podium = leaderboard.slice(0, 3);
 
 			expect(podium.length).toBe(3);
-			expect(podium.map((p) => p.userId)).toEqual([
-				"user1",
-				"user2",
-				"user3",
-			]);
+			expect(podium.map((p) => p.userId)).toEqual(["user1", "user2", "user3"]);
 		});
 
 		it("should handle fewer than 3 participants", () => {
@@ -491,10 +483,7 @@ describe("summary overview stats", () => {
 				},
 			];
 
-			const totalMatches = rounds.reduce(
-				(sum, r) => sum + r.matches.length,
-				0,
-			);
+			const totalMatches = rounds.reduce((sum, r) => sum + r.matches.length, 0);
 			const finalizedMatches = rounds.reduce(
 				(sum, r) =>
 					sum + r.matches.filter((m) => m.status === "finalized").length,
@@ -504,6 +493,178 @@ describe("summary overview stats", () => {
 			expect(totalMatches).toBe(5);
 			expect(finalizedMatches).toBe(3);
 		});
+	});
+});
+
+// =============================================================================
+// Best Round Accuracy Filtering Tests
+// =============================================================================
+
+describe("summary best round accuracy filtering", () => {
+	interface Round {
+		id: number;
+		name: string;
+		matches: Array<{ status: string }>;
+	}
+
+	interface RoundPick {
+		userId: string;
+		displayName: string;
+		imageUrl: string | null;
+		roundId: number;
+		correctWinners: number;
+	}
+
+	function calculateBestRoundAccuracy(rounds: Round[], picks: RoundPick[]) {
+		const accuracyRoundNames = new Set([
+			"Round of 128",
+			"Round of 64",
+			"Round of 32",
+			"Round of 16",
+		]);
+		const accuracyRounds = rounds.filter((round) =>
+			accuracyRoundNames.has(round.name),
+		);
+		const matchesPerRound = new Map<number, number>();
+		const roundNameById = new Map<number, string>();
+		for (const round of accuracyRounds) {
+			roundNameById.set(round.id, round.name);
+			const finalizedCount = round.matches.filter(
+				(match) => match.status === "finalized",
+			).length;
+			matchesPerRound.set(round.id, finalizedCount);
+		}
+
+		let bestRoundAccuracy: {
+			userId: string;
+			displayName: string;
+			imageUrl: string | null;
+			roundName: string;
+			accuracy: number;
+			correctWinners: number;
+			totalMatches: number;
+		} | null = null;
+
+		for (const pick of picks) {
+			if (!roundNameById.has(pick.roundId)) continue;
+			const totalMatches = matchesPerRound.get(pick.roundId) ?? 0;
+			if (totalMatches === 0) continue;
+
+			const accuracy = (pick.correctWinners / totalMatches) * 100;
+			const roundName = roundNameById.get(pick.roundId) ?? "Unknown Round";
+
+			if (
+				!bestRoundAccuracy ||
+				accuracy > bestRoundAccuracy.accuracy ||
+				(accuracy === bestRoundAccuracy.accuracy &&
+					pick.correctWinners > bestRoundAccuracy.correctWinners)
+			) {
+				bestRoundAccuracy = {
+					userId: pick.userId,
+					displayName: pick.displayName,
+					imageUrl: pick.imageUrl,
+					roundName,
+					accuracy,
+					correctWinners: pick.correctWinners,
+					totalMatches,
+				};
+			}
+		}
+
+		return bestRoundAccuracy;
+	}
+
+	it("should ignore quarterfinals and later rounds", () => {
+		const rounds: Round[] = [
+			{
+				id: 4,
+				name: "Round of 16",
+				matches: Array.from({ length: 4 }, () => ({ status: "finalized" })),
+			},
+			{
+				id: 5,
+				name: "Quarter Finals",
+				matches: Array.from({ length: 2 }, () => ({ status: "finalized" })),
+			},
+		];
+		const picks: RoundPick[] = [
+			{
+				userId: "user1",
+				displayName: "User 1",
+				imageUrl: null,
+				roundId: 4,
+				correctWinners: 3,
+			},
+			{
+				userId: "user2",
+				displayName: "User 2",
+				imageUrl: null,
+				roundId: 5,
+				correctWinners: 2,
+			},
+		];
+
+		const best = calculateBestRoundAccuracy(rounds, picks);
+
+		expect(best?.userId).toBe("user1");
+		expect(best?.roundName).toBe("Round of 16");
+		expect(best?.accuracy).toBe(75);
+	});
+
+	it("should return null when only later rounds exist", () => {
+		const rounds: Round[] = [
+			{
+				id: 5,
+				name: "Quarter Finals",
+				matches: Array.from({ length: 2 }, () => ({ status: "finalized" })),
+			},
+			{
+				id: 6,
+				name: "Semi Finals",
+				matches: Array.from({ length: 1 }, () => ({ status: "finalized" })),
+			},
+			{
+				id: 7,
+				name: "Final",
+				matches: Array.from({ length: 1 }, () => ({ status: "finalized" })),
+			},
+		];
+		const picks: RoundPick[] = [
+			{
+				userId: "user1",
+				displayName: "User 1",
+				imageUrl: null,
+				roundId: 5,
+				correctWinners: 2,
+			},
+		];
+
+		const best = calculateBestRoundAccuracy(rounds, picks);
+
+		expect(best).toBeNull();
+	});
+
+	it("should ignore rounds without finalized matches", () => {
+		const rounds: Round[] = [
+			{
+				id: 3,
+				name: "Round of 32",
+				matches: Array.from({ length: 4 }, () => ({ status: "pending" })),
+			},
+		];
+		const picks: RoundPick[] = [
+			{
+				userId: "user1",
+				displayName: "User 1",
+				imageUrl: null,
+				roundId: 3,
+				correctWinners: 4,
+			},
+		];
+
+		const best = calculateBestRoundAccuracy(rounds, picks);
+
+		expect(best).toBeNull();
 	});
 });
 
@@ -518,11 +679,7 @@ function detectUpset(match: {
 	player2Seed: number | null;
 	winnerName: string | null;
 }): boolean {
-	if (
-		!match.winnerName ||
-		!match.player1Seed ||
-		!match.player2Seed
-	) {
+	if (!match.winnerName || !match.player1Seed || !match.player2Seed) {
 		return false;
 	}
 
