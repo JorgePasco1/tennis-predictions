@@ -73,6 +73,7 @@ export const summaryRouter = createTRPCRouter({
 						totalPredictions: 0,
 						totalMatches: 0,
 						finalizedMatches: 0,
+						seededMatches: 0,
 						averageAccuracy: 0,
 						upsetRate: 0,
 					},
@@ -145,6 +146,15 @@ export const summaryRouter = createTRPCRouter({
 						finalizedMatches: tournamentRounds.reduce(
 							(sum, r) =>
 								sum + r.matches.filter((m) => m.status === "finalized").length,
+							0,
+						),
+						seededMatches: tournamentRounds.reduce(
+							(sum, r) =>
+								sum +
+								r.matches.filter(
+									(m) =>
+										m.status === "finalized" && m.player1Seed && m.player2Seed,
+								).length,
 							0,
 						),
 						averageAccuracy: 0,
@@ -346,9 +356,15 @@ export const summaryRouter = createTRPCRouter({
 					);
 			}
 
+			// Count seeded matches (matches where both players have seeds)
+			// This is the denominator for upset rate calculation
+			const seededMatches = allMatches.filter(
+				(m) => m.player1Seed && m.player2Seed,
+			);
+
 			// Identify upsets (where higher seed beat lower seed)
 			// In tennis, lower seed number = better player, so upset = higher seed wins
-			const upsetMatches = allMatches.filter((m) => {
+			const upsetMatches = seededMatches.filter((m) => {
 				if (!m.winnerName || !m.player1Seed || !m.player2Seed) return false;
 
 				const player1IsWinner = m.winnerName === m.player1Name;
@@ -576,8 +592,8 @@ export const summaryRouter = createTRPCRouter({
 					: 0;
 
 			const upsetRate =
-				finalizedMatches > 0
-					? (upsetMatches.length / finalizedMatches) * 100
+				seededMatches.length > 0
+					? (upsetMatches.length / seededMatches.length) * 100
 					: 0;
 
 			// ========================================
@@ -643,6 +659,7 @@ export const summaryRouter = createTRPCRouter({
 					totalPredictions,
 					totalMatches,
 					finalizedMatches,
+					seededMatches: seededMatches.length,
 					averageAccuracy,
 					upsetRate,
 				},
