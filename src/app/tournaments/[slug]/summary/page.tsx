@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -12,6 +13,12 @@ export default async function TournamentSummaryPage({
 	params: Promise<{ slug: string }>;
 }) {
 	const { slug } = await params;
+
+	// Check authentication first - redirect to sign-in if not logged in
+	const { userId } = await auth();
+	if (!userId) {
+		redirect(`/sign-in?redirect_url=/tournaments/${slug}/summary`);
+	}
 
 	const tournament = await api.tournaments
 		.getBySlug({ slug })
