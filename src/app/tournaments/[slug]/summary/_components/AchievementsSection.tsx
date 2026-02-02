@@ -1,8 +1,8 @@
 import { Award, Flame, Medal, Star, Target, Trophy, Zap } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { getInitials, ServerAvatar } from "./ServerAvatar";
 
 type AchievementCategory = "round" | "streak" | "milestone" | "special";
 
@@ -32,15 +32,6 @@ interface Achievement {
 
 interface AchievementsSectionProps {
 	achievements: Achievement[];
-}
-
-function getInitials(name: string): string {
-	return name
-		.split(" ")
-		.map((n) => n[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
 }
 
 const categoryConfig = {
@@ -173,15 +164,13 @@ export function AchievementsSection({
 												)}
 												key={achievement.id}
 											>
-												<Avatar className="h-8 w-8">
-													<AvatarImage
-														alt={achievement.user.displayName}
-														src={achievement.user.imageUrl ?? undefined}
-													/>
-													<AvatarFallback className="text-xs">
-														{getInitials(achievement.user.displayName)}
-													</AvatarFallback>
-												</Avatar>
+												<ServerAvatar
+													alt={achievement.user.displayName}
+													className="h-8 w-8"
+													fallback={getInitials(achievement.user.displayName)}
+													fallbackClassName="text-xs"
+													src={achievement.user.imageUrl}
+												/>
 
 												<div className="min-w-0 flex-1">
 													<p className="truncate font-medium text-sm">

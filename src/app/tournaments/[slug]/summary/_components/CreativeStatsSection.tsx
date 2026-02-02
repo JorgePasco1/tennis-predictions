@@ -6,10 +6,10 @@ import {
 	TrendingUp,
 	Users,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { getInitials, ServerAvatar } from "./ServerAvatar";
 
 interface CreativeStatsData {
 	upsetCallers: Array<{
@@ -48,15 +48,6 @@ interface CreativeStatsData {
 
 interface CreativeStatsSectionProps {
 	creativeStats: CreativeStatsData;
-}
-
-function getInitials(name: string): string {
-	return name
-		.split(" ")
-		.map((n) => n[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
 }
 
 export function CreativeStatsSection({
@@ -109,15 +100,13 @@ export function CreativeStatsSection({
 										<span className="w-4 text-muted-foreground text-sm">
 											{idx + 1}.
 										</span>
-										<Avatar className="h-6 w-6">
-											<AvatarImage
-												alt={user.displayName}
-												src={user.imageUrl ?? undefined}
-											/>
-											<AvatarFallback className="text-xs">
-												{getInitials(user.displayName)}
-											</AvatarFallback>
-										</Avatar>
+										<ServerAvatar
+											alt={user.displayName}
+											className="h-6 w-6"
+											fallback={getInitials(user.displayName)}
+											fallbackClassName="text-xs"
+											src={user.imageUrl}
+										/>
 										<span className="flex-1 text-sm">{user.displayName}</span>
 										<Badge variant={idx === 0 ? "default" : "secondary"}>
 											{user.count} upsets
@@ -190,15 +179,13 @@ export function CreativeStatsSection({
 										<span className="w-4 text-muted-foreground text-sm">
 											{idx + 1}.
 										</span>
-										<Avatar className="h-6 w-6">
-											<AvatarImage
-												alt={user.displayName}
-												src={user.imageUrl ?? undefined}
-											/>
-											<AvatarFallback className="text-xs">
-												{getInitials(user.displayName)}
-											</AvatarFallback>
-										</Avatar>
+										<ServerAvatar
+											alt={user.displayName}
+											className="h-6 w-6"
+											fallback={getInitials(user.displayName)}
+											fallbackClassName="text-xs"
+											src={user.imageUrl}
+										/>
 										<span className="flex-1 text-sm">{user.displayName}</span>
 										<Badge variant={idx === 0 ? "default" : "secondary"}>
 											{user.count} picks
@@ -226,20 +213,14 @@ export function CreativeStatsSection({
 
 							<div className="flex items-center justify-between gap-4">
 								<div className="flex-1 text-center">
-									<Avatar className="mx-auto mb-2 h-12 w-12">
-										<AvatarImage
-											alt={creativeStats.closestCompetition.user1.displayName}
-											src={
-												creativeStats.closestCompetition.user1.imageUrl ??
-												undefined
-											}
-										/>
-										<AvatarFallback>
-											{getInitials(
-												creativeStats.closestCompetition.user1.displayName,
-											)}
-										</AvatarFallback>
-									</Avatar>
+									<ServerAvatar
+										alt={creativeStats.closestCompetition.user1.displayName}
+										className="mx-auto mb-2 h-12 w-12"
+										fallback={getInitials(
+											creativeStats.closestCompetition.user1.displayName,
+										)}
+										src={creativeStats.closestCompetition.user1.imageUrl}
+									/>
 									<p className="font-medium text-sm">
 										{creativeStats.closestCompetition.user1.displayName}
 									</p>
@@ -260,20 +241,14 @@ export function CreativeStatsSection({
 								</div>
 
 								<div className="flex-1 text-center">
-									<Avatar className="mx-auto mb-2 h-12 w-12">
-										<AvatarImage
-											alt={creativeStats.closestCompetition.user2.displayName}
-											src={
-												creativeStats.closestCompetition.user2.imageUrl ??
-												undefined
-											}
-										/>
-										<AvatarFallback>
-											{getInitials(
-												creativeStats.closestCompetition.user2.displayName,
-											)}
-										</AvatarFallback>
-									</Avatar>
+									<ServerAvatar
+										alt={creativeStats.closestCompetition.user2.displayName}
+										className="mx-auto mb-2 h-12 w-12"
+										fallback={getInitials(
+											creativeStats.closestCompetition.user2.displayName,
+										)}
+										src={creativeStats.closestCompetition.user2.imageUrl}
+									/>
 									<p className="font-medium text-sm">
 										{creativeStats.closestCompetition.user2.displayName}
 									</p>

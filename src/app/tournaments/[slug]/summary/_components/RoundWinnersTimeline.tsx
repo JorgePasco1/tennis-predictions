@@ -1,8 +1,8 @@
 import { Calendar, Trophy } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { getInitials, ServerAvatar } from "./ServerAvatar";
 
 interface RoundWinner {
 	roundId: number;
@@ -18,15 +18,6 @@ interface RoundWinner {
 
 interface RoundWinnersTimelineProps {
 	roundWinners: RoundWinner[];
-}
-
-function getInitials(name: string): string {
-	return name
-		.split(" ")
-		.map((n) => n[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
 }
 
 export function RoundWinnersTimeline({
@@ -92,15 +83,13 @@ export function RoundWinnersTimeline({
 
 							{round.winner ? (
 								<>
-									<Avatar className="mb-2 h-12 w-12">
-										<AvatarImage
-											alt={round.winner.displayName}
-											src={round.winner.imageUrl ?? undefined}
-										/>
-										<AvatarFallback className="text-sm">
-											{getInitials(round.winner.displayName)}
-										</AvatarFallback>
-									</Avatar>
+									<ServerAvatar
+										alt={round.winner.displayName}
+										className="mb-2 h-12 w-12"
+										fallback={getInitials(round.winner.displayName)}
+										fallbackClassName="text-sm"
+										src={round.winner.imageUrl}
+									/>
 
 									<p className="mb-1 text-center font-medium text-sm">
 										{round.winner.displayName}

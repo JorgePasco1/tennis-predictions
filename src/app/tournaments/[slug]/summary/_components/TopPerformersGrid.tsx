@@ -1,7 +1,7 @@
 import { Award, Flame, Sparkles, Target } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { getInitials, ServerAvatar } from "./ServerAvatar";
 
 interface TopPerformersData {
 	mostExactScores: {
@@ -40,15 +40,6 @@ interface TopPerformersGridProps {
 	topPerformers: TopPerformersData;
 }
 
-function getInitials(name: string): string {
-	return name
-		.split(" ")
-		.map((n) => n[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
-}
-
 interface PerformerCardProps {
 	title: string;
 	icon: React.ReactNode;
@@ -85,10 +76,12 @@ function PerformerCard({
 			</div>
 			<p className="mb-3 font-medium text-muted-foreground text-sm">{title}</p>
 
-			<Avatar className="mb-2 h-14 w-14">
-				<AvatarImage alt={user.displayName} src={user.imageUrl ?? undefined} />
-				<AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
-			</Avatar>
+			<ServerAvatar
+				alt={user.displayName}
+				className="mb-2 h-14 w-14"
+				fallback={getInitials(user.displayName)}
+				src={user.imageUrl}
+			/>
 
 			<p className="mb-1 font-semibold">{user.displayName}</p>
 

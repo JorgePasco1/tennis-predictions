@@ -1,7 +1,7 @@
 import { Crown, Medal, Trophy } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
+import { getInitials, ServerAvatar } from "./ServerAvatar";
 
 interface PodiumEntry {
 	rank: number;
@@ -52,15 +52,6 @@ const podiumConfig = {
 	},
 } as const;
 
-function getInitials(name: string): string {
-	return name
-		.split(" ")
-		.map((n) => n[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
-}
-
 export function PodiumDisplay({ podium }: PodiumDisplayProps) {
 	if (podium.length === 0) {
 		return null;
@@ -109,19 +100,16 @@ export function PodiumDisplay({ podium }: PodiumDisplayProps) {
 											config.borderColor,
 										)}
 									>
-										<Avatar
+										<ServerAvatar
+											alt={entry.displayName}
 											className={cn(
 												entry.rank === 1 ? "h-24 w-24" : "h-20 w-20",
+												config.bgColor,
 											)}
-										>
-											<AvatarImage
-												alt={entry.displayName}
-												src={entry.imageUrl ?? undefined}
-											/>
-											<AvatarFallback className={cn("text-lg", config.bgColor)}>
-												{getInitials(entry.displayName)}
-											</AvatarFallback>
-										</Avatar>
+											fallback={getInitials(entry.displayName)}
+											fallbackClassName="text-lg"
+											src={entry.imageUrl}
+										/>
 									</div>
 									<p className="text-center font-semibold text-lg">
 										{entry.displayName}
@@ -189,15 +177,13 @@ export function PodiumDisplay({ podium }: PodiumDisplayProps) {
 
 								<div className="flex-1">
 									<div className="flex items-center gap-2">
-										<Avatar className="h-10 w-10">
-											<AvatarImage
-												alt={entry.displayName}
-												src={entry.imageUrl ?? undefined}
-											/>
-											<AvatarFallback className={cn("text-sm", config.bgColor)}>
-												{getInitials(entry.displayName)}
-											</AvatarFallback>
-										</Avatar>
+										<ServerAvatar
+											alt={entry.displayName}
+											className={cn("h-10 w-10", config.bgColor)}
+											fallback={getInitials(entry.displayName)}
+											fallbackClassName="text-sm"
+											src={entry.imageUrl}
+										/>
 										<div>
 											<p className="font-semibold">{entry.displayName}</p>
 											<p className={cn("text-sm", config.textColor)}>
