@@ -122,7 +122,7 @@ Type safety is automatically maintained across the entire stack.
 **Schema location:** `src/server/db/schema.ts`
 **Database client:** `src/server/db/index.ts` exports `db` instance
 
-**Table naming convention:** All tables are prefixed with `tennis-predictions_*` (configured in `drizzle.config.ts`)
+**Table naming convention:** Tables use unprefixed names (e.g., `user`, `tournament`, `match`). The `createTable` helper in schema.ts passes names through unchanged.
 
 **Workflow:**
 1. Update schema in `src/server/db/schema.ts`
