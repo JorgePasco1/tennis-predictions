@@ -75,6 +75,8 @@ export const tournaments = createTable(
 			.notNull()
 			.defaultNow(),
 		deletedAt: timestamp("deleted_at", { withTimezone: true }),
+		closedAt: timestamp("closed_at", { withTimezone: true }),
+		closedBy: varchar("closed_by", { length: 255 }).references(() => users.id),
 	},
 	(table) => [
 		index("tournament_status_idx").on(table.status),
@@ -313,6 +315,12 @@ export const tournamentsRelations = relations(tournaments, ({ one, many }) => ({
 	uploadedByUser: one(users, {
 		fields: [tournaments.uploadedBy],
 		references: [users.id],
+		relationName: "uploadedByUser",
+	}),
+	closedByUser: one(users, {
+		fields: [tournaments.closedBy],
+		references: [users.id],
+		relationName: "closedByUser",
 	}),
 	rounds: many(rounds),
 }));
