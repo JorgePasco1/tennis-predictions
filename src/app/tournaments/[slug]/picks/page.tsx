@@ -402,7 +402,10 @@ export default function PicksPage({
 	);
 	const finalizedMatchesCount =
 		activeRound.matches.length - pendingMatches.length;
-	const filteredMatches = filterMatchesByPlayerName(pendingMatches, searchQuery);
+	const filteredMatches = filterMatchesByPlayerName(
+		pendingMatches,
+		searchQuery,
+	);
 	const totalMatchesCount = pendingMatches.length;
 	const filteredMatchesCount = filteredMatches.length;
 	const isSubmissionsClosed = !!activeRound.submissionsClosedAt;
@@ -503,8 +506,8 @@ export default function PicksPage({
 						</div>
 						<p className="text-orange-800">
 							{finalizedMatchesCount} of {activeRound.matches.length} matches in
-							this round have already been finalized and cannot be voted on.
-							You can submit picks for the remaining {totalMatchesCount} pending
+							this round have already been finalized and cannot be voted on. You
+							can submit picks for the remaining {totalMatchesCount} pending
 							matches.
 						</p>
 					</div>

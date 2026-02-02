@@ -71,8 +71,8 @@ export default function AdminTournamentManagePage({
 		},
 	});
 
-	const reopenSubmissionsMutation = api.admin.reopenRoundSubmissions.useMutation(
-		{
+	const reopenSubmissionsMutation =
+		api.admin.reopenRoundSubmissions.useMutation({
 			onSuccess: (result) => {
 				refetch();
 				if (result.finalizedMatches > 0) {
@@ -86,8 +86,7 @@ export default function AdminTournamentManagePage({
 			onError: (error) => {
 				toast.error(error.message || "Failed to reopen submissions");
 			},
-		},
-	);
+		});
 
 	// TODO: Remove closeRound UI - rounds now auto-finalize when all matches complete
 	// Stub mutation to prevent TypeScript errors - does not actually call API
@@ -360,7 +359,12 @@ export default function AdminTournamentManagePage({
 		pendingMatches: number,
 		finalizedMatches: number,
 	) => {
-		setReopenDialogData({ roundId, roundName, pendingMatches, finalizedMatches });
+		setReopenDialogData({
+			roundId,
+			roundName,
+			pendingMatches,
+			finalizedMatches,
+		});
 		setShowReopenDialog(true);
 	};
 
@@ -1387,11 +1391,11 @@ export default function AdminTournamentManagePage({
 						<AlertDialogTitle>Reopen Submissions?</AlertDialogTitle>
 						<AlertDialogDescription asChild>
 							<div className="text-muted-foreground text-sm">
-								<p>
-									Reopen submissions for {reopenDialogData?.roundName}?
-								</p>
+								<p>Reopen submissions for {reopenDialogData?.roundName}?</p>
 								<div className="mt-3 space-y-2 text-left">
-									<p className="font-medium text-foreground">This will allow:</p>
+									<p className="font-medium text-foreground">
+										This will allow:
+									</p>
 									<ul className="list-inside list-disc space-y-1">
 										<li>Users to submit or modify picks for pending matches</li>
 										<li>Draft saves for matches not yet finalized</li>
@@ -1404,9 +1408,9 @@ export default function AdminTournamentManagePage({
 											</p>
 											<p className="mt-1 text-orange-800 text-sm">
 												{reopenDialogData.finalizedMatches} match(es) have
-												already been finalized and cannot be voted on.
-												Only {reopenDialogData.pendingMatches} pending
-												match(es) will be available for picks.
+												already been finalized and cannot be voted on. Only{" "}
+												{reopenDialogData.pendingMatches} pending match(es) will
+												be available for picks.
 											</p>
 										</div>
 									) : (
@@ -1696,7 +1700,10 @@ export default function AdminTournamentManagePage({
 									const pendingMatches = tournament.rounds.flatMap((r) =>
 										r.matches
 											.filter((m) => !m.deletedAt && m.status !== "finalized")
-											.map((m) => ({ roundName: r.name, matchNumber: m.matchNumber })),
+											.map((m) => ({
+												roundName: r.name,
+												matchNumber: m.matchNumber,
+											})),
 									);
 									const isReady =
 										unfinalizedRounds.length === 0 &&
@@ -1710,12 +1717,15 @@ export default function AdminTournamentManagePage({
 													✓ Ready to close
 												</p>
 												<ul className="mt-2 list-inside list-disc space-y-1 text-green-800 text-sm">
-													<li>All {tournament.rounds.length} rounds are finalized</li>
+													<li>
+														All {tournament.rounds.length} rounds are finalized
+													</li>
 													<li>
 														All{" "}
 														{tournament.rounds.reduce(
 															(sum, r) =>
-																sum + r.matches.filter((m) => !m.deletedAt).length,
+																sum +
+																r.matches.filter((m) => !m.deletedAt).length,
 															0,
 														)}{" "}
 														matches are finalized
@@ -1745,9 +1755,7 @@ export default function AdminTournamentManagePage({
 														{pendingMatches.length} match(es) pending:{" "}
 														{pendingMatches
 															.slice(0, 3)
-															.map(
-																(m) => `${m.roundName} #${m.matchNumber}`,
-															)
+															.map((m) => `${m.roundName} #${m.matchNumber}`)
 															.join(", ")}
 														{pendingMatches.length > 3 &&
 															` and ${pendingMatches.length - 3} more`}
