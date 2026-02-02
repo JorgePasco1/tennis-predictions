@@ -1,5 +1,3 @@
-"use client";
-
 import {
 	BarChart3,
 	CheckCircle2,
@@ -14,6 +12,7 @@ interface OverviewData {
 	totalPredictions: number;
 	totalMatches: number;
 	finalizedMatches: number;
+	seededMatches: number;
 	averageAccuracy: number;
 	upsetRate: number;
 }
@@ -55,6 +54,10 @@ export function TournamentOverview({ overview }: TournamentOverviewProps) {
 		{
 			label: "Upset Rate",
 			value: `${overview.upsetRate.toFixed(1)}%`,
+			subValue:
+				overview.seededMatches > 0
+					? `of ${overview.seededMatches} seeded`
+					: "no seeded matches",
 			icon: TrendingUp,
 			color: "text-red-500",
 			bgColor: "bg-red-50",
@@ -85,6 +88,11 @@ export function TournamentOverview({ overview }: TournamentOverviewProps) {
 								</div>
 								<p className="font-bold text-2xl">{stat.value}</p>
 								<p className="text-muted-foreground text-xs">{stat.label}</p>
+								{"subValue" in stat && stat.subValue && (
+									<p className="mt-0.5 text-muted-foreground text-xs">
+										{stat.subValue}
+									</p>
+								)}
 							</div>
 						);
 					})}

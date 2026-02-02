@@ -1,5 +1,3 @@
-"use client";
-
 import { Award, Flame, Sparkles, Target } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -167,7 +165,8 @@ export function TopPerformersGrid({ topPerformers }: TopPerformersGridProps) {
 							iconBgColor="bg-red-100"
 							mainStat={topPerformers.longestStreak.streak}
 							mainStatLabel="Consecutive Wins"
-							title="Longest Streak"
+							secondaryStat="across all tournaments"
+							title="All-Time Longest Streak"
 							user={topPerformers.longestStreak}
 						/>
 					)}

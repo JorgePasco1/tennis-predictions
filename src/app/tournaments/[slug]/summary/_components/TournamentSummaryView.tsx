@@ -1,6 +1,5 @@
-"use client";
-
 import type { RouterOutputs } from "~/trpc/react";
+import { AchievementsSection } from "./AchievementsSection";
 import { CreativeStatsSection } from "./CreativeStatsSection";
 import { PodiumDisplay } from "./PodiumDisplay";
 import { RoundWinnersTimeline } from "./RoundWinnersTimeline";
@@ -16,37 +15,41 @@ interface TournamentSummaryViewProps {
 export function TournamentSummaryView({ data }: TournamentSummaryViewProps) {
 	const hasParticipants = data.overview.totalParticipants > 0;
 
-	if (!hasParticipants) {
-		return (
-			<div className="rounded-lg border border-dashed bg-muted/50 p-12 text-center">
-				<p className="text-lg text-muted-foreground">
-					No participants found for this tournament.
-				</p>
-			</div>
-		);
-	}
-
 	return (
 		<div className="space-y-8">
-			{/* Podium - Top 3 */}
-			<PodiumDisplay podium={data.podium} />
-
-			{/* Tournament Overview Stats */}
+			{/* Tournament Overview Stats - always show */}
 			<TournamentOverview overview={data.overview} />
 
+			{/* No participants message */}
+			{!hasParticipants && (
+				<div className="rounded-lg border border-dashed bg-muted/50 p-8 text-center">
+					<p className="text-muted-foreground">
+						No participants submitted picks for this tournament.
+					</p>
+				</div>
+			)}
+
+			{/* Podium - Top 3 */}
+			{hasParticipants && <PodiumDisplay podium={data.podium} />}
+
 			{/* Top Performers Grid */}
-			{data.topPerformers && (
+			{hasParticipants && data.topPerformers && (
 				<TopPerformersGrid topPerformers={data.topPerformers} />
 			)}
 
 			{/* Round Winners Timeline */}
-			{data.roundWinners.length > 0 && (
+			{hasParticipants && data.roundWinners.length > 0 && (
 				<RoundWinnersTimeline roundWinners={data.roundWinners} />
 			)}
 
 			{/* Creative Stats */}
-			{data.creativeStats && (
+			{hasParticipants && data.creativeStats && (
 				<CreativeStatsSection creativeStats={data.creativeStats} />
+			)}
+
+			{/* Achievements */}
+			{data.achievements && data.achievements.length > 0 && (
+				<AchievementsSection achievements={data.achievements} />
 			)}
 		</div>
 	);
