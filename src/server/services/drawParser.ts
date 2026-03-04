@@ -213,9 +213,18 @@ function parsePlayerFromStatsItem($statsItem: cheerio.Cheerio<any>): {
 		return { name: "", seed: null };
 	}
 
-	// Get the player name from the link text
+	// Get the player name from the link text, or fall back to direct text content
+	// On the ATP website, "Bye" entries have no <a> tag — the text sits directly in .name
 	const $link = $nameDiv.find("a");
-	const name = sanitizeText($link.text());
+	let name: string;
+	if ($link.length > 0) {
+		name = sanitizeText($link.text());
+	} else {
+		// Clone, remove child elements (like <span> for seed), and get remaining text
+		const $clone = $nameDiv.clone();
+		$clone.find("span").remove();
+		name = sanitizeText($clone.text());
+	}
 
 	// Get the seed from the span (if exists)
 	const $seedSpan = $nameDiv.find("span");

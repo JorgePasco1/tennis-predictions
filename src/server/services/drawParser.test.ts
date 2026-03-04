@@ -125,7 +125,7 @@ describe("parseAtpDraw", () => {
 			expect(result.tournamentName).toBe("Test");
 		});
 
-		it("should skip matches with missing player information", () => {
+		it("should include matches with missing player info as empty names (normalized to TBD during commit)", () => {
 			const htmlWithMissingPlayer = `
         <html>
         <head><title>Test Tournament</title></head>
@@ -148,9 +148,10 @@ describe("parseAtpDraw", () => {
       `;
 
 			const result = parseAtpDraw(htmlWithMissingPlayer);
-			// Match should be skipped because player 2 has no name
-			// The round itself is filtered out because it has no valid matches
-			expect(result.rounds.length).toBe(0);
+			// Match is included with empty player2Name — normalized to "TBD" during commit
+			expect(result.rounds.length).toBe(1);
+			expect(result.rounds[0]?.matches[0]?.player1Name).toBe("Player A");
+			expect(result.rounds[0]?.matches[0]?.player2Name).toBe("");
 		});
 
 		it("should handle rounds with no matches", () => {
@@ -595,7 +596,40 @@ describe("validateParsedDraw empty player name handling", () => {
 // =============================================================================
 
 describe("BYE player name in parsed draws", () => {
-	it("should preserve BYE as player name when parsed", () => {
+	it("should preserve Bye as player name when parsed (no anchor tag, real ATP format)", () => {
+		const htmlWithBye = `
+			<html>
+			<head><title>Test Tournament</title></head>
+			<body>
+				<div class="draw draw-round-1">
+					<div class="draw-header">Round of 128</div>
+					<div class="draw-item">
+						<div class="stats-item">
+							<div class="player-info">
+								<div class="name"><a href="/player">C. Alcaraz</a><span>(1)</span></div>
+							</div>
+						</div>
+						<div class="stats-item">
+							<div class="player-info">
+								<div class="name">Bye</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</body>
+			</html>
+		`;
+
+		const result = parseAtpDraw(htmlWithBye);
+
+		expect(result.rounds.length).toBe(1);
+		expect(result.rounds[0]?.matches.length).toBe(1);
+		expect(result.rounds[0]?.matches[0]?.player1Name).toBe("C. Alcaraz");
+		expect(result.rounds[0]?.matches[0]?.player1Seed).toBe(1);
+		expect(result.rounds[0]?.matches[0]?.player2Name).toBe("Bye");
+	});
+
+	it("should also handle BYE wrapped in anchor tag (legacy format)", () => {
 		const htmlWithBye = `
 			<html>
 			<head><title>Test Tournament</title></head>
