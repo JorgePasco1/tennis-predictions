@@ -51,8 +51,8 @@ export const picksRouter = createTRPCRouter({
 					z.object({
 						matchId: z.number().int(),
 						predictedWinner: z.string(),
-						predictedSetsWon: z.number().int().min(2).max(3),
-						predictedSetsLost: z.number().int().min(0).max(2),
+						predictedSetsWon: z.number().int().min(0).max(20),
+						predictedSetsLost: z.number().int().min(0).max(20),
 					}),
 				),
 			}),
@@ -91,6 +91,7 @@ export const picksRouter = createTRPCRouter({
 							id: true,
 							name: true,
 							status: true,
+							sport: true,
 							format: true,
 						},
 					},
@@ -176,23 +177,45 @@ export const picksRouter = createTRPCRouter({
 					});
 				}
 
-				// Validate sets based on tournament format
-				if (pick.predictedSetsWon !== requiredSetsToWin) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message: `Invalid score: winner must have won exactly ${requiredSetsToWin} sets for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
-					});
-				}
+				if (round.tournament.sport === "football") {
+					if (
+						pick.predictedSetsWon < 0 ||
+						pick.predictedSetsLost < 0 ||
+						pick.predictedSetsWon > 20 ||
+						pick.predictedSetsLost > 20
+					) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Football scores must be between 0 and 20",
+						});
+					}
 
-				const maxSetsLost = requiredSetsToWin - 1;
-				if (
-					pick.predictedSetsLost < 0 ||
-					pick.predictedSetsLost > maxSetsLost
-				) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message: `Invalid score: sets lost must be between 0 and ${maxSetsLost} for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
-					});
+					if (pick.predictedSetsWon === pick.predictedSetsLost) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message:
+								"Football picks must identify an advancing team, so tied scores are not allowed",
+						});
+					}
+				} else {
+					// Validate sets based on tournament format
+					if (pick.predictedSetsWon !== requiredSetsToWin) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: `Invalid score: winner must have won exactly ${requiredSetsToWin} sets for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
+						});
+					}
+
+					const maxSetsLost = requiredSetsToWin - 1;
+					if (
+						pick.predictedSetsLost < 0 ||
+						pick.predictedSetsLost > maxSetsLost
+					) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: `Invalid score: sets lost must be between 0 and ${maxSetsLost} for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
+						});
+					}
 				}
 			}
 
@@ -334,8 +357,8 @@ export const picksRouter = createTRPCRouter({
 					z.object({
 						matchId: z.number().int(),
 						predictedWinner: z.string(),
-						predictedSetsWon: z.number().int().min(2).max(3),
-						predictedSetsLost: z.number().int().min(0).max(2),
+						predictedSetsWon: z.number().int().min(0).max(20),
+						predictedSetsLost: z.number().int().min(0).max(20),
 					}),
 				),
 			}),
@@ -374,6 +397,7 @@ export const picksRouter = createTRPCRouter({
 							id: true,
 							name: true,
 							status: true,
+							sport: true,
 							format: true,
 						},
 					},
@@ -440,10 +464,6 @@ export const picksRouter = createTRPCRouter({
 			const matchesById = new Map(round.matches.map((m) => [m.id, m]));
 			validateNoFinalizedMatches(input.picks, matchesById);
 
-			// Get tournament format for score validation
-			const tournamentFormat = round.tournament.format;
-			const requiredSetsToWin = tournamentFormat === "bo5" ? 3 : 2;
-
 			// Validate provided picks (partial is OK)
 			for (const pick of input.picks) {
 				const match = round.matches.find((m) => m.id === pick.matchId);
@@ -459,23 +479,46 @@ export const picksRouter = createTRPCRouter({
 					});
 				}
 
-				// Validate sets based on tournament format
-				if (pick.predictedSetsWon !== requiredSetsToWin) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message: `Invalid score: winner must have won exactly ${requiredSetsToWin} sets for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
-					});
-				}
+				if (round.tournament.sport === "football") {
+					if (
+						pick.predictedSetsWon < 0 ||
+						pick.predictedSetsLost < 0 ||
+						pick.predictedSetsWon > 20 ||
+						pick.predictedSetsLost > 20
+					) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Football scores must be between 0 and 20",
+						});
+					}
 
-				const maxSetsLost = requiredSetsToWin - 1;
-				if (
-					pick.predictedSetsLost < 0 ||
-					pick.predictedSetsLost > maxSetsLost
-				) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message: `Invalid score: sets lost must be between 0 and ${maxSetsLost} for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
-					});
+					if (pick.predictedSetsWon === pick.predictedSetsLost) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message:
+								"Football picks must identify an advancing team, so tied scores are not allowed",
+						});
+					}
+				} else {
+					const tournamentFormat = round.tournament.format;
+					const requiredSetsToWin = tournamentFormat === "bo5" ? 3 : 2;
+					if (pick.predictedSetsWon !== requiredSetsToWin) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: `Invalid score: winner must have won exactly ${requiredSetsToWin} sets for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
+						});
+					}
+
+					const maxSetsLost = requiredSetsToWin - 1;
+					if (
+						pick.predictedSetsLost < 0 ||
+						pick.predictedSetsLost > maxSetsLost
+					) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: `Invalid score: sets lost must be between 0 and ${maxSetsLost} for ${tournamentFormat === "bo5" ? "Best of 5" : "Best of 3"} format`,
+						});
+					}
 				}
 			}
 
