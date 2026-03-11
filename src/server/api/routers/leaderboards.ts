@@ -10,7 +10,6 @@ import {
 	userRoundPicks,
 	users,
 } from "~/server/db/schema";
-import { getScoringForRound } from "~/server/utils/scoring-config";
 
 export const leaderboardsRouter = createTRPCRouter({
 	/**
@@ -40,6 +39,7 @@ export const leaderboardsRouter = createTRPCRouter({
 			const tournamentRounds = await ctx.db.query.rounds.findMany({
 				where: eq(rounds.tournamentId, input.tournamentId),
 				with: {
+					scoringRule: true,
 					matches: {
 						where: isNull(matches.deletedAt),
 					},
@@ -68,10 +68,10 @@ export const leaderboardsRouter = createTRPCRouter({
 				const finalizedMatches = round.matches.filter(
 					(m) => m.status === "finalized",
 				).length;
-				const scoring = getScoringForRound(round.name);
+				const pointsPerWinner = round.scoringRule?.pointsPerWinner ?? 10;
+				const pointsExactScore = round.scoringRule?.pointsExactScore ?? 5;
 				const maxPossiblePoints =
-					finalizedMatches *
-					(scoring.pointsPerWinner + scoring.pointsExactScore);
+					finalizedMatches * (pointsPerWinner + pointsExactScore);
 
 				return {
 					roundId: round.id,
@@ -79,8 +79,8 @@ export const leaderboardsRouter = createTRPCRouter({
 					roundNumber: round.roundNumber,
 					totalMatches,
 					finalizedMatches,
-					pointsPerWinner: scoring.pointsPerWinner,
-					pointsExactScore: scoring.pointsExactScore,
+					pointsPerWinner,
+					pointsExactScore,
 					maxPossiblePoints,
 				};
 			});
@@ -308,6 +308,7 @@ export const leaderboardsRouter = createTRPCRouter({
 			const tournamentRounds = await ctx.db.query.rounds.findMany({
 				where: eq(rounds.tournamentId, input.tournamentId),
 				with: {
+					scoringRule: true,
 					matches: {
 						where: isNull(matches.deletedAt),
 					},
@@ -327,7 +328,8 @@ export const leaderboardsRouter = createTRPCRouter({
 
 			// Build rounds metadata
 			const roundsMetadata = tournamentRounds.map((round) => {
-				const scoring = getScoringForRound(round.name);
+				const pointsPerWinner = round.scoringRule?.pointsPerWinner ?? 10;
+				const pointsExactScore = round.scoringRule?.pointsExactScore ?? 5;
 				const finalizedMatches = round.matches.filter(
 					(m) => m.status === "finalized",
 				).length;
@@ -336,8 +338,8 @@ export const leaderboardsRouter = createTRPCRouter({
 					roundId: round.id,
 					roundName: round.name,
 					roundNumber: round.roundNumber,
-					pointsPerWinner: scoring.pointsPerWinner,
-					pointsExactScore: scoring.pointsExactScore,
+					pointsPerWinner,
+					pointsExactScore,
 					totalMatches: round.matches.length,
 					finalizedMatches,
 					isFinalized: round.isFinalized,

@@ -13,6 +13,8 @@ export const env = createEnv({
 			.default("development"),
 		CLERK_SECRET_KEY: z.string().min(1),
 		CLERK_WEBHOOK_SECRET: z.string().min(1).optional(),
+		FOOTBALL_DATA_API_TOKEN: z.string().min(1).optional(),
+		FOOTBALL_DATA_BASE_URL: z.string().url().optional(),
 	},
 
 	/**
@@ -33,6 +35,8 @@ export const env = createEnv({
 		NODE_ENV: process.env.NODE_ENV,
 		CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
 		CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
+		FOOTBALL_DATA_API_TOKEN: process.env.FOOTBALL_DATA_API_TOKEN,
+		FOOTBALL_DATA_BASE_URL: process.env.FOOTBALL_DATA_BASE_URL,
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
 			process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 	},

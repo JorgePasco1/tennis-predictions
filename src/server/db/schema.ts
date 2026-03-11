@@ -25,8 +25,22 @@ export const tournamentStatusEnum = pgEnum("tournament_status", [
 	"active",
 	"archived",
 ]);
+export const tournamentSportEnum = pgEnum("tournament_sport", [
+	"tennis",
+	"football",
+]);
+export const tournamentSourceEnum = pgEnum("tournament_source", [
+	"parser",
+	"api_football",
+	"football_data",
+]);
 export const tournamentFormatEnum = pgEnum("tournament_format", ["bo3", "bo5"]);
 export const matchStatusEnum = pgEnum("match_status", ["pending", "finalized"]);
+export const matchKindEnum = pgEnum("match_kind", [
+	"standard",
+	"two_leg_tie",
+	"single_match",
+]);
 export const achievementCategoryEnum = pgEnum("achievement_category", [
 	"round",
 	"streak",
@@ -62,8 +76,23 @@ export const tournaments = createTable(
 		name: varchar({ length: 255 }).notNull(),
 		slug: varchar({ length: 255 }).notNull().unique(),
 		year: integer().notNull(),
+		sport: tournamentSportEnum().notNull().default("tennis"),
+		source: tournamentSourceEnum().notNull().default("parser"),
+		scoringProfileKey: varchar("scoring_profile_key", {
+			length: 100,
+		})
+			.notNull()
+			.default("classic_round_points_v1"),
+		scoringSettings: json("scoring_settings").$type<{
+			lateTieWinnerPoints?: number;
+		}>(),
 		format: tournamentFormatEnum().notNull().default("bo3"),
 		atpUrl: varchar("atp_url", { length: 500 }),
+		externalLeagueId: integer("external_league_id"),
+		externalCompetitionCode: varchar("external_competition_code", {
+			length: 50,
+		}),
+		externalSeason: integer("external_season"),
 		status: tournamentStatusEnum().notNull().default("draft"),
 		currentRoundNumber: integer("current_round_number"),
 		startDate: timestamp("start_date", { withTimezone: true }),
@@ -148,6 +177,23 @@ export const matches = createTable(
 		finalScore: varchar("final_score", { length: 50 }),
 		setsWon: integer("sets_won"),
 		setsLost: integer("sets_lost"),
+		kind: matchKindEnum().notNull().default("standard"),
+		metadata: json("metadata").$type<{
+			externalTieKey?: string;
+			externalFixtureIds?: number[];
+			roundLabel?: string;
+			scoreLabel?: string;
+			legs?: Array<{
+				fixtureId: number;
+				label: string;
+				homeTeam: string;
+				awayTeam: string;
+				homeGoals: number | null;
+				awayGoals: number | null;
+				status: string;
+				kickoff?: string;
+			}>;
+		}>(),
 		status: matchStatusEnum().notNull().default("pending"),
 		finalizedAt: timestamp("finalized_at", { withTimezone: true }),
 		finalizedBy: varchar("finalized_by", { length: 255 }).references(
@@ -208,6 +254,14 @@ export const matchPicks = createTable(
 		predictedWinner: varchar("predicted_winner", { length: 255 }).notNull(),
 		predictedSetsWon: integer("predicted_sets_won").notNull(),
 		predictedSetsLost: integer("predicted_sets_lost").notNull(),
+		scoringVariantKey: varchar("scoring_variant_key", { length: 100 }),
+		snapshotPointsPerWinner: integer("snapshot_points_per_winner"),
+		snapshotPointsExactScore: integer("snapshot_points_exact_score"),
+		snapshotContext: json("snapshot_context").$type<{
+			completedLegs?: number;
+			totalLegs?: number;
+			matchKind?: "standard" | "two_leg_tie" | "single_match";
+		}>(),
 		isWinnerCorrect: boolean("is_winner_correct"),
 		isExactScore: boolean("is_exact_score"),
 		pointsEarned: integer("points_earned").notNull().default(0),

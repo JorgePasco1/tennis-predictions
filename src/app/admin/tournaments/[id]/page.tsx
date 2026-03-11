@@ -8,6 +8,7 @@ import {
 	SearchInput,
 	SearchResultsCount,
 } from "~/components/match-search";
+import { getScoringProfileLabel } from "~/lib/scoring-profiles";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -50,6 +51,16 @@ export default function AdminTournamentManagePage({
 	const setActiveRoundMutation = api.admin.setActiveRound.useMutation({
 		onSuccess: () => refetch(),
 	});
+	const syncFootballTournamentMutation =
+		api.admin.syncFootballTournament.useMutation({
+			onSuccess: (result) => {
+				refetch();
+				toast.success(`Football sync completed. ${result.updatedMatches} ties updated.`);
+			},
+			onError: (error) => {
+				toast.error(error.message || "Failed to sync football tournament");
+			},
+		});
 
 	const finalizeMatchMutation = api.admin.finalizeMatch.useMutation({
 		onSuccess: () => refetch(),
@@ -168,6 +179,8 @@ export default function AdminTournamentManagePage({
 	const [editForm, setEditForm] = useState({
 		format: "",
 		atpUrl: "",
+		scoringProfileKey: "classic_round_points_v1",
+		lateTieWinnerPoints: "",
 	});
 	const [matchResults, setMatchResults] = useState<
 		Record<
@@ -240,15 +253,43 @@ export default function AdminTournamentManagePage({
 		setEditForm({
 			format: tournament?.format || "bo3",
 			atpUrl: tournament?.atpUrl || "",
+			scoringProfileKey:
+				tournament?.scoringProfileKey || "classic_round_points_v1",
+			lateTieWinnerPoints:
+				typeof tournament?.scoringSettings?.lateTieWinnerPoints === "number"
+					? String(tournament.scoringSettings.lateTieWinnerPoints)
+					: "",
 		});
 		setIsEditingProperties(true);
 	};
 
 	const handleSaveProperties = async () => {
+		const lateTieWinnerPoints = editForm.lateTieWinnerPoints.trim();
+		const parsedLateTieWinnerPoints = lateTieWinnerPoints
+			? Number.parseInt(lateTieWinnerPoints, 10)
+			: undefined;
+		if (lateTieWinnerPoints && Number.isNaN(parsedLateTieWinnerPoints)) {
+			toast.error("Late tie winner points must be a valid number");
+			return;
+		}
 		await updateTournamentMutation.mutateAsync({
 			id: tournamentId,
-			format: editForm.format as "bo3" | "bo5",
+			format:
+				tournament.sport === "tennis"
+					? (editForm.format as "bo3" | "bo5")
+					: undefined,
 			atpUrl: editForm.atpUrl || undefined,
+			scoringProfileKey: editForm.scoringProfileKey as
+				| "classic_round_points_v1"
+				| "football_aggregate_v1",
+			scoringSettings:
+				editForm.scoringProfileKey === "football_aggregate_v1"
+					? {
+							...(parsedLateTieWinnerPoints !== undefined
+								? { lateTieWinnerPoints: parsedLateTieWinnerPoints }
+								: {}),
+						}
+					: {},
 		});
 		setIsEditingProperties(false);
 	};
@@ -586,13 +627,20 @@ export default function AdminTournamentManagePage({
 					{!isEditingProperties ? (
 						<div className="space-y-2 text-gray-700">
 							<p>
-								<span className="font-medium">Format:</span>{" "}
-								{tournament.format === "bo5"
-									? "Best of 5 (Grand Slam)"
-									: "Best of 3"}
+								<span className="font-medium">Sport:</span> {tournament.sport}
 							</p>
 							<p>
-								<span className="font-medium">ATP URL:</span>{" "}
+								<span className="font-medium">Format:</span>{" "}
+								{tournament.sport === "tennis"
+									? tournament.format === "bo5"
+										? "Best of 5 (Grand Slam)"
+										: "Best of 3"
+									: "Football scoring"}
+							</p>
+							<p>
+								<span className="font-medium">
+									{tournament.sport === "tennis" ? "ATP URL" : "Reference URL"}:
+								</span>{" "}
 								{tournament.atpUrl ? (
 									<a
 										className="text-blue-600 underline hover:text-blue-800"
@@ -606,46 +654,91 @@ export default function AdminTournamentManagePage({
 									<span className="text-gray-500">Not set</span>
 								)}
 							</p>
+							{tournament.sport === "football" && (
+								<p>
+									<span className="font-medium">Source:</span> {tournament.source}
+								</p>
+							)}
+							<p>
+								<span className="font-medium">Scoring profile:</span>{" "}
+								{getScoringProfileLabel(
+									tournament.scoringProfileKey as
+										| "classic_round_points_v1"
+										| "football_aggregate_v1",
+								)}
+							</p>
+							{tournament.scoringProfileKey === "football_aggregate_v1" && (
+								<p>
+									<span className="font-medium">Late tie winner points:</span>{" "}
+									{typeof tournament.scoringSettings?.lateTieWinnerPoints ===
+									"number"
+										? tournament.scoringSettings.lateTieWinnerPoints
+										: "Default (half of round winner points)"}
+								</p>
+							)}
+							{tournament.sport === "football" &&
+								tournament.externalCompetitionCode && (
+									<p>
+										<span className="font-medium">Competition code:</span>{" "}
+										{tournament.externalCompetitionCode}
+									</p>
+								)}
+							{tournament.sport === "football" && (
+								<button
+									className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+									disabled={syncFootballTournamentMutation.isPending}
+									onClick={() =>
+										syncFootballTournamentMutation.mutate({ tournamentId })
+									}
+									type="button"
+								>
+									{syncFootballTournamentMutation.isPending
+										? "Syncing..."
+										: "Sync From football-data.org"}
+								</button>
+							)}
 						</div>
 					) : (
 						<div className="space-y-4">
-							<div>
-								<label className="mb-2 block font-medium text-gray-700 text-sm">
-									Tournament Format
-								</label>
-								<div className="flex gap-4">
-									<label className="flex cursor-pointer items-center gap-2">
-										<input
-											checked={editForm.format === "bo3"}
-											className="h-4 w-4 text-blue-600"
-											name="format"
-											onChange={() =>
-												setEditForm((prev) => ({ ...prev, format: "bo3" }))
-											}
-											type="radio"
-											value="bo3"
-										/>
-										<span className="text-gray-700">
-											Best of 3 (Regular tournaments)
-										</span>
+							{tournament.sport === "tennis" && (
+								<div>
+									<label className="mb-2 block font-medium text-gray-700 text-sm">
+										Tournament Format
 									</label>
-									<label className="flex cursor-pointer items-center gap-2">
-										<input
-											checked={editForm.format === "bo5"}
-											className="h-4 w-4 text-blue-600"
-											name="format"
-											onChange={() =>
-												setEditForm((prev) => ({ ...prev, format: "bo5" }))
-											}
-											type="radio"
-											value="bo5"
-										/>
-										<span className="text-gray-700">
-											Best of 5 (Grand Slams)
-										</span>
-									</label>
+									<div className="flex gap-4">
+										<label className="flex cursor-pointer items-center gap-2">
+											<input
+												checked={editForm.format === "bo3"}
+												className="h-4 w-4 text-blue-600"
+												name="format"
+												onChange={() =>
+													setEditForm((prev) => ({ ...prev, format: "bo3" }))
+												}
+												type="radio"
+												value="bo3"
+											/>
+											<span className="text-gray-700">
+												Best of 3 (Regular tournaments)
+											</span>
+										</label>
+										<label className="flex cursor-pointer items-center gap-2">
+											<input
+												checked={editForm.format === "bo5"}
+												className="h-4 w-4 text-blue-600"
+												name="format"
+												onChange={() =>
+													setEditForm((prev) => ({ ...prev, format: "bo5" }))
+												}
+												type="radio"
+												value="bo5"
+											/>
+											<span className="text-gray-700">
+												Best of 5 (Grand Slams)
+											</span>
+										</label>
+									</div>
 								</div>
-							</div>
+							)}
 
 							<div>
 								<label
@@ -665,6 +758,58 @@ export default function AdminTournamentManagePage({
 									value={editForm.atpUrl}
 								/>
 							</div>
+
+							<div>
+								<label
+									className="mb-2 block font-medium text-gray-700 text-sm"
+									htmlFor="scoringProfileKey"
+								>
+									Scoring Profile
+								</label>
+								<select
+									className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+									id="scoringProfileKey"
+									onChange={(e) =>
+										setEditForm((prev) => ({
+											...prev,
+											scoringProfileKey: e.target.value,
+										}))
+									}
+									value={editForm.scoringProfileKey}
+								>
+									<option value="classic_round_points_v1">
+										Classic Round Points v1
+									</option>
+									<option value="football_aggregate_v1">
+										Football Aggregate v1
+									</option>
+								</select>
+							</div>
+
+							{editForm.scoringProfileKey === "football_aggregate_v1" && (
+								<div>
+									<label
+										className="mb-2 block font-medium text-gray-700 text-sm"
+										htmlFor="lateTieWinnerPoints"
+									>
+										Late Tie Winner Points
+									</label>
+									<input
+										className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+										id="lateTieWinnerPoints"
+										min={1}
+										onChange={(e) =>
+											setEditForm((prev) => ({
+												...prev,
+												lateTieWinnerPoints: e.target.value,
+											}))
+										}
+										placeholder="Leave blank to use half of the round winner points"
+										type="number"
+										value={editForm.lateTieWinnerPoints}
+									/>
+								</div>
+							)}
 
 							<div className="flex gap-4">
 								<button
@@ -1107,7 +1252,7 @@ export default function AdminTournamentManagePage({
 													)}
 												</div>
 
-												{match.status === "pending" && (
+												{match.status === "pending" && tournament.sport === "tennis" && (
 													<div className="space-y-3 border-t pt-4">
 														<div>
 															<label className="mb-1 block text-gray-700 text-sm">
@@ -1342,6 +1487,14 @@ export default function AdminTournamentManagePage({
 														>
 															Finalize Result
 														</button>
+													</div>
+												)}
+												{match.status === "pending" && tournament.sport === "football" && (
+													<div className="rounded border-t bg-blue-50 p-4 text-blue-900">
+														Football tournament data is synced from
+														football-data.org. Use the "Sync From
+														football-data.org" button in Tournament Properties to
+														refresh results.
 													</div>
 												)}
 											</div>

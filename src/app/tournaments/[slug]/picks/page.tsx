@@ -6,6 +6,10 @@ import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CountdownTimer } from "~/components/countdown/CountdownTimer";
 import {
+	getMatchScoringNotice,
+	getRoundScoringDescription,
+} from "~/lib/scoring-profiles";
+import {
 	filterMatchesByPlayerName,
 	SearchInput,
 	SearchResultsCount,
@@ -36,6 +40,7 @@ export default function PicksPage({
 	const saveDraftMutation = api.picks.saveRoundPicksDraft.useMutation();
 
 	const activeRound = tournament?.rounds.find((r) => r.isActive);
+	const isFootball = tournament?.sport === "football";
 	const hasLoadedDraft = useRef(false);
 	const matchRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
@@ -172,7 +177,26 @@ export default function PicksPage({
 	);
 	const allPicksComplete =
 		votableMatches.length > 0 &&
-		votableMatches.every((match) => picks[match.id]?.predictedWinner);
+		votableMatches.every(
+			(match) =>
+				picks[match.id]?.predictedWinner &&
+				typeof picks[match.id]?.predictedSetsWon === "number" &&
+				typeof picks[match.id]?.predictedSetsLost === "number" &&
+				(!isFootball ||
+					picks[match.id]?.predictedSetsWon !==
+						picks[match.id]?.predictedSetsLost),
+		);
+
+	const getDefaultScoreForWinner = () => {
+		if (isFootball) {
+			return { predictedSetsWon: 1, predictedSetsLost: 0 };
+		}
+
+		return {
+			predictedSetsWon: tournament?.format === "bo5" ? 3 : 2,
+			predictedSetsLost: 0,
+		};
+	};
 
 	const scrollToFirstIncomplete = () => {
 		if (!activeRound) return;
@@ -414,6 +438,18 @@ export default function PicksPage({
 	);
 	const isDisabled = isSubmissionsClosed || isNotYetOpen;
 	const hasPartiallyFinalizedRound = finalizedMatchesCount > 0;
+	const roundScoringDescription =
+		activeRound.scoringRule && tournament
+			? getRoundScoringDescription({
+					profileKey: tournament.scoringProfileKey as
+						| "classic_round_points_v1"
+						| "football_aggregate_v1",
+					scoringSettings: tournament.scoringSettings,
+					pointsPerWinner: activeRound.scoringRule.pointsPerWinner,
+					pointsExactScore: activeRound.scoringRule.pointsExactScore,
+					isFootball,
+				})
+			: null;
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -439,9 +475,7 @@ export default function PicksPage({
 								{tournament.name} • {activeRound.name}
 								{activeRound.scoringRule && (
 									<span className="block text-sm">
-										Scoring: {activeRound.scoringRule.pointsPerWinner}{" "}
-										pts/winner, {activeRound.scoringRule.pointsExactScore}{" "}
-										pts/exact score
+										Scoring: {roundScoringDescription}
 									</span>
 								)}
 							</p>
@@ -553,14 +587,18 @@ export default function PicksPage({
 							📊 Tournament Information
 						</div>
 						<p className="text-blue-800">
-							View the official tournament draw and details:{" "}
+							View the official tournament{" "}
+							{tournament.sport === "football" ? "reference page" : "draw and details"}
+							:{" "}
 							<a
 								className="break-all font-semibold underline hover:text-blue-600"
 								href={tournament.atpUrl}
 								rel="noopener noreferrer"
 								target="_blank"
 							>
-								ATP Tournament Page
+								{tournament.sport === "football"
+									? "Tournament Reference"
+									: "ATP Tournament Page"}
 							</a>
 						</p>
 					</div>
@@ -599,7 +637,7 @@ export default function PicksPage({
 							>
 								<div className="mb-4">
 									<div className="mb-2 font-semibold text-gray-900">
-										Match {match.matchNumber}
+										{isFootball ? "Tie" : "Match"} {match.matchNumber}
 									</div>
 									<div className="text-gray-700 text-lg">
 										{match.player1Seed && `(${match.player1Seed}) `}
@@ -611,10 +649,38 @@ export default function PicksPage({
 								</div>
 
 								<div className="space-y-4">
+									{activeRound.scoringRule && tournament && (
+										(() => {
+											const scoringNotice = getMatchScoringNotice({
+												profileKey: tournament.scoringProfileKey as
+													| "classic_round_points_v1"
+													| "football_aggregate_v1",
+												scoringSettings: tournament.scoringSettings,
+												matchKind: match.kind,
+												matchMetadata: match.metadata,
+												isFinalized: match.status === "finalized",
+												pointsPerWinner:
+													activeRound.scoringRule.pointsPerWinner,
+												pointsExactScore:
+													activeRound.scoringRule.pointsExactScore,
+											});
+
+											if (!scoringNotice) {
+												return null;
+											}
+
+											return (
+												<div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-orange-900 text-sm">
+													{scoringNotice}
+												</div>
+											);
+										})()
+									)}
+
 									{/* Winner Selection */}
 									<div>
 										<label className="mb-2 block font-medium text-gray-700 text-sm">
-											Predicted Winner
+											{isFootball ? "Predicted Advancing Team" : "Predicted Winner"}
 										</label>
 										<div className="flex gap-4">
 											<button
@@ -633,9 +699,10 @@ export default function PicksPage({
 															predictedWinner: match.player1Name,
 															predictedSetsWon:
 																prev[match.id]?.predictedSetsWon ??
-																(tournament.format === "bo5" ? 3 : 2),
+																getDefaultScoreForWinner().predictedSetsWon,
 															predictedSetsLost:
-																prev[match.id]?.predictedSetsLost ?? 0,
+																prev[match.id]?.predictedSetsLost ??
+																getDefaultScoreForWinner().predictedSetsLost,
 														},
 													}))
 												}
@@ -659,9 +726,10 @@ export default function PicksPage({
 															predictedWinner: match.player2Name,
 															predictedSetsWon:
 																prev[match.id]?.predictedSetsWon ??
-																(tournament.format === "bo5" ? 3 : 2),
+																getDefaultScoreForWinner().predictedSetsWon,
 															predictedSetsLost:
-																prev[match.id]?.predictedSetsLost ?? 0,
+																prev[match.id]?.predictedSetsLost ??
+																getDefaultScoreForWinner().predictedSetsLost,
 														},
 													}))
 												}
@@ -676,12 +744,72 @@ export default function PicksPage({
 									{picks[match.id]?.predictedWinner && (
 										<div>
 											<label className="mb-2 block font-medium text-gray-700 text-sm">
-												Predicted Score
-											</label>
-											<div
-												className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
-											>
-												{tournament.format === "bo3" ? (
+											{isFootball ? "Predicted Score" : "Predicted Score"}
+										</label>
+											{isFootball ? (
+												<div className="grid grid-cols-2 gap-4">
+													<div>
+														<label
+															className="mb-1 block text-gray-600 text-xs"
+															htmlFor={`score-won-${match.id}`}
+														>
+															{picks[match.id]?.predictedWinner === match.player1Name
+																? formatPlayerName(match.player1Name)
+																: formatPlayerName(match.player2Name)}
+														</label>
+														<input
+															className="w-full rounded-lg border border-gray-300 px-4 py-2"
+															disabled={isDisabled}
+															id={`score-won-${match.id}`}
+															min={0}
+															onChange={(e) =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsWon:
+																			Number.parseInt(e.target.value || "0", 10),
+																	},
+																}))
+															}
+															type="number"
+															value={picks[match.id]?.predictedSetsWon ?? 1}
+														/>
+													</div>
+													<div>
+														<label
+															className="mb-1 block text-gray-600 text-xs"
+															htmlFor={`score-lost-${match.id}`}
+														>
+															{picks[match.id]?.predictedWinner === match.player1Name
+																? formatPlayerName(match.player2Name)
+																: formatPlayerName(match.player1Name)}
+														</label>
+														<input
+															className="w-full rounded-lg border border-gray-300 px-4 py-2"
+															disabled={isDisabled}
+															id={`score-lost-${match.id}`}
+															min={0}
+															onChange={(e) =>
+																setPicks((prev) => ({
+																	...prev,
+																	[match.id]: {
+																		...prev[match.id]!,
+																		predictedSetsLost:
+																			Number.parseInt(e.target.value || "0", 10),
+																	},
+																}))
+															}
+															type="number"
+															value={picks[match.id]?.predictedSetsLost ?? 0}
+														/>
+													</div>
+												</div>
+											) : (
+												<div
+													className={`grid gap-4 ${tournament.format === "bo5" ? "grid-cols-3" : "grid-cols-2"}`}
+												>
+													{tournament.format === "bo3" ? (
 													<>
 														<button
 															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
@@ -730,7 +858,7 @@ export default function PicksPage({
 															2-1
 														</button>
 													</>
-												) : (
+													) : (
 													<>
 														<button
 															className={`rounded-lg border-2 px-4 py-2 font-semibold transition ${
@@ -802,8 +930,9 @@ export default function PicksPage({
 															3-2
 														</button>
 													</>
-												)}
-											</div>
+													)}
+												</div>
+											)}
 										</div>
 									)}
 								</div>
@@ -826,8 +955,7 @@ export default function PicksPage({
 								)}
 							</div>
 							<div className="text-gray-600 text-sm">
-								{activeRound.scoringRule &&
-									`${activeRound.scoringRule.pointsPerWinner} points per correct winner, +${activeRound.scoringRule.pointsExactScore} for exact score`}
+								{roundScoringDescription}
 							</div>
 						</div>
 						<div className="flex gap-4">
