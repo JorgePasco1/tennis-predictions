@@ -27,6 +27,8 @@ export function createPendingMatch(
 		winnerName: null,
 		finalScore: null,
 		isRetirement: false,
+		kind: "standard",
+		metadata: null,
 		userPick: null,
 		...overrides,
 	};
@@ -49,6 +51,8 @@ export function createFinalizedMatch(
 		winnerName: "Carlos Alcaraz",
 		finalScore: "3-0",
 		isRetirement: false,
+		kind: "standard",
+		metadata: null,
 		userPick: null,
 		...overrides,
 	};
@@ -71,6 +75,8 @@ export function createRetirementMatch(
 		winnerName: "Alexander Zverev",
 		finalScore: "2-1",
 		isRetirement: true,
+		kind: "standard",
+		metadata: null,
 		userPick: null,
 		...overrides,
 	};
@@ -93,6 +99,8 @@ export function createMatchWithCorrectPick(
 		winnerName: "Jannik Sinner",
 		finalScore: "3-1",
 		isRetirement: false,
+		kind: "standard",
+		metadata: null,
 		userPick: {
 			predictedWinner: "Jannik Sinner",
 			predictedSetsWon: 3,
@@ -122,6 +130,8 @@ export function createMatchWithWrongPick(
 		winnerName: "Stefanos Tsitsipas",
 		finalScore: "3-2",
 		isRetirement: false,
+		kind: "standard",
+		metadata: null,
 		userPick: {
 			predictedWinner: "Daniil Medvedev",
 			predictedSetsWon: 3,
@@ -151,6 +161,8 @@ export function createMatchWithPendingPick(
 		winnerName: null,
 		finalScore: null,
 		isRetirement: false,
+		kind: "standard",
+		metadata: null,
 		userPick: {
 			predictedWinner: "Holger Rune",
 			predictedSetsWon: 3,
@@ -180,6 +192,8 @@ export function createMatchWithPartialCorrectPick(
 		winnerName: "Casper Ruud",
 		finalScore: "3-0",
 		isRetirement: false,
+		kind: "standard",
+		metadata: null,
 		userPick: {
 			predictedWinner: "Casper Ruud",
 			predictedSetsWon: 3,

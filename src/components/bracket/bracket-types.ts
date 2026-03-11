@@ -13,6 +13,16 @@ export interface MatchData {
 	winnerName: string | null;
 	finalScore: string | null;
 	isRetirement: boolean;
+	kind: "standard" | "two_leg_tie" | "single_match";
+	metadata: {
+		legs?: Array<{
+			homeTeam: string;
+			awayTeam: string;
+			homeGoals: number | null;
+			awayGoals: number | null;
+			status: string;
+		}>;
+	} | null;
 	userPick: {
 		predictedWinner: string;
 		predictedSetsWon: number;

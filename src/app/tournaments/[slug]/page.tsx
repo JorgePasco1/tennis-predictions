@@ -81,6 +81,8 @@ export default async function TournamentDetailPage({
 			winnerName: match.winnerName,
 			finalScore: match.finalScore,
 			isRetirement: match.isRetirement,
+			kind: match.kind,
+			metadata: match.metadata,
 			userPick: match.userPick,
 		})),
 	}));

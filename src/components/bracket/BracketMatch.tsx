@@ -68,10 +68,15 @@ export function BracketMatch({
 	const userPickedPlayer1 = userPick?.predictedWinner === match.player1Name;
 	const userPickedPlayer2 = userPick?.predictedWinner === match.player2Name;
 
-	// Parse "3-0" into [winnerSets, loserSets]
-	const scoreParts = match.finalScore?.split("-").map(Number) ?? [];
+	// Parse "3-0" or "3-0 agg" into [winnerSets, loserSets]
+	const scoreString = match.finalScore?.replace(/\s*agg$/i, "") ?? "";
+	const scoreParts = scoreString.split("-").map(Number);
 	const [winnerSets, loserSets] =
-		scoreParts.length === 2 ? scoreParts : [undefined, undefined];
+		scoreParts.length === 2 &&
+		!Number.isNaN(scoreParts[0]) &&
+		!Number.isNaN(scoreParts[1])
+			? scoreParts
+			: [undefined, undefined];
 	const player1Sets = isPlayer1Winner
 		? winnerSets
 		: isPlayer2Winner
@@ -82,6 +87,20 @@ export function BracketMatch({
 		: isPlayer1Winner
 			? loserSets
 			: undefined;
+
+	// For two-leg ties, compute first-leg score to show on pending matches
+	const firstLegLabel = (() => {
+		if (match.kind !== "two_leg_tie" || isFinalized) return null;
+		const legs = match.metadata?.legs;
+		if (!legs?.length) return null;
+		const finishedLeg = legs.find((l) =>
+			["FINISHED", "FT", "AET", "PEN"].includes(l.status),
+		);
+		if (!finishedLeg) return null;
+		if (finishedLeg.homeGoals == null || finishedLeg.awayGoals == null)
+			return null;
+		return `1st leg: ${finishedLeg.homeTeam} ${finishedLeg.homeGoals}-${finishedLeg.awayGoals} ${finishedLeg.awayTeam}`;
+	})();
 
 	if (compact) {
 		return (
@@ -202,6 +221,11 @@ export function BracketMatch({
 						</span>
 					)}
 				</div>
+				{firstLegLabel && (
+					<div className="truncate border-t px-2 py-0.5 text-[10px] text-muted-foreground">
+						{firstLegLabel}
+					</div>
+				)}
 			</div>
 		);
 	}
@@ -314,6 +338,12 @@ export function BracketMatch({
 					</div>
 				</div>
 			</div>
+
+			{firstLegLabel && (
+				<div className="mt-2 rounded bg-muted/50 px-3 py-1 text-muted-foreground text-xs">
+					{firstLegLabel}
+				</div>
+			)}
 
 			{/* Result row */}
 			{isFinalized && userPick && !isRetirement && (
