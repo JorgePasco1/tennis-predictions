@@ -64,6 +64,20 @@
 			"when": 1770006504221,
 			"tag": "0008_melodic_sue_storm",
 			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1770249600000,
+			"tag": "0009_fancy_grid",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1770260400000,
+			"tag": "0010_clever_maelstrom",
+			"breakpoints": true
 		}
 	]
 }
