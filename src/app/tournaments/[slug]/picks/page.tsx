@@ -6,6 +6,10 @@ import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CountdownTimer } from "~/components/countdown/CountdownTimer";
 import {
+	getMatchScoringNotice,
+	getRoundScoringDescription,
+} from "~/lib/scoring-profiles";
+import {
 	filterMatchesByPlayerName,
 	SearchInput,
 	SearchResultsCount,
@@ -431,6 +435,18 @@ export default function PicksPage({
 	);
 	const isDisabled = isSubmissionsClosed || isNotYetOpen;
 	const hasPartiallyFinalizedRound = finalizedMatchesCount > 0;
+	const roundScoringDescription =
+		activeRound.scoringRule && tournament
+			? getRoundScoringDescription({
+					profileKey: tournament.scoringProfileKey as
+						| "classic_round_points_v1"
+						| "football_aggregate_v1",
+					scoringSettings: tournament.scoringSettings,
+					pointsPerWinner: activeRound.scoringRule.pointsPerWinner,
+					pointsExactScore: activeRound.scoringRule.pointsExactScore,
+					isFootball,
+				})
+			: null;
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -456,9 +472,7 @@ export default function PicksPage({
 								{tournament.name} • {activeRound.name}
 								{activeRound.scoringRule && (
 									<span className="block text-sm">
-										Scoring: {activeRound.scoringRule.pointsPerWinner}{" "}
-										pts/winner, {activeRound.scoringRule.pointsExactScore}{" "}
-										pts/exact score
+										Scoring: {roundScoringDescription}
 									</span>
 								)}
 							</p>
@@ -632,6 +646,34 @@ export default function PicksPage({
 								</div>
 
 								<div className="space-y-4">
+									{activeRound.scoringRule && tournament && (
+										(() => {
+											const scoringNotice = getMatchScoringNotice({
+												profileKey: tournament.scoringProfileKey as
+													| "classic_round_points_v1"
+													| "football_aggregate_v1",
+												scoringSettings: tournament.scoringSettings,
+												matchKind: match.kind,
+												matchMetadata: match.metadata,
+												isFinalized: match.status === "finalized",
+												pointsPerWinner:
+													activeRound.scoringRule.pointsPerWinner,
+												pointsExactScore:
+													activeRound.scoringRule.pointsExactScore,
+											});
+
+											if (!scoringNotice) {
+												return null;
+											}
+
+											return (
+												<div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-orange-900 text-sm">
+													{scoringNotice}
+												</div>
+											);
+										})()
+									)}
+
 									{/* Winner Selection */}
 									<div>
 										<label className="mb-2 block font-medium text-gray-700 text-sm">
@@ -902,8 +944,7 @@ export default function PicksPage({
 								)}
 							</div>
 							<div className="text-gray-600 text-sm">
-								{activeRound.scoringRule &&
-									`${activeRound.scoringRule.pointsPerWinner} points per correct ${isFootball ? "advancing team" : "winner"}, +${activeRound.scoringRule.pointsExactScore} for exact ${isFootball ? "score" : "score"}`}
+								{roundScoringDescription}
 							</div>
 						</div>
 						<div className="flex gap-4">

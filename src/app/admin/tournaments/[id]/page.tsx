@@ -8,6 +8,7 @@ import {
 	SearchInput,
 	SearchResultsCount,
 } from "~/components/match-search";
+import { getScoringProfileLabel } from "~/lib/scoring-profiles";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -178,6 +179,8 @@ export default function AdminTournamentManagePage({
 	const [editForm, setEditForm] = useState({
 		format: "",
 		atpUrl: "",
+		scoringProfileKey: "classic_round_points_v1",
+		lateTieWinnerPoints: "",
 	});
 	const [matchResults, setMatchResults] = useState<
 		Record<
@@ -250,11 +253,18 @@ export default function AdminTournamentManagePage({
 		setEditForm({
 			format: tournament?.format || "bo3",
 			atpUrl: tournament?.atpUrl || "",
+			scoringProfileKey:
+				tournament?.scoringProfileKey || "classic_round_points_v1",
+			lateTieWinnerPoints:
+				typeof tournament?.scoringSettings?.lateTieWinnerPoints === "number"
+					? String(tournament.scoringSettings.lateTieWinnerPoints)
+					: "",
 		});
 		setIsEditingProperties(true);
 	};
 
 	const handleSaveProperties = async () => {
+		const lateTieWinnerPoints = editForm.lateTieWinnerPoints.trim();
 		await updateTournamentMutation.mutateAsync({
 			id: tournamentId,
 			format:
@@ -262,6 +272,22 @@ export default function AdminTournamentManagePage({
 					? (editForm.format as "bo3" | "bo5")
 					: undefined,
 			atpUrl: editForm.atpUrl || undefined,
+			scoringProfileKey: editForm.scoringProfileKey as
+				| "classic_round_points_v1"
+				| "football_aggregate_v1",
+			scoringSettings:
+				editForm.scoringProfileKey === "football_aggregate_v1"
+					? {
+							...(lateTieWinnerPoints
+								? {
+										lateTieWinnerPoints: Number.parseInt(
+											lateTieWinnerPoints,
+											10,
+										),
+									}
+								: {}),
+						}
+					: {},
 		});
 		setIsEditingProperties(false);
 	};
@@ -631,6 +657,23 @@ export default function AdminTournamentManagePage({
 									<span className="font-medium">Source:</span> {tournament.source}
 								</p>
 							)}
+							<p>
+								<span className="font-medium">Scoring profile:</span>{" "}
+								{getScoringProfileLabel(
+									tournament.scoringProfileKey as
+										| "classic_round_points_v1"
+										| "football_aggregate_v1",
+								)}
+							</p>
+							{tournament.scoringProfileKey === "football_aggregate_v1" && (
+								<p>
+									<span className="font-medium">Late tie winner points:</span>{" "}
+									{typeof tournament.scoringSettings?.lateTieWinnerPoints ===
+									"number"
+										? tournament.scoringSettings.lateTieWinnerPoints
+										: "Default (half of round winner points)"}
+								</p>
+							)}
 							{tournament.sport === "football" &&
 								tournament.externalCompetitionCode && (
 									<p>
@@ -713,6 +756,54 @@ export default function AdminTournamentManagePage({
 									value={editForm.atpUrl}
 								/>
 							</div>
+
+							<div>
+								<label className="mb-2 block font-medium text-gray-700 text-sm">
+									Scoring Profile
+								</label>
+								<select
+									className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+									onChange={(e) =>
+										setEditForm((prev) => ({
+											...prev,
+											scoringProfileKey: e.target.value,
+										}))
+									}
+									value={editForm.scoringProfileKey}
+								>
+									<option value="classic_round_points_v1">
+										Classic Round Points v1
+									</option>
+									<option value="football_aggregate_v1">
+										Football Aggregate v1
+									</option>
+								</select>
+							</div>
+
+							{editForm.scoringProfileKey === "football_aggregate_v1" && (
+								<div>
+									<label
+										className="mb-2 block font-medium text-gray-700 text-sm"
+										htmlFor="lateTieWinnerPoints"
+									>
+										Late Tie Winner Points
+									</label>
+									<input
+										className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+										id="lateTieWinnerPoints"
+										min={1}
+										onChange={(e) =>
+											setEditForm((prev) => ({
+												...prev,
+												lateTieWinnerPoints: e.target.value,
+											}))
+										}
+										placeholder="Leave blank to use half of the round winner points"
+										type="number"
+										value={editForm.lateTieWinnerPoints}
+									/>
+								</div>
+							)}
 
 							<div className="flex gap-4">
 								<button
