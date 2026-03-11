@@ -11,12 +11,63 @@ import {
 	userRoundPicks,
 	users,
 } from "~/server/db/schema";
+import {
+	importFootballTournamentFromFootballData,
+} from "~/server/services/footballData";
 import { parseAtpDraw, validateParsedDraw } from "~/server/services/drawParser";
 import {
 	calculateMatchPickScores,
 	unfinalizeMatchScores,
 } from "~/server/services/scoring";
 import { getScoringForRound } from "~/server/utils/scoring-config";
+
+const footballImportSchema = z.object({
+	competitionCode: z.string().trim().min(1).max(50),
+	season: z.number().int().min(2000).max(2100),
+});
+
+const normalizedFootballTournamentSchema = z.object({
+	tournamentName: z.string(),
+	year: z.number().int(),
+	competitionCode: z.string(),
+	season: z.number().int(),
+	rounds: z.array(
+		z.object({
+			roundNumber: z.number().int(),
+			name: z.string(),
+			matches: z.array(
+				z.object({
+					matchNumber: z.number().int(),
+					player1Name: z.string(),
+					player2Name: z.string(),
+					winnerName: z.string().optional(),
+					setsWon: z.number().int().optional(),
+					setsLost: z.number().int().optional(),
+					finalScore: z.string().optional(),
+					kind: z.enum(["two_leg_tie", "single_match"]),
+					metadata: z.object({
+						externalTieKey: z.string(),
+						externalFixtureIds: z.array(z.number().int()),
+						roundLabel: z.string(),
+						scoreLabel: z.string(),
+						legs: z.array(
+							z.object({
+								fixtureId: z.number().int(),
+								label: z.string(),
+								homeTeam: z.string(),
+								awayTeam: z.string(),
+								homeGoals: z.number().int().nullable(),
+								awayGoals: z.number().int().nullable(),
+								status: z.string(),
+								kickoff: z.string(),
+							}),
+						),
+					}),
+				}),
+			),
+		}),
+	),
+});
 
 export const adminRouter = createTRPCRouter({
 	/**
@@ -74,6 +125,453 @@ export const adminRouter = createTRPCRouter({
 			}
 
 			return result;
+		}),
+	previewFootballImport: adminProcedure
+		.input(footballImportSchema)
+		.query(async ({ input }) => {
+			return importFootballTournamentFromFootballData(input);
+		}),
+
+	importFootballTournament: adminProcedure
+		.input(
+			z.object({
+				parsedTournament: normalizedFootballTournamentSchema,
+				overwriteExisting: z.boolean().default(false),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const { parsedTournament } = input;
+
+			await ctx.db
+				.insert(users)
+				.values({
+					id: ctx.user.id,
+					clerkId: ctx.user.id,
+					email: ctx.user.email,
+					displayName: ctx.user.email.split("@")[0] ?? "Admin",
+					role: "admin",
+				})
+				.onConflictDoNothing({ target: users.id });
+
+			const slug = generateSlug(parsedTournament.tournamentName, parsedTournament.year);
+
+			const existingTournament = await ctx.db.query.tournaments.findFirst({
+				where: and(eq(tournaments.slug, slug), isNull(tournaments.deletedAt)),
+				with: {
+					rounds: {
+						with: {
+							userRoundPicks: true,
+							matches: true,
+						},
+					},
+				},
+			});
+
+			if (existingTournament) {
+				const totalPicks = existingTournament.rounds.reduce(
+					(sum, round) => sum + round.userRoundPicks.length,
+					0,
+				);
+
+				const hasFinalized = existingTournament.rounds.some((round) =>
+					round.matches.some((match) => match.status === "finalized"),
+				);
+
+				if (hasFinalized) {
+					throw new Error(
+						"Cannot re-import: Tournament has finalized matches. This operation is blocked to preserve data integrity.",
+					);
+				}
+
+				if (totalPicks > 0 && !input.overwriteExisting) {
+					throw new Error(
+						`Tournament already exists with ${totalPicks} user picks. Set overwriteExisting=true to proceed with soft delete.`,
+					);
+				}
+
+				await ctx.db
+					.update(tournaments)
+					.set({ deletedAt: new Date() })
+					.where(eq(tournaments.id, existingTournament.id));
+
+				const roundIds = existingTournament.rounds.map((round) => round.id);
+				if (roundIds.length > 0) {
+					await ctx.db
+						.update(matches)
+						.set({ deletedAt: new Date() })
+						.where(
+							sql`${matches.roundId} IN (${sql.join(
+								roundIds.map((id) => sql`${id}`),
+								sql`, `,
+							)})`,
+						);
+				}
+			}
+
+			return await ctx.db.transaction(async (tx) => {
+				const [tournament] = await tx
+					.insert(tournaments)
+					.values({
+						name: parsedTournament.tournamentName,
+						slug,
+						year: parsedTournament.year,
+						sport: "football",
+						source: "football_data",
+						format: "bo3",
+						externalCompetitionCode: parsedTournament.competitionCode,
+						externalSeason: parsedTournament.season,
+						status: "draft",
+						uploadedBy: ctx.user.id,
+					})
+					.returning();
+
+				if (!tournament) {
+					throw new Error("Failed to create football tournament");
+				}
+
+				const insertedRounds = await tx
+					.insert(rounds)
+					.values(
+						parsedTournament.rounds.map((round) => ({
+							tournamentId: tournament.id,
+							roundNumber: round.roundNumber,
+							name: round.name,
+							isActive: false,
+							isFinalized: round.matches.every(
+								(match) => match.winnerName && match.setsWon != null && match.setsLost != null,
+							),
+						})),
+					)
+					.returning();
+
+				await tx.insert(roundScoringRules).values(
+					insertedRounds.map((round) => ({
+						roundId: round.id,
+						pointsPerWinner: getScoringForRound(round.name).pointsPerWinner,
+						pointsExactScore: getScoringForRound(round.name).pointsExactScore,
+					})),
+				);
+
+				const roundNumberToId = new Map(
+					insertedRounds.map((round) => [round.roundNumber, round.id]),
+				);
+
+				const allMatchValues = parsedTournament.rounds.flatMap((round) => {
+					const roundId = roundNumberToId.get(round.roundNumber);
+					if (!roundId) {
+						throw new Error(`Round ID not found for ${round.roundNumber}`);
+					}
+
+					return round.matches.map((match) => ({
+						roundId,
+						matchNumber: match.matchNumber,
+						player1Name: match.player1Name,
+						player2Name: match.player2Name,
+						player1Seed: null,
+						player2Seed: null,
+						winnerName: match.winnerName,
+						finalScore: match.finalScore,
+						setsWon: match.setsWon,
+						setsLost: match.setsLost,
+						kind: match.kind,
+						metadata: match.metadata,
+						status:
+							match.winnerName && match.setsWon != null && match.setsLost != null
+								? ("finalized" as const)
+								: ("pending" as const),
+						isBye: false,
+						isRetirement: false,
+						finalizedAt:
+							match.winnerName && match.setsWon != null && match.setsLost != null
+								? new Date()
+								: null,
+						finalizedBy:
+							match.winnerName && match.setsWon != null && match.setsLost != null
+								? ctx.user.id
+								: null,
+					}));
+				});
+
+				if (allMatchValues.length > 0) {
+					await tx.insert(matches).values(allMatchValues);
+				}
+
+				const allRounds = await tx.query.rounds.findMany({
+					where: eq(rounds.tournamentId, tournament.id),
+					with: {
+						matches: {
+							where: isNull(matches.deletedAt),
+						},
+					},
+					orderBy: [asc(rounds.roundNumber)],
+				});
+
+				for (const currentRound of allRounds) {
+					const nextRound = allRounds.find(
+						(round) => round.roundNumber === currentRound.roundNumber + 1,
+					);
+
+					if (!nextRound) {
+						continue;
+					}
+
+					for (const finalizedMatch of currentRound.matches) {
+						if (
+							finalizedMatch.status !== "finalized" ||
+							!finalizedMatch.winnerName
+						) {
+							continue;
+						}
+
+						const nextMatchNumber = Math.ceil(finalizedMatch.matchNumber / 2);
+						const nextMatch = nextRound.matches.find(
+							(match) => match.matchNumber === nextMatchNumber,
+						);
+
+						if (!nextMatch) {
+							continue;
+						}
+
+						const isPlayer1 = finalizedMatch.matchNumber % 2 === 1;
+						const currentSlotValue = isPlayer1
+							? nextMatch.player1Name
+							: nextMatch.player2Name;
+
+						if (currentSlotValue !== "TBD") {
+							continue;
+						}
+
+						await tx
+							.update(matches)
+							.set(
+								isPlayer1
+									? { player1Name: finalizedMatch.winnerName }
+									: { player2Name: finalizedMatch.winnerName },
+							)
+							.where(eq(matches.id, nextMatch.id));
+
+						if (isPlayer1) {
+							nextMatch.player1Name = finalizedMatch.winnerName;
+						} else {
+							nextMatch.player2Name = finalizedMatch.winnerName;
+						}
+					}
+				}
+
+				return tournament;
+			});
+		}),
+
+	syncFootballTournament: adminProcedure
+		.input(
+			z.object({
+				tournamentId: z.number().int(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const tournament = await ctx.db.query.tournaments.findFirst({
+				where: and(eq(tournaments.id, input.tournamentId), isNull(tournaments.deletedAt)),
+				with: {
+					rounds: {
+						orderBy: [asc(rounds.roundNumber)],
+						with: {
+							matches: {
+								orderBy: [asc(matches.matchNumber)],
+								where: isNull(matches.deletedAt),
+							},
+						},
+					},
+				},
+			});
+
+			if (!tournament) {
+				throw new Error("Tournament not found");
+			}
+
+			if (
+				tournament.sport !== "football" ||
+				tournament.source !== "football_data" ||
+				!tournament.externalCompetitionCode ||
+				!tournament.externalSeason
+			) {
+				throw new Error("Tournament is not configured for football-data.org sync");
+			}
+
+			const normalized = await importFootballTournamentFromFootballData({
+				competitionCode: tournament.externalCompetitionCode,
+				season: tournament.externalSeason,
+			});
+
+			return await ctx.db.transaction(async (tx) => {
+				let updatedMatches = 0;
+
+				for (const normalizedRound of normalized.rounds) {
+					let existingRound = tournament.rounds.find(
+						(round) => round.roundNumber === normalizedRound.roundNumber,
+					);
+					if (!existingRound) {
+						const [insertedRound] = await tx
+							.insert(rounds)
+							.values({
+								tournamentId: tournament.id,
+								roundNumber: normalizedRound.roundNumber,
+								name: normalizedRound.name,
+								isActive: false,
+								isFinalized: normalizedRound.matches.every(
+									(match) =>
+										match.winnerName &&
+										match.setsWon != null &&
+										match.setsLost != null,
+								),
+							})
+							.returning();
+
+						if (!insertedRound) {
+							throw new Error(
+								`Failed to create round ${normalizedRound.name} during sync`,
+							);
+						}
+
+						await tx.insert(roundScoringRules).values({
+							roundId: insertedRound.id,
+							pointsPerWinner:
+								getScoringForRound(normalizedRound.name).pointsPerWinner,
+							pointsExactScore:
+								getScoringForRound(normalizedRound.name).pointsExactScore,
+						});
+
+						existingRound = {
+							...insertedRound,
+							matches: [],
+						};
+						tournament.rounds.push(existingRound);
+					}
+
+					for (const normalizedMatch of normalizedRound.matches) {
+						let existingMatch = existingRound.matches.find(
+							(match) => match.matchNumber === normalizedMatch.matchNumber,
+						);
+						const willBeFinalized = Boolean(
+							normalizedMatch.winnerName &&
+							normalizedMatch.setsWon != null &&
+							normalizedMatch.setsLost != null,
+						);
+
+						if (!existingMatch) {
+							const [insertedMatch] = await tx
+								.insert(matches)
+								.values({
+									roundId: existingRound.id,
+									matchNumber: normalizedMatch.matchNumber,
+									player1Name: normalizedMatch.player1Name,
+									player2Name: normalizedMatch.player2Name,
+									player1Seed: null,
+									player2Seed: null,
+									winnerName: normalizedMatch.winnerName ?? null,
+									finalScore: normalizedMatch.finalScore ?? null,
+									setsWon: normalizedMatch.setsWon ?? null,
+									setsLost: normalizedMatch.setsLost ?? null,
+									kind: normalizedMatch.kind,
+									metadata: normalizedMatch.metadata,
+									status: willBeFinalized ? "finalized" : "pending",
+									isBye: false,
+									isRetirement: false,
+									finalizedAt: willBeFinalized ? new Date() : null,
+									finalizedBy: willBeFinalized ? ctx.user.id : null,
+								})
+								.returning();
+
+							if (!insertedMatch) {
+								throw new Error(
+									`Failed to create tie ${normalizedMatch.matchNumber} in ${normalizedRound.name}`,
+								);
+							}
+
+							existingMatch = insertedMatch;
+							existingRound.matches.push(insertedMatch);
+
+							if (willBeFinalized) {
+								await calculateMatchPickScores(tx, insertedMatch.id);
+							}
+
+							updatedMatches += 1;
+							continue;
+						}
+
+						await tx
+							.update(matches)
+							.set({
+								player1Name: normalizedMatch.player1Name,
+								player2Name: normalizedMatch.player2Name,
+								winnerName: normalizedMatch.winnerName ?? null,
+								finalScore: normalizedMatch.finalScore ?? null,
+								setsWon: normalizedMatch.setsWon ?? null,
+								setsLost: normalizedMatch.setsLost ?? null,
+								kind: normalizedMatch.kind,
+								metadata: normalizedMatch.metadata,
+								status: willBeFinalized ? "finalized" : "pending",
+								finalizedAt: willBeFinalized ? new Date() : null,
+								finalizedBy: willBeFinalized ? ctx.user.id : null,
+							})
+							.where(eq(matches.id, existingMatch.id));
+
+						if (willBeFinalized) {
+							await calculateMatchPickScores(tx, existingMatch.id);
+						} else if (existingMatch.status === "finalized") {
+							await unfinalizeMatchScores(tx, existingMatch.id);
+						}
+
+						if (willBeFinalized && normalizedMatch.winnerName) {
+							const nextRound = tournament.rounds.find(
+								(round) =>
+									round.roundNumber === normalizedRound.roundNumber + 1,
+							);
+							const nextMatchNumber = Math.ceil(normalizedMatch.matchNumber / 2);
+							const nextMatch = nextRound?.matches.find(
+								(match) => match.matchNumber === nextMatchNumber,
+							);
+
+							if (nextMatch) {
+								const isPlayer1 = normalizedMatch.matchNumber % 2 === 1;
+								const currentSlotValue = isPlayer1
+									? nextMatch.player1Name
+									: nextMatch.player2Name;
+
+								if (currentSlotValue === "TBD") {
+									await tx
+										.update(matches)
+										.set(
+											isPlayer1
+												? { player1Name: normalizedMatch.winnerName }
+												: { player2Name: normalizedMatch.winnerName },
+										)
+										.where(eq(matches.id, nextMatch.id));
+
+									if (isPlayer1) {
+										nextMatch.player1Name = normalizedMatch.winnerName;
+									} else {
+										nextMatch.player2Name = normalizedMatch.winnerName;
+									}
+								}
+							}
+						}
+
+						updatedMatches += 1;
+					}
+
+					await tx
+						.update(rounds)
+						.set({
+							isFinalized: normalizedRound.matches.every(
+								(match) =>
+									match.winnerName && match.setsWon != null && match.setsLost != null,
+							),
+						})
+						.where(eq(rounds.id, existingRound.id));
+				}
+
+				return { updatedMatches };
+			});
 		}),
 
 	/**
@@ -198,6 +696,8 @@ export const adminRouter = createTRPCRouter({
 						name: parsedDraw.tournamentName,
 						slug,
 						year: parsedDraw.year,
+						sport: "tennis",
+						source: "parser",
 						format,
 						atpUrl,
 						status: "draft",
@@ -741,8 +1241,8 @@ export const adminRouter = createTRPCRouter({
 				matchId: z.number().int(),
 				winnerName: z.string(),
 				finalScore: z.string(),
-				setsWon: z.number().int().min(0).max(3),
-				setsLost: z.number().int().min(0).max(3),
+				setsWon: z.number().int().min(0).max(20),
+				setsLost: z.number().int().min(0).max(20),
 				isRetirement: z.boolean().default(false),
 			}),
 		)
@@ -786,23 +1286,34 @@ export const adminRouter = createTRPCRouter({
 				throw new Error("Winner must be one of the match players");
 			}
 
-			// Only apply strict set validation for non-retirement matches
+			// Only apply strict score validation for non-retirement matches
 			if (!input.isRetirement) {
-				if (input.setsWon < 2) {
-					throw new Error("Winner must have won at least 2 sets");
-				}
-				if (input.setsLost >= input.setsWon) {
-					throw new Error("Winner must have won more sets than they lost");
-				}
-				if (input.setsWon === 2 && input.setsLost > 1) {
-					throw new Error(
-						"Invalid score: if sets won is 2, sets lost must be 0 or 1",
-					);
-				}
-				if (input.setsWon === 3 && input.setsLost > 2) {
-					throw new Error(
-						"Invalid score: if sets won is 3, sets lost must be 0, 1, or 2",
-					);
+				if (match.round.tournament.sport === "tennis") {
+					if (input.setsWon < 2) {
+						throw new Error("Winner must have won at least 2 sets");
+					}
+					if (input.setsLost >= input.setsWon) {
+						throw new Error("Winner must have won more sets than they lost");
+					}
+					if (input.setsWon === 2 && input.setsLost > 1) {
+						throw new Error(
+							"Invalid score: if sets won is 2, sets lost must be 0 or 1",
+						);
+					}
+					if (input.setsWon === 3 && input.setsLost > 2) {
+						throw new Error(
+							"Invalid score: if sets won is 3, sets lost must be 0, 1, or 2",
+						);
+					}
+				} else {
+					if (input.setsWon < 0 || input.setsLost < 0) {
+						throw new Error("Football scores cannot be negative");
+					}
+					if (input.setsWon === input.setsLost) {
+						throw new Error(
+							"Football result must identify an advancing team; tied scores are not supported in manual entry",
+						);
+					}
 				}
 			}
 
@@ -969,7 +1480,7 @@ export const adminRouter = createTRPCRouter({
 				atpUrl?: string | null;
 			} = {};
 
-			if (input.format) {
+			if (input.format && tournament.sport === "tennis") {
 				updateData.format = input.format;
 			}
 
