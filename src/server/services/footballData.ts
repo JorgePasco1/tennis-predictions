@@ -235,8 +235,8 @@ function resolveMatchGoals(match: FootballDataMatch): FootballDataScoreline {
 
 	if (match.score.duration === "EXTRA_TIME") {
 		return {
-			home: sumNullable([regularTime.home, extraTime.home]),
-			away: sumNullable([regularTime.away, extraTime.away]),
+			home: sumNullable([regularTime.home, extraTime.home ?? 0]),
+			away: sumNullable([regularTime.away, extraTime.away ?? 0]),
 		};
 	}
 

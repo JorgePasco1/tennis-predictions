@@ -265,6 +265,13 @@ export default function AdminTournamentManagePage({
 
 	const handleSaveProperties = async () => {
 		const lateTieWinnerPoints = editForm.lateTieWinnerPoints.trim();
+		const parsedLateTieWinnerPoints = lateTieWinnerPoints
+			? Number.parseInt(lateTieWinnerPoints, 10)
+			: undefined;
+		if (lateTieWinnerPoints && Number.isNaN(parsedLateTieWinnerPoints)) {
+			toast.error("Late tie winner points must be a valid number");
+			return;
+		}
 		await updateTournamentMutation.mutateAsync({
 			id: tournamentId,
 			format:
@@ -278,13 +285,8 @@ export default function AdminTournamentManagePage({
 			scoringSettings:
 				editForm.scoringProfileKey === "football_aggregate_v1"
 					? {
-							...(lateTieWinnerPoints
-								? {
-										lateTieWinnerPoints: Number.parseInt(
-											lateTieWinnerPoints,
-											10,
-										),
-									}
+							...(parsedLateTieWinnerPoints !== undefined
+								? { lateTieWinnerPoints: parsedLateTieWinnerPoints }
 								: {}),
 						}
 					: {},
@@ -758,11 +760,15 @@ export default function AdminTournamentManagePage({
 							</div>
 
 							<div>
-								<label className="mb-2 block font-medium text-gray-700 text-sm">
+								<label
+									className="mb-2 block font-medium text-gray-700 text-sm"
+									htmlFor="scoringProfileKey"
+								>
 									Scoring Profile
 								</label>
 								<select
 									className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+									id="scoringProfileKey"
 									onChange={(e) =>
 										setEditForm((prev) => ({
 											...prev,

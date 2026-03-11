@@ -181,7 +181,10 @@ export default function PicksPage({
 			(match) =>
 				picks[match.id]?.predictedWinner &&
 				typeof picks[match.id]?.predictedSetsWon === "number" &&
-				typeof picks[match.id]?.predictedSetsLost === "number",
+				typeof picks[match.id]?.predictedSetsLost === "number" &&
+				(!isFootball ||
+					picks[match.id]?.predictedSetsWon !==
+						picks[match.id]?.predictedSetsLost),
 		);
 
 	const getDefaultScoreForWinner = () => {
@@ -746,7 +749,10 @@ export default function PicksPage({
 											{isFootball ? (
 												<div className="grid grid-cols-2 gap-4">
 													<div>
-														<label className="mb-1 block text-gray-600 text-xs">
+														<label
+															className="mb-1 block text-gray-600 text-xs"
+															htmlFor={`score-won-${match.id}`}
+														>
 															{picks[match.id]?.predictedWinner === match.player1Name
 																? formatPlayerName(match.player1Name)
 																: formatPlayerName(match.player2Name)}
@@ -754,6 +760,7 @@ export default function PicksPage({
 														<input
 															className="w-full rounded-lg border border-gray-300 px-4 py-2"
 															disabled={isDisabled}
+															id={`score-won-${match.id}`}
 															min={0}
 															onChange={(e) =>
 																setPicks((prev) => ({
@@ -770,7 +777,10 @@ export default function PicksPage({
 														/>
 													</div>
 													<div>
-														<label className="mb-1 block text-gray-600 text-xs">
+														<label
+															className="mb-1 block text-gray-600 text-xs"
+															htmlFor={`score-lost-${match.id}`}
+														>
 															{picks[match.id]?.predictedWinner === match.player1Name
 																? formatPlayerName(match.player2Name)
 																: formatPlayerName(match.player1Name)}
@@ -778,6 +788,7 @@ export default function PicksPage({
 														<input
 															className="w-full rounded-lg border border-gray-300 px-4 py-2"
 															disabled={isDisabled}
+															id={`score-lost-${match.id}`}
 															min={0}
 															onChange={(e) =>
 																setPicks((prev) => ({
