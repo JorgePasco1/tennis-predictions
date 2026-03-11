@@ -78,6 +78,14 @@ export const tournaments = createTable(
 		year: integer().notNull(),
 		sport: tournamentSportEnum().notNull().default("tennis"),
 		source: tournamentSourceEnum().notNull().default("parser"),
+		scoringProfileKey: varchar("scoring_profile_key", {
+			length: 100,
+		})
+			.notNull()
+			.default("classic_round_points_v1"),
+		scoringSettings: json("scoring_settings").$type<{
+			lateTieWinnerPoints?: number;
+		}>(),
 		format: tournamentFormatEnum().notNull().default("bo3"),
 		atpUrl: varchar("atp_url", { length: 500 }),
 		externalLeagueId: integer("external_league_id"),
@@ -246,6 +254,14 @@ export const matchPicks = createTable(
 		predictedWinner: varchar("predicted_winner", { length: 255 }).notNull(),
 		predictedSetsWon: integer("predicted_sets_won").notNull(),
 		predictedSetsLost: integer("predicted_sets_lost").notNull(),
+		scoringVariantKey: varchar("scoring_variant_key", { length: 100 }),
+		snapshotPointsPerWinner: integer("snapshot_points_per_winner"),
+		snapshotPointsExactScore: integer("snapshot_points_exact_score"),
+		snapshotContext: json("snapshot_context").$type<{
+			completedLegs?: number;
+			totalLegs?: number;
+			matchKind?: "standard" | "two_leg_tie" | "single_match";
+		}>(),
 		isWinnerCorrect: boolean("is_winner_correct"),
 		isExactScore: boolean("is_exact_score"),
 		pointsEarned: integer("points_earned").notNull().default(0),
