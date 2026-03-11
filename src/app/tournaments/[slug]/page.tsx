@@ -96,7 +96,7 @@ export default async function TournamentDetailPage({
 						<CardHeader className="p-8">
 							<CardTitle className="mb-2 text-4xl">{tournament.name}</CardTitle>
 							<p className="text-blue-100">
-								{tournament.year} • {tournament.status}
+								{tournament.year} • {tournament.sport} • {tournament.status}
 							</p>
 							{tournament.atpUrl && (
 								<p className="mt-2">
@@ -106,7 +106,9 @@ export default async function TournamentDetailPage({
 										rel="noopener noreferrer"
 										target="_blank"
 									>
-										View on ATP Tour ↗
+										{tournament.sport === "football"
+											? "View tournament reference ↗"
+											: "View on ATP Tour ↗"}
 									</a>
 								</p>
 							)}

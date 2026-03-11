@@ -50,6 +50,16 @@ export default function AdminTournamentManagePage({
 	const setActiveRoundMutation = api.admin.setActiveRound.useMutation({
 		onSuccess: () => refetch(),
 	});
+	const syncFootballTournamentMutation =
+		api.admin.syncFootballTournament.useMutation({
+			onSuccess: (result) => {
+				refetch();
+				toast.success(`Football sync completed. ${result.updatedMatches} ties updated.`);
+			},
+			onError: (error) => {
+				toast.error(error.message || "Failed to sync football tournament");
+			},
+		});
 
 	const finalizeMatchMutation = api.admin.finalizeMatch.useMutation({
 		onSuccess: () => refetch(),
@@ -247,7 +257,10 @@ export default function AdminTournamentManagePage({
 	const handleSaveProperties = async () => {
 		await updateTournamentMutation.mutateAsync({
 			id: tournamentId,
-			format: editForm.format as "bo3" | "bo5",
+			format:
+				tournament.sport === "tennis"
+					? (editForm.format as "bo3" | "bo5")
+					: undefined,
 			atpUrl: editForm.atpUrl || undefined,
 		});
 		setIsEditingProperties(false);
@@ -586,13 +599,20 @@ export default function AdminTournamentManagePage({
 					{!isEditingProperties ? (
 						<div className="space-y-2 text-gray-700">
 							<p>
-								<span className="font-medium">Format:</span>{" "}
-								{tournament.format === "bo5"
-									? "Best of 5 (Grand Slam)"
-									: "Best of 3"}
+								<span className="font-medium">Sport:</span> {tournament.sport}
 							</p>
 							<p>
-								<span className="font-medium">ATP URL:</span>{" "}
+								<span className="font-medium">Format:</span>{" "}
+								{tournament.sport === "tennis"
+									? tournament.format === "bo5"
+										? "Best of 5 (Grand Slam)"
+										: "Best of 3"
+									: "Football scoring"}
+							</p>
+							<p>
+								<span className="font-medium">
+									{tournament.sport === "tennis" ? "ATP URL" : "Reference URL"}:
+								</span>{" "}
 								{tournament.atpUrl ? (
 									<a
 										className="text-blue-600 underline hover:text-blue-800"
@@ -606,46 +626,74 @@ export default function AdminTournamentManagePage({
 									<span className="text-gray-500">Not set</span>
 								)}
 							</p>
+							{tournament.sport === "football" && (
+								<p>
+									<span className="font-medium">Source:</span> {tournament.source}
+								</p>
+							)}
+							{tournament.sport === "football" &&
+								tournament.externalCompetitionCode && (
+									<p>
+										<span className="font-medium">Competition code:</span>{" "}
+										{tournament.externalCompetitionCode}
+									</p>
+								)}
+							{tournament.sport === "football" && (
+								<button
+									className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+									disabled={syncFootballTournamentMutation.isPending}
+									onClick={() =>
+										syncFootballTournamentMutation.mutate({ tournamentId })
+									}
+									type="button"
+								>
+									{syncFootballTournamentMutation.isPending
+										? "Syncing..."
+										: "Sync From football-data.org"}
+								</button>
+							)}
 						</div>
 					) : (
 						<div className="space-y-4">
-							<div>
-								<label className="mb-2 block font-medium text-gray-700 text-sm">
-									Tournament Format
-								</label>
-								<div className="flex gap-4">
-									<label className="flex cursor-pointer items-center gap-2">
-										<input
-											checked={editForm.format === "bo3"}
-											className="h-4 w-4 text-blue-600"
-											name="format"
-											onChange={() =>
-												setEditForm((prev) => ({ ...prev, format: "bo3" }))
-											}
-											type="radio"
-											value="bo3"
-										/>
-										<span className="text-gray-700">
-											Best of 3 (Regular tournaments)
-										</span>
+							{tournament.sport === "tennis" && (
+								<div>
+									<label className="mb-2 block font-medium text-gray-700 text-sm">
+										Tournament Format
 									</label>
-									<label className="flex cursor-pointer items-center gap-2">
-										<input
-											checked={editForm.format === "bo5"}
-											className="h-4 w-4 text-blue-600"
-											name="format"
-											onChange={() =>
-												setEditForm((prev) => ({ ...prev, format: "bo5" }))
-											}
-											type="radio"
-											value="bo5"
-										/>
-										<span className="text-gray-700">
-											Best of 5 (Grand Slams)
-										</span>
-									</label>
+									<div className="flex gap-4">
+										<label className="flex cursor-pointer items-center gap-2">
+											<input
+												checked={editForm.format === "bo3"}
+												className="h-4 w-4 text-blue-600"
+												name="format"
+												onChange={() =>
+													setEditForm((prev) => ({ ...prev, format: "bo3" }))
+												}
+												type="radio"
+												value="bo3"
+											/>
+											<span className="text-gray-700">
+												Best of 3 (Regular tournaments)
+											</span>
+										</label>
+										<label className="flex cursor-pointer items-center gap-2">
+											<input
+												checked={editForm.format === "bo5"}
+												className="h-4 w-4 text-blue-600"
+												name="format"
+												onChange={() =>
+													setEditForm((prev) => ({ ...prev, format: "bo5" }))
+												}
+												type="radio"
+												value="bo5"
+											/>
+											<span className="text-gray-700">
+												Best of 5 (Grand Slams)
+											</span>
+										</label>
+									</div>
 								</div>
-							</div>
+							)}
 
 							<div>
 								<label
@@ -1107,7 +1155,7 @@ export default function AdminTournamentManagePage({
 													)}
 												</div>
 
-												{match.status === "pending" && (
+												{match.status === "pending" && tournament.sport === "tennis" && (
 													<div className="space-y-3 border-t pt-4">
 														<div>
 															<label className="mb-1 block text-gray-700 text-sm">
@@ -1342,6 +1390,14 @@ export default function AdminTournamentManagePage({
 														>
 															Finalize Result
 														</button>
+													</div>
+												)}
+												{match.status === "pending" && tournament.sport === "football" && (
+													<div className="rounded border-t bg-blue-50 p-4 text-blue-900">
+														Football tournament data is synced from
+														football-data.org. Use the "Sync From
+														football-data.org" button in Tournament Properties to
+														refresh results.
 													</div>
 												)}
 											</div>
