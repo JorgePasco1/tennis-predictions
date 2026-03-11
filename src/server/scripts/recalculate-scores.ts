@@ -11,8 +11,9 @@
  */
 
 import { eq } from "drizzle-orm";
+import { recalculateRoundScores } from "~/server/services/scoring";
 import { db } from "~/server/db";
-import { matches, matchPicks, userRoundPicks } from "~/server/db/schema";
+import { matches, userRoundPicks } from "~/server/db/schema";
 
 async function recalculateAllScores() {
 	console.log("🔄 Starting score recalculation...\n");
@@ -60,29 +61,11 @@ async function recalculateAllScores() {
 			continue;
 		}
 
-		let roundPicksUpdated = 0;
-
-		for (const match of finalizedMatches) {
-			for (const pick of match.matchPicks) {
-				// Recalculate points
-				let newPoints = 0;
-				if (pick.isWinnerCorrect) {
-					newPoints += pointsPerWinner;
-				}
-				if (pick.isExactScore) {
-					newPoints += pointsExactScore;
-				}
-
-				// Only update if points changed
-				if (pick.pointsEarned !== newPoints) {
-					await db
-						.update(matchPicks)
-						.set({ pointsEarned: newPoints })
-						.where(eq(matchPicks.id, pick.id));
-					roundPicksUpdated++;
-				}
-			}
-		}
+		const roundPicksUpdated = finalizedMatches.reduce(
+			(sum, match) => sum + match.matchPicks.length,
+			0,
+		);
+		await recalculateRoundScores(db, round.id);
 
 		totalPicksUpdated += roundPicksUpdated;
 		if (roundPicksUpdated > 0) {

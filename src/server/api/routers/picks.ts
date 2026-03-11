@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { resolvePickScoringSnapshot } from "~/lib/scoring-profiles";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
 	matches,
@@ -37,6 +38,42 @@ function validateNoFinalizedMatches(
 			});
 		}
 	}
+}
+
+function buildPickScoringSnapshot(input: {
+	round: {
+		scoringRule: {
+			pointsPerWinner: number;
+			pointsExactScore: number;
+		} | null;
+		tournament: {
+			scoringProfileKey: string;
+			scoringSettings: {
+				lateTieWinnerPoints?: number;
+			} | null;
+		};
+	};
+	match: {
+		status: string;
+		kind: "standard" | "two_leg_tie" | "single_match";
+		metadata: {
+			legs?: Array<{
+				status: string;
+			}>;
+		} | null;
+	};
+}) {
+	return resolvePickScoringSnapshot({
+		profileKey: input.round.tournament.scoringProfileKey as
+			| "classic_round_points_v1"
+			| "football_aggregate_v1",
+		scoringSettings: input.round.tournament.scoringSettings,
+		matchKind: input.match.kind,
+		matchMetadata: input.match.metadata,
+		isFinalized: input.match.status === "finalized",
+		pointsPerWinner: input.round.scoringRule?.pointsPerWinner ?? 10,
+		pointsExactScore: input.round.scoringRule?.pointsExactScore ?? 5,
+	});
 }
 
 export const picksRouter = createTRPCRouter({
@@ -86,6 +123,7 @@ export const picksRouter = createTRPCRouter({
 					matches: {
 						where: isNull(matches.deletedAt),
 					},
+					scoringRule: true,
 					tournament: {
 						columns: {
 							id: true,
@@ -93,6 +131,8 @@ export const picksRouter = createTRPCRouter({
 							status: true,
 							sport: true,
 							format: true,
+							scoringProfileKey: true,
+							scoringSettings: true,
 						},
 					},
 				},
@@ -262,14 +302,32 @@ export const picksRouter = createTRPCRouter({
 				}
 
 				// Create all match picks
-				const matchPickValues = input.picks.map((pick) => ({
-					userRoundPickId: userRoundPick.id,
-					matchId: pick.matchId,
-					predictedWinner: pick.predictedWinner,
-					predictedSetsWon: pick.predictedSetsWon,
-					predictedSetsLost: pick.predictedSetsLost,
-					pointsEarned: 0,
-				}));
+				const matchPickValues = input.picks.map((pick) => {
+					const match = round.matches.find((entry) => entry.id === pick.matchId);
+					if (!match) {
+						throw new Error(`Match ${pick.matchId} not found in round`);
+					}
+
+					const scoringSnapshot = buildPickScoringSnapshot({
+						round,
+						match,
+					});
+
+					return {
+						userRoundPickId: userRoundPick.id,
+						matchId: pick.matchId,
+						predictedWinner: pick.predictedWinner,
+						predictedSetsWon: pick.predictedSetsWon,
+						predictedSetsLost: pick.predictedSetsLost,
+						scoringVariantKey: scoringSnapshot.scoringVariantKey,
+						snapshotPointsPerWinner:
+							scoringSnapshot.snapshotPointsPerWinner,
+						snapshotPointsExactScore:
+							scoringSnapshot.snapshotPointsExactScore,
+						snapshotContext: scoringSnapshot.snapshotContext,
+						pointsEarned: 0,
+					};
+				});
 
 				await tx.insert(matchPicks).values(matchPickValues);
 
@@ -392,6 +450,7 @@ export const picksRouter = createTRPCRouter({
 					matches: {
 						where: isNull(matches.deletedAt),
 					},
+					scoringRule: true,
 					tournament: {
 						columns: {
 							id: true,
@@ -399,6 +458,8 @@ export const picksRouter = createTRPCRouter({
 							status: true,
 							sport: true,
 							format: true,
+							scoringProfileKey: true,
+							scoringSettings: true,
 						},
 					},
 				},
@@ -566,14 +627,32 @@ export const picksRouter = createTRPCRouter({
 
 				// Create match picks for the draft
 				if (input.picks.length > 0) {
-					const matchPickValues = input.picks.map((pick) => ({
-						userRoundPickId: userRoundPick.id,
-						matchId: pick.matchId,
-						predictedWinner: pick.predictedWinner,
-						predictedSetsWon: pick.predictedSetsWon,
-						predictedSetsLost: pick.predictedSetsLost,
-						pointsEarned: 0,
-					}));
+					const matchPickValues = input.picks.map((pick) => {
+						const match = round.matches.find((entry) => entry.id === pick.matchId);
+						if (!match) {
+							throw new Error(`Match ${pick.matchId} not found in round`);
+						}
+
+						const scoringSnapshot = buildPickScoringSnapshot({
+							round,
+							match,
+						});
+
+						return {
+							userRoundPickId: userRoundPick.id,
+							matchId: pick.matchId,
+							predictedWinner: pick.predictedWinner,
+							predictedSetsWon: pick.predictedSetsWon,
+							predictedSetsLost: pick.predictedSetsLost,
+							scoringVariantKey: scoringSnapshot.scoringVariantKey,
+							snapshotPointsPerWinner:
+								scoringSnapshot.snapshotPointsPerWinner,
+							snapshotPointsExactScore:
+								scoringSnapshot.snapshotPointsExactScore,
+							snapshotContext: scoringSnapshot.snapshotContext,
+							pointsEarned: 0,
+						};
+					});
 
 					await tx.insert(matchPicks).values(matchPickValues);
 				}

@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { getDefaultScoringProfileKey } from "~/lib/scoring-profiles";
 import { adminProcedure, createTRPCRouter } from "~/server/api/trpc";
 import {
 	matches,
@@ -217,6 +218,8 @@ export const adminRouter = createTRPCRouter({
 						year: parsedTournament.year,
 						sport: "football",
 						source: "football_data",
+						scoringProfileKey: getDefaultScoringProfileKey("football"),
+						scoringSettings: {},
 						format: "bo3",
 						externalCompetitionCode: parsedTournament.competitionCode,
 						externalSeason: parsedTournament.season,
@@ -698,6 +701,8 @@ export const adminRouter = createTRPCRouter({
 						year: parsedDraw.year,
 						sport: "tennis",
 						source: "parser",
+						scoringProfileKey: getDefaultScoringProfileKey("tennis"),
+						scoringSettings: {},
 						format,
 						atpUrl,
 						status: "draft",
@@ -1464,6 +1469,14 @@ export const adminRouter = createTRPCRouter({
 				id: z.number().int(),
 				format: z.enum(tournamentFormatEnum.enumValues).optional(),
 				atpUrl: z.string().url().optional().or(z.literal("")),
+				scoringProfileKey: z
+					.enum(["classic_round_points_v1", "football_aggregate_v1"])
+					.optional(),
+				scoringSettings: z
+					.object({
+						lateTieWinnerPoints: z.number().int().min(1).max(100).optional(),
+					})
+					.optional(),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -1478,6 +1491,10 @@ export const adminRouter = createTRPCRouter({
 			const updateData: {
 				format?: "bo3" | "bo5";
 				atpUrl?: string | null;
+				scoringProfileKey?: "classic_round_points_v1" | "football_aggregate_v1";
+				scoringSettings?: {
+					lateTieWinnerPoints?: number;
+				};
 			} = {};
 
 			if (input.format && tournament.sport === "tennis") {
@@ -1486,6 +1503,14 @@ export const adminRouter = createTRPCRouter({
 
 			if (input.atpUrl !== undefined) {
 				updateData.atpUrl = input.atpUrl || null;
+			}
+
+			if (input.scoringProfileKey) {
+				updateData.scoringProfileKey = input.scoringProfileKey;
+			}
+
+			if (input.scoringSettings) {
+				updateData.scoringSettings = input.scoringSettings;
 			}
 
 			const [updatedTournament] = await ctx.db
