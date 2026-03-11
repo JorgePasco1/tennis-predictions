@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "~/server/db/schema";
+import { resolvePickScoringSnapshot } from "~/lib/scoring-profiles";
 import {
 	matches,
 	matchPicks,
@@ -23,6 +24,7 @@ export async function calculateMatchPickScores(
 			round: {
 				with: {
 					scoringRule: true,
+					tournament: true,
 				},
 			},
 		},
@@ -68,30 +70,54 @@ export async function calculateMatchPickScores(
 		return;
 	}
 
-	// Get scoring rule (default if not found)
-	const pointsPerWinner = match.round.scoringRule?.pointsPerWinner ?? 10;
-	const pointsExactScore = match.round.scoringRule?.pointsExactScore ?? 5;
-
 	// Calculate and update each pick
 	for (const pick of picks) {
+		const snapshot =
+			pick.snapshotPointsPerWinner != null &&
+			pick.snapshotPointsExactScore != null &&
+			pick.scoringVariantKey
+				? {
+						scoringVariantKey: pick.scoringVariantKey,
+						snapshotPointsPerWinner: pick.snapshotPointsPerWinner,
+						snapshotPointsExactScore: pick.snapshotPointsExactScore,
+						snapshotContext: pick.snapshotContext ?? {
+							matchKind: match.kind,
+						},
+					}
+				: resolvePickScoringSnapshot({
+						profileKey: match.round.tournament.scoringProfileKey as
+							| "classic_round_points_v1"
+							| "football_aggregate_v1",
+						scoringSettings: match.round.tournament.scoringSettings,
+						matchKind: match.kind,
+						matchMetadata: match.metadata,
+						isFinalized: match.status === "finalized",
+						pointsPerWinner: match.round.scoringRule?.pointsPerWinner ?? 10,
+						pointsExactScore: match.round.scoringRule?.pointsExactScore ?? 5,
+					});
 		const isWinnerCorrect = pick.predictedWinner === match.winnerName;
 		const isExactScore =
 			isWinnerCorrect &&
+			snapshot.snapshotPointsExactScore > 0 &&
 			pick.predictedSetsWon === match.setsWon &&
 			pick.predictedSetsLost === match.setsLost;
 
 		let pointsEarned = 0;
 		if (isWinnerCorrect) {
-			pointsEarned += pointsPerWinner;
+			pointsEarned += snapshot.snapshotPointsPerWinner;
 		}
 		if (isExactScore) {
-			pointsEarned += pointsExactScore;
+			pointsEarned += snapshot.snapshotPointsExactScore;
 		}
 
 		// Update the match pick
 		await db
 			.update(matchPicks)
 			.set({
+				scoringVariantKey: snapshot.scoringVariantKey,
+				snapshotPointsPerWinner: snapshot.snapshotPointsPerWinner,
+				snapshotPointsExactScore: snapshot.snapshotPointsExactScore,
+				snapshotContext: snapshot.snapshotContext,
 				isWinnerCorrect,
 				isExactScore,
 				pointsEarned,

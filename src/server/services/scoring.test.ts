@@ -28,11 +28,20 @@ type MockDb = {
 		matchPicks: {
 			findMany: ReturnType<typeof vi.fn>;
 		};
+		userRoundPicks: {
+			findMany: ReturnType<typeof vi.fn>;
+		};
 	};
 	update: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+	transaction: ReturnType<typeof vi.fn>;
 };
 
 function createMockDb(): MockDb {
+	const insertMock = vi.fn().mockReturnValue({
+		values: vi.fn().mockResolvedValue([]),
+	});
+
 	return {
 		query: {
 			matches: {
@@ -41,10 +50,36 @@ function createMockDb(): MockDb {
 			matchPicks: {
 				findMany: vi.fn(),
 			},
+			userRoundPicks: {
+				findMany: vi.fn().mockResolvedValue([]),
+			},
 		},
 		update: vi.fn(),
+		insert: insertMock,
+		transaction: vi
+			.fn()
+			.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+				callback({
+					query: {
+						userStreaks: {
+							findFirst: vi.fn().mockResolvedValue(null),
+						},
+					},
+					update: vi.fn().mockReturnValue({
+						set: vi.fn().mockReturnValue({
+							where: vi.fn().mockResolvedValue([]),
+						}),
+					}),
+					insert: insertMock,
+				}),
+			),
 	};
 }
+
+const defaultTournamentScoring = {
+	scoringProfileKey: "classic_round_points_v1" as const,
+	scoringSettings: {},
+};
 
 describe("scoring service", () => {
 	describe("calculateMatchPickScores", () => {
@@ -121,6 +156,7 @@ describe("scoring service", () => {
 				round: {
 					...mockRounds.ao_r128,
 					scoringRule: mockScoringRules.ao_r128,
+					tournament: defaultTournamentScoring,
 				},
 			};
 
@@ -159,7 +195,10 @@ describe("scoring service", () => {
 			// Get the set() call and verify the values
 			const setCalls = updateMock.mock.results[0]?.value.set.mock.calls;
 			expect(setCalls).toBeDefined();
-			expect(setCalls[0][0]).toEqual({
+			expect(setCalls[0][0]).toMatchObject({
+				scoringVariantKey: "normal",
+				snapshotPointsPerWinner: 2,
+				snapshotPointsExactScore: 3,
 				isWinnerCorrect: true,
 				isExactScore: false,
 				pointsEarned: 2, // Only winner points (from mockScoringRules.ao_r128)
@@ -172,6 +211,7 @@ describe("scoring service", () => {
 				round: {
 					...mockRounds.ao_r128,
 					scoringRule: mockScoringRules.ao_r128,
+					tournament: defaultTournamentScoring,
 				},
 			};
 
@@ -205,7 +245,10 @@ describe("scoring service", () => {
 			);
 
 			const setCalls = updateMock.mock.results[0]?.value.set.mock.calls;
-			expect(setCalls[0][0]).toEqual({
+			expect(setCalls[0][0]).toMatchObject({
+				scoringVariantKey: "normal",
+				snapshotPointsPerWinner: 2,
+				snapshotPointsExactScore: 3,
 				isWinnerCorrect: true,
 				isExactScore: true,
 				pointsEarned: 5, // Winner (2) + Exact (3)
@@ -218,6 +261,7 @@ describe("scoring service", () => {
 				round: {
 					...mockRounds.ao_r128,
 					scoringRule: mockScoringRules.ao_r128,
+					tournament: defaultTournamentScoring,
 				},
 			};
 
@@ -251,7 +295,10 @@ describe("scoring service", () => {
 			);
 
 			const setCalls = updateMock.mock.results[0]?.value.set.mock.calls;
-			expect(setCalls[0][0]).toEqual({
+			expect(setCalls[0][0]).toMatchObject({
+				scoringVariantKey: "normal",
+				snapshotPointsPerWinner: 2,
+				snapshotPointsExactScore: 3,
 				isWinnerCorrect: false,
 				isExactScore: false,
 				pointsEarned: 0,
@@ -264,6 +311,7 @@ describe("scoring service", () => {
 				round: {
 					...mockRounds.ao_r128,
 					scoringRule: null, // No scoring rule
+					tournament: defaultTournamentScoring,
 				},
 			};
 
@@ -297,7 +345,10 @@ describe("scoring service", () => {
 
 			const setCalls = updateMock.mock.results[0]?.value.set.mock.calls;
 			// Default: 10 for winner, 5 for exact score = 15 total
-			expect(setCalls[0][0]).toEqual({
+			expect(setCalls[0][0]).toMatchObject({
+				scoringVariantKey: "normal",
+				snapshotPointsPerWinner: 10,
+				snapshotPointsExactScore: 5,
 				isWinnerCorrect: true,
 				isExactScore: true,
 				pointsEarned: 15,
@@ -310,6 +361,7 @@ describe("scoring service", () => {
 				round: {
 					...mockRounds.ao_r128,
 					scoringRule: mockScoringRules.ao_r128,
+					tournament: defaultTournamentScoring,
 				},
 			};
 
@@ -374,6 +426,7 @@ describe("scoring service", () => {
 				round: {
 					...mockRounds.ao_final,
 					scoringRule: mockScoringRules.ao_final,
+					tournament: defaultTournamentScoring,
 				},
 			};
 
@@ -404,10 +457,84 @@ describe("scoring service", () => {
 
 			const setCalls = updateMock.mock.results[0]?.value.set.mock.calls;
 			// Final: 30 for winner, 45 for exact score = 75 total
-			expect(setCalls[0][0]).toEqual({
+			expect(setCalls[0][0]).toMatchObject({
+				scoringVariantKey: "normal",
+				snapshotPointsPerWinner: 30,
+				snapshotPointsExactScore: 45,
 				isWinnerCorrect: true,
 				isExactScore: true,
 				pointsEarned: 75,
+			});
+		});
+
+		it("should honor late football tie snapshots with no exact-score bonus", async () => {
+			const footballTieWithRound = {
+				id: 2001,
+				roundId: 200,
+				matchNumber: 1,
+				player1Name: "Arsenal",
+				player2Name: "Barcelona",
+				winnerName: "Arsenal",
+				finalScore: "3-2 agg",
+				setsWon: 3,
+				setsLost: 2,
+				status: "finalized" as const,
+				finalizedAt: new Date(),
+				finalizedBy: mockUsers.admin.id,
+				kind: "two_leg_tie" as const,
+				metadata: {
+					legs: [{ status: "FINISHED" }, { status: "FINISHED" }],
+				},
+				round: {
+					...mockRounds.ao_r128,
+					scoringRule: mockScoringRules.ao_r128,
+					tournament: {
+						scoringProfileKey: "football_aggregate_v1" as const,
+						scoringSettings: { lateTieWinnerPoints: 1 },
+					},
+				},
+			};
+
+			mockDb.query.matches.findFirst.mockResolvedValue(footballTieWithRound);
+			mockDb.query.matchPicks.findMany.mockResolvedValue([
+				{
+					id: 1,
+					matchId: 2001,
+					userRoundPickId: 1,
+					predictedWinner: "Arsenal",
+					predictedSetsWon: 3,
+					predictedSetsLost: 2,
+					scoringVariantKey: "late_after_leg1",
+					snapshotPointsPerWinner: 1,
+					snapshotPointsExactScore: 0,
+					snapshotContext: {
+						completedLegs: 1,
+						totalLegs: 2,
+						matchKind: "two_leg_tie",
+					},
+					isWinnerCorrect: null,
+					isExactScore: null,
+					pointsEarned: 0,
+				},
+			]);
+
+			const updateMock = vi.fn().mockReturnValue({
+				set: vi.fn().mockReturnValue({
+					where: vi.fn().mockResolvedValue([]),
+				}),
+			});
+			mockDb.update = updateMock;
+
+			await calculateMatchPickScores(mockDb as never, 2001);
+
+			const setCalls = updateMock.mock.results[0]?.value.set.mock.calls;
+			expect(setCalls[0][0]).toMatchObject({
+				scoringVariantKey: "late_after_leg1",
+				snapshotPointsPerWinner: 1,
+				snapshotPointsExactScore: 0,
+				isWinnerCorrect: true,
+				isExactScore: false,
+				pointsEarned: 1,
 			});
 		});
 	});
